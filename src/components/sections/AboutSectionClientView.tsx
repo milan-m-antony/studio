@@ -66,17 +66,17 @@ export default function AboutSectionClientView({ content }: AboutSectionClientVi
   }, []);
   
   // Ensure content properties are not null before passing to Typewriter or rendering
-  const headlineMain = content.headline_main ?? "Milan: Weaving ";
-  const headlineCodeKeyword = content.headline_code_keyword ?? "Code";
-  const headlineConnector = content.headline_connector ?? " with ";
-  const headlineCreativityKeyword = content.headline_creativity_keyword ?? "Creativity";
+  const headlineMain = content.headline_main ?? "";
+  const headlineCodeKeyword = content.headline_code_keyword ?? "";
+  const headlineConnector = content.headline_connector ?? "";
+  const headlineCreativityKeyword = content.headline_creativity_keyword ?? "";
   
-  const paragraph1 = content.paragraph1 ?? "Default paragraph 1 text if not loaded.";
-  const paragraph2 = content.paragraph2 ?? "Default paragraph 2 text if not loaded.";
-  const paragraph3 = content.paragraph3 ?? "Default paragraph 3 text if not loaded.";
+  const paragraph1 = content.paragraph1 ?? "As a creative developer, I bridge the gap between design and functionality. I'm passionate about crafting user-centric web experiences that are not only visually appealing but also performant and accessible.";
+  const paragraph2 = content.paragraph2 ?? "My toolkit includes modern JavaScript frameworks like React and Next.js, coupled with a strong understanding of backend technologies and cloud platforms. I enjoy tackling complex problems and continuously learning new skills to stay at the forefront of web development.";
+  const paragraph3 = content.paragraph3 ?? "Whether it's building a sleek user interface, optimizing an application for speed, or architecting a scalable backend, I bring enthusiasm and a meticulous approach to every project.";
   
   const imageUrl = content.imageUrl ?? "https://placehold.co/600x800.png"; // Default placeholder
-  const imageTagline = content.image_tagline ?? "Fuelled by coffee & code.";
+  const imageTagline = content.image_tagline ?? null; // Changed fallback to null
 
   const parallaxStyleContainer = (factor: number) => ({
     transform: `translateY(${offsetY * factor}px)`,
@@ -130,14 +130,16 @@ export default function AboutSectionClientView({ content }: AboutSectionClientVi
             alt="Milan working on a project"
             layout="fill"
             objectFit="cover"
-            className="transition-transform duration-500 group-hover:scale-105" // Removed dark mode invert classes
+            className="transition-transform duration-500 group-hover:scale-105"
             data-ai-hint="developer working"
             priority
           />
           <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent"></div>
-           <div className="absolute bottom-4 left-4 text-white bg-black/40 p-3 rounded-md shadow-md">
-            <p className="text-sm font-medium">{imageTagline}</p>
-          </div>
+           {imageTagline && (
+            <div className="absolute bottom-4 left-4 text-white bg-black/40 p-3 rounded-md shadow-md">
+              <p className="text-sm font-medium">{imageTagline}</p>
+            </div>
+           )}
         </div>
       </div>
     </div>
