@@ -3,9 +3,8 @@
 
 import React, { useEffect, useState, type FormEvent, type ChangeEvent } from 'react';
 import { useRouter } from 'next/navigation';
-// Removed SectionWrapper import as it's not used for the login form part anymore
 import SectionTitle from '@/components/ui/SectionTitle';
-import { Button } from '@/components/ui/button'; // Removed buttonVariants as it wasn't used
+import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
@@ -15,7 +14,8 @@ import Link from 'next/link';
 import ProjectsManager from '@/components/admin/ProjectsManager';
 import SkillsManager from '@/components/admin/SkillsManager';
 import AboutManager from '@/components/admin/AboutManager';
-import SectionWrapper from '@/components/ui/SectionWrapper'; // Still needed for authenticated view
+import TimelineManager from '@/components/admin/TimelineManager'; // Import the new component
+import SectionWrapper from '@/components/ui/SectionWrapper';
 
 export default function AdminDashboardPage() {
   const router = useRouter();
@@ -80,19 +80,16 @@ export default function AdminDashboardPage() {
 
 
   if (!isMounted) {
-    return ( // Keep using SectionWrapper for loading state for consistency if desired
-      <SectionWrapper>
-        <div className="flex justify-center items-center min-h-screen">
-          <p className="text-muted-foreground">Loading dashboard...</p>
-        </div>
-      </SectionWrapper>
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-background p-4">
+        <p className="text-muted-foreground">Loading dashboard...</p>
+      </div>
     );
   }
 
   if (!isAuthenticatedForRender) {
     return (
-      // Use a dedicated div for full-screen centering of the login card
-      <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-background to-muted/50 p-4">
+      <div className="flex items-center justify-center min-h-screen bg-black p-4">
         <Card className="w-full max-w-md shadow-2xl"> 
           <CardHeader className="text-center">
             <div className="mx-auto mb-4 p-3 bg-primary rounded-full inline-block">
@@ -117,7 +114,7 @@ export default function AdminDashboardPage() {
           </CardContent>
            <CardFooter className="mt-6 flex flex-col items-center space-y-2">
              <Link href="/" className="inline-flex items-center justify-center text-sm font-medium text-muted-foreground hover:text-primary transition-colors p-0 h-auto">
-                <Home className="mr-2 h-4 w-4 inline-block" />Back to Portfolio
+                <span><Home className="mr-2 h-4 w-4 inline-block" />Back to Portfolio</span>
              </Link>
           </CardFooter>
         </Card>
@@ -125,7 +122,6 @@ export default function AdminDashboardPage() {
     );
   }
 
-  // Authenticated View (uses SectionWrapper for consistent page content layout)
   return (
     <SectionWrapper>
       <SectionTitle subtitle="Manage portfolio content.">Admin Dashboard</SectionTitle>
@@ -144,6 +140,7 @@ export default function AdminDashboardPage() {
         <ProjectsManager />
         <SkillsManager />
         <AboutManager />
+        <TimelineManager /> {/* Add the new TimelineManager component */}
       </div>
     </SectionWrapper>
   );

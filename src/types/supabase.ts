@@ -1,10 +1,6 @@
 
 // Based on your Supabase table structure
 // This file helps provide TypeScript types for your Supabase data.
-// You can generate these types automatically using the Supabase CLI:
-// npx supabase gen types typescript --project-id YOUR_PROJECT_ID --schema public > src/types/supabase.ts
-
-// For now, let's define some basic types based on the SQL provided earlier.
 
 export type Json =
   | string
@@ -23,6 +19,7 @@ export interface Database {
           title: string
           description: string | null
           image_url: string | null
+          // image_hint: string | null // Removed
           live_demo_url: string | null
           repo_url: string | null
           tags: string[] | null
@@ -153,7 +150,7 @@ export interface Database {
           date: string
           title: string
           description: string
-          icon_name: string
+          icon_name: string // For Lucide icon name
           type: string
           sort_order: number | null
           created_at: string
@@ -180,9 +177,9 @@ export interface Database {
         }
         Relationships: []
       }
-      about_content: { // New table for About Me section
+      about_content: {
         Row: {
-          id: string // Should be a fixed UUID for the single entry
+          id: string
           headline_main: string | null
           headline_code_keyword: string | null
           headline_connector: string | null
@@ -195,7 +192,7 @@ export interface Database {
           updated_at: string
         }
         Insert: {
-          id: string // Must be provided for upsert, or use a default if table allows
+          id: string
           headline_main?: string | null
           headline_code_keyword?: string | null
           headline_connector?: string | null
@@ -244,9 +241,9 @@ export interface Project {
   id: string;
   title: string;
   description: string | null;
-  imageUrl: string | null;
-  liveDemoUrl?: string | null;
-  repoUrl?: string | null;
+  imageUrl: string | null; // Mapped from image_url
+  liveDemoUrl?: string | null; // Mapped from live_demo_url
+  repoUrl?: string | null;   // Mapped from repo_url
   tags: string[] | null;
   status: ProjectStatus | null;
   progress?: number | null;
@@ -256,18 +253,20 @@ export interface Project {
 export interface Skill {
   id: string;
   name: string;
-  iconImageUrl: string | null;
+  iconImageUrl: string | null; // Mapped from icon_image_url
   description: string | null;
-  categoryId?: string | null;
+  categoryId?: string | null; // Mapped from category_id
+  created_at?: string; // Usually available
 }
 
 export interface SkillCategory {
   id: string;
   name: string;
-  iconImageUrl?: string | null;
+  iconImageUrl?: string | null; // Mapped from icon_image_url
   skills?: Skill[];
-  skillCount?: number;
+  skillCount?: number; // Derived client-side
   sort_order?: number | null;
+  created_at?: string; // Usually available
 }
 
 export type TimelineEventType = 'work' | 'education' | 'certification' | 'milestone';
@@ -277,9 +276,10 @@ export interface TimelineEvent {
   date: string;
   title: string;
   description: string;
-  iconName: string;
+  iconName: string; // Mapped from icon_name
   type: TimelineEventType;
   sort_order?: number | null;
+  created_at?: string; // Usually available
 }
 
 export interface Certification {
@@ -287,15 +287,14 @@ export interface Certification {
   title: string;
   issuer: string;
   date: string;
-  imageUrl: string | null;
+  imageUrl: string | null; // Mapped from image_url
   imageHint: string | null;
-  verifyUrl?: string | null;
+  verifyUrl?: string | null; // Mapped from verify_url
   created_at: string;
 }
 
-// New type for About Content
 export interface AboutContent {
-  id: string; // This will be a fixed UUID
+  id: string;
   headline_main: string | null;
   headline_code_keyword: string | null;
   headline_connector: string | null;
@@ -303,7 +302,7 @@ export interface AboutContent {
   paragraph1: string | null;
   paragraph2: string | null;
   paragraph3: string | null;
-  imageUrl: string | null; // Corresponds to image_url in DB
+  imageUrl: string | null; // Mapped from image_url
   image_tagline: string | null;
   updated_at?: string;
 }
