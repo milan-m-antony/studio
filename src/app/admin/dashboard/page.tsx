@@ -11,7 +11,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { ShieldCheck, LogOut, AlertTriangle, LogIn, PlusCircle, Edit, Trash2, Home, UploadCloud, Package as DefaultCategoryIcon, Cpu as DefaultSkillIcon, UserCircle as AboutMeIcon, Image as ImageIcon } from 'lucide-react';
+import { ShieldCheck, LogOut, AlertTriangle, LogIn, PlusCircle, Edit, Trash2, Home, UploadCloud, Package as DefaultCategoryIcon, Cpu as DefaultSkillIcon, UserCircle as AboutMeIcon, Image as ImageIcon, ChevronDown } from 'lucide-react';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabaseClient';
 import type { Project, ProjectStatus, SkillCategory, Skill as SkillType, AboutContent } from '@/types/supabase';
@@ -29,8 +29,9 @@ import {
   Accordion,
   AccordionContent,
   AccordionItem,
-  AccordionTrigger,
+  // AccordionTrigger, // We will use AccordionPrimitive.Trigger for custom layout
 } from "@/components/ui/accordion";
+import * as AccordionPrimitive from "@radix-ui/react-accordion"; // Import primitives
 import {
   AlertDialog,
   AlertDialogAction,
@@ -124,46 +125,46 @@ interface MappedSkillCategory {
 
 export default function AdminDashboardPage() {
   const router = useRouter();
-  const [isMounted, setIsMounted] = useState(false);
-  const [isAuthenticatedForRender, setIsAuthenticatedForRender] = useState(false);
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
+  const [isMounted, setIsMounted] = React.useState(false);
+  const [isAuthenticatedForRender, setIsAuthenticatedForRender] = React.useState(false);
+  const [username, setUsername] = React.useState('');
+  const [password, setPassword] = React.useState('');
+  const [error, setError] = React.useState('');
   const { toast } = useToast();
 
   // Projects State
-  const [projects, setProjects] = useState<MappedProject[]>([]);
-  const [isLoadingProjects, setIsLoadingProjects] = useState(false);
-  const [isProjectModalOpen, setIsProjectModalOpen] = useState(false);
-  const [currentProject, setCurrentProject] = useState<(MappedProject & {tags: string}) | null>(null);
-  const [showProjectDeleteConfirm, setShowProjectDeleteConfirm] = useState(false);
-  const [projectToDelete, setProjectToDelete] = useState<MappedProject | null>(null);
-  const [projectImageFile, setProjectImageFile] = useState<File | null>(null);
-  const [projectImagePreview, setProjectImagePreview] = useState<string | null>(null);
+  const [projects, setProjects] = React.useState<MappedProject[]>([]);
+  const [isLoadingProjects, setIsLoadingProjects] = React.useState(false);
+  const [isProjectModalOpen, setIsProjectModalOpen] = React.useState(false);
+  const [currentProject, setCurrentProject] = React.useState<(MappedProject & {tagsInput: string}) | null>(null);
+  const [showProjectDeleteConfirm, setShowProjectDeleteConfirm] = React.useState(false);
+  const [projectToDelete, setProjectToDelete] = React.useState<MappedProject | null>(null);
+  const [projectImageFile, setProjectImageFile] = React.useState<File | null>(null);
+  const [projectImagePreview, setProjectImagePreview] = React.useState<string | null>(null);
 
   // Skill Categories State
-  const [skillCategories, setSkillCategories] = useState<MappedSkillCategory[]>([]);
-  const [isLoadingSkills, setIsLoadingSkills] = useState(false);
-  const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
-  const [currentCategory, setCurrentCategory] = useState<(MappedSkillCategory & { icon_image_url?: string }) | null>(null);
-  const [showCategoryDeleteConfirm, setShowCategoryDeleteConfirm] = useState(false);
-  const [categoryToDelete, setCategoryToDelete] = useState<MappedSkillCategory | null>(null);
-  const [categoryIconFile, setCategoryIconFile] = useState<File | null>(null);
-  const [categoryIconPreview, setCategoryIconPreview] = useState<string | null>(null);
+  const [skillCategories, setSkillCategories] = React.useState<MappedSkillCategory[]>([]);
+  const [isLoadingSkills, setIsLoadingSkills] = React.useState(false);
+  const [isCategoryModalOpen, setIsCategoryModalOpen] = React.useState(false);
+  const [currentCategory, setCurrentCategory] = React.useState<MappedSkillCategory | null>(null);
+  const [showCategoryDeleteConfirm, setShowCategoryDeleteConfirm] = React.useState(false);
+  const [categoryToDelete, setCategoryToDelete] = React.useState<MappedSkillCategory | null>(null);
+  const [categoryIconFile, setCategoryIconFile] = React.useState<File | null>(null);
+  const [categoryIconPreview, setCategoryIconPreview] = React.useState<string | null>(null);
 
   // Skills State
-  const [isSkillModalOpen, setIsSkillModalOpen] = useState(false);
-  const [currentSkill, setCurrentSkill] = useState<(SkillType & { icon_image_url?: string }) | null>(null);
-  const [parentCategoryIdForNewSkill, setParentCategoryIdForNewSkill] = useState<string | null>(null);
-  const [showSkillDeleteConfirm, setShowSkillDeleteConfirm] = useState(false);
-  const [skillToDelete, setSkillToDelete] = useState<SkillType | null>(null);
-  const [skillIconFile, setSkillIconFile] = useState<File | null>(null);
-  const [skillIconPreview, setSkillIconPreview] = useState<string | null>(null);
+  const [isSkillModalOpen, setIsSkillModalOpen] = React.useState(false);
+  const [currentSkill, setCurrentSkill] = React.useState<SkillType | null>(null);
+  const [parentCategoryIdForNewSkill, setParentCategoryIdForNewSkill] = React.useState<string | null>(null);
+  const [showSkillDeleteConfirm, setShowSkillDeleteConfirm] = React.useState(false);
+  const [skillToDelete, setSkillToDelete] = React.useState<SkillType | null>(null);
+  const [skillIconFile, setSkillIconFile] = React.useState<File | null>(null);
+  const [skillIconPreview, setSkillIconPreview] = React.useState<string | null>(null);
 
   // About Content State
-  const [isLoadingAbout, setIsLoadingAbout] = useState(false);
-  const [aboutImageFile, setAboutImageFile] = useState<File | null>(null);
-  const [aboutImagePreview, setAboutImagePreview] = useState<string | null>(null);
+  const [isLoadingAbout, setIsLoadingAbout] = React.useState(false);
+  const [aboutImageFile, setAboutImageFile] = React.useState<File | null>(null);
+  const [aboutImagePreview, setAboutImagePreview] = React.useState<string | null>(null);
 
   // Forms
   const projectForm = useForm<ProjectFormData>({
@@ -220,7 +221,7 @@ export default function AdminDashboardPage() {
       projectForm.reset({
         id: currentProject.id, title: currentProject.title, description: currentProject.description || '',
         image_url: currentProject.imageUrl || '', live_demo_url: currentProject.liveDemoUrl || '', repo_url: currentProject.repoUrl || '',
-        tags: currentProject.tags, // tags is already a string here
+        tags: currentProject.tagsInput,
         status: currentProject.status || 'Concept',
         progress: currentProject.progress === null || currentProject.progress === undefined ? null : Number(currentProject.progress),
       });
@@ -265,10 +266,10 @@ export default function AdminDashboardPage() {
         id: p.id,
         title: p.title,
         description: p.description,
-        imageUrl: p.image_url,
-        liveDemoUrl: p.live_demo_url,
-        repoUrl: p.repo_url,
-        tags: p.tags,
+        imageUrl: p.image_url, // map snake_case to camelCase
+        liveDemoUrl: p.live_demo_url, // map
+        repoUrl: p.repo_url, // map
+        tags: p.tags, // already an array or null
         status: p.status as ProjectStatus | null,
         progress: p.progress,
         created_at: p.created_at,
@@ -569,7 +570,7 @@ export default function AdminDashboardPage() {
     if (aboutImageFile) {
       const fileExt = aboutImageFile.name.split('.').pop();
       const fileName = `about_me_image.${Date.now()}.${fileExt}`;
-      const filePath = `${fileName}`; // Store at root of 'about-images' bucket
+      const filePath = `${fileName}`; 
       toast({ title: "Uploading About Me Image", description: "Please wait...", variant: "default" });
       const { data: uploadData, error: uploadError } = await supabase.storage
         .from('about-images')
@@ -612,12 +613,12 @@ export default function AdminDashboardPage() {
   // Delete handlers
   const handleDeleteProject = async () => {
     if (!projectToDelete) return;
-    console.log("[AdminDashboard] Attempting to delete project ID:", projectToDelete.id);
+    console.log("[AdminDashboard] Deleting project ID:", projectToDelete.id);
     
     if (projectToDelete.imageUrl) {
         const imagePath = projectToDelete.imageUrl.substring(projectToDelete.imageUrl.indexOf('/project-images/') + '/project-images/'.length);
         if (imagePath && !imagePath.startsWith('http')) {
-            console.log("[AdminDashboard] Attempting to delete image from storage:", imagePath);
+            console.log("[AdminDashboard] Deleting image from storage:", imagePath);
             const { error: storageError } = await supabase.storage.from('project-images').remove([imagePath]);
             if (storageError) {
                 console.warn("[AdminDashboard] Error deleting project image from storage, proceeding with DB delete:", JSON.stringify(storageError, null, 2));
@@ -625,17 +626,15 @@ export default function AdminDashboardPage() {
         }
     }
     
-    console.log("[AdminDashboard] Proceeding with Supabase DB delete call for project...");
     const { error: deleteError } = await supabase
       .from('projects')
       .delete()
       .eq('id', projectToDelete.id);
 
     if (deleteError) {
-      console.error("[AdminDashboard] Error deleting project from DB (raw Supabase error object):", JSON.stringify(deleteError, null, 2));
+      console.error("[AdminDashboard] Error deleting project from DB:", JSON.stringify(deleteError, null, 2));
       toast({ title: "Error", description: `Failed to delete project: ${deleteError.message || 'An unexpected error occurred.'}`, variant: "destructive" });
     } else {
-      console.log("[AdminDashboard] Project deleted successfully from DB.");
       toast({ title: "Success", description: "Project deleted successfully." });
       fetchProjects();
       router.refresh();
@@ -685,10 +684,10 @@ export default function AdminDashboardPage() {
 
   // Modal triggers / openers
   const triggerDeleteConfirmation = (project: MappedProject) => { setProjectToDelete(project); setShowProjectDeleteConfirm(true);};
-  const handleOpenProjectModal = (project?: MappedProject) => { setCurrentProject(project ? {...project, tags: (project.tags || []).join(', ')} : null); setIsProjectModalOpen(true); };
-  const handleOpenCategoryModal = (category?: MappedSkillCategory) => { setCurrentCategory(category ? { ...category, icon_image_url: category.iconImageUrl || '' } : null); setIsCategoryModalOpen(true); };
+  const handleOpenProjectModal = (project?: MappedProject) => { setCurrentProject(project ? {...project, tagsInput: (project.tags || []).join(', ')} : null); setIsProjectModalOpen(true); };
+  const handleOpenCategoryModal = (category?: MappedSkillCategory) => { setCurrentCategory(category || null); setIsCategoryModalOpen(true); };
   const triggerCategoryDeleteConfirmation = (category: MappedSkillCategory) => { setCategoryToDelete(category); setShowCategoryDeleteConfirm(true); };
-  const handleOpenSkillModal = (category_id: string, skill?: SkillType) => { setParentCategoryIdForNewSkill(category_id); setCurrentSkill(skill ? { ...skill, icon_image_url: skill.iconImageUrl || '', category_id: skill.categoryId || category_id } : null); skillForm.setValue('category_id', category_id); setIsSkillModalOpen(true); };
+  const handleOpenSkillModal = (category_id: string, skill?: SkillType) => { setParentCategoryIdForNewSkill(category_id); setCurrentSkill(skill ? { ...skill, categoryId: skill.categoryId || category_id } : null); skillForm.setValue('category_id', category_id); setIsSkillModalOpen(true); };
   const triggerSkillDeleteConfirmation = (skill: SkillType) => { setSkillToDelete(skill); setShowSkillDeleteConfirm(true); };
 
 
@@ -720,9 +719,13 @@ export default function AdminDashboardPage() {
             </form>
           </CardContent>
            <CardFooter className="mt-6 flex flex-col items-center space-y-2">
-             <Link href="/" className={cn(buttonVariants({ variant: "link" }), "text-muted-foreground hover:text-primary flex items-center")}>
-                 <Home className="mr-2 h-4 w-4" />Back to Portfolio
-            </Link>
+             <Button variant="link" asChild className="text-muted-foreground hover:text-primary">
+                <Link href="/">
+                    <span>
+                        <Home className="mr-2 h-4 w-4" />Back to Portfolio
+                    </span>
+                </Link>
+             </Button>
           </CardFooter>
         </Card>
       </SectionWrapper>
@@ -784,9 +787,9 @@ export default function AdminDashboardPage() {
                   </div>
                   <div className="flex space-x-2 self-start sm:self-center shrink-0">
                     <Button variant="outline" size="sm" onClick={() => handleOpenProjectModal(project)}><Edit className="mr-1.5 h-3.5 w-3.5" /> Edit</Button>
-                     <Button variant="destructive" size="sm" onClick={() => triggerDeleteConfirmation(project)}>
+                    <Button variant="destructive" size="sm" onClick={() => triggerDeleteConfirmation(project)}>
                         <Trash2 className="mr-1.5 h-3.5 w-3.5" /> Delete
-                     </Button>
+                    </Button>
                   </div>
                 </Card>
             ))}</div>
@@ -840,29 +843,40 @@ export default function AdminDashboardPage() {
             <Accordion type="single" collapsible className="w-full">
               {skillCategories.map((category) => (
                 <AccordionItem value={category.id} key={category.id}>
-                  <AccordionTrigger className="hover:no-underline">
-                    <div className="flex items-center gap-3 flex-grow">
-                      {category.iconImageUrl ? <Image src={category.iconImageUrl} alt={category.name} width={20} height={20} className="rounded-sm" /> : <DefaultCategoryIcon className="h-5 w-5 text-primary"/>}
-                      <span className="font-medium text-lg">{category.name}</span>
-                      <Badge variant="outline">{category.skills?.length || 0} skills</Badge>
+                  <AccordionPrimitive.Header className="flex items-center justify-between py-2 px-4 group border-b hover:bg-muted/50 transition-colors">
+                    <AccordionPrimitive.Trigger asChild className="flex-grow cursor-pointer py-2">
+                       <div className="flex items-center gap-3">
+                        {category.iconImageUrl ? (
+                            <div className="relative h-6 w-6 rounded-sm overflow-hidden border dark:bg-secondary">
+                                <Image src={category.iconImageUrl} alt={category.name} layout="fill" objectFit="contain" />
+                            </div>
+                        ) : <DefaultCategoryIcon className="h-5 w-5 text-primary"/>}
+                        <span className="font-medium text-lg">{category.name}</span>
+                        <Badge variant="outline">{category.skills?.length || 0} skills</Badge>
+                        <ChevronDown className="h-4 w-4 shrink-0 transition-transform duration-200 group-data-[state=open]:rotate-180 ml-auto text-muted-foreground group-hover:text-foreground" />
+                       </div>
+                    </AccordionPrimitive.Trigger>
+                    <div className="flex space-x-1.5 shrink-0 ml-3 pl-3 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity duration-200">
+                      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); handleOpenCategoryModal(category);}}><Edit className="h-4 w-4" /></Button>
+                      <Button variant="ghost" size="icon" className="h-8 w-8 hover:text-destructive" onClick={(e) => { e.stopPropagation(); triggerCategoryDeleteConfirmation(category);}}><Trash2 className="h-4 w-4" /></Button>
+                      <Button variant="ghost" size="icon" className="h-8 w-8 hover:text-primary" onClick={(e) => { e.stopPropagation(); handleOpenSkillModal(category.id);}}><PlusCircle className="h-4 w-4"/></Button>
                     </div>
-                    <div className="flex space-x-2 shrink-0 ml-auto pl-4">
-                      <Button variant="outline" size="sm" onClick={(e) => { e.stopPropagation(); handleOpenCategoryModal(category);}}><Edit className="h-3.5 w-3.5" /></Button>
-                      <Button variant="destructive" size="sm" onClick={(e) => { e.stopPropagation(); triggerCategoryDeleteConfirmation(category);}}><Trash2 className="h-3.5 w-3.5" /></Button>
-                      <Button size="sm" onClick={(e) => { e.stopPropagation(); handleOpenSkillModal(category.id);}}><PlusCircle className="mr-1.5 h-3.5 w-3.5"/> Add Skill</Button>
-                    </div>
-                  </AccordionTrigger>
+                  </AccordionPrimitive.Header>
                   <AccordionContent className="bg-muted/20 p-4 rounded-b-md">
                     {category.skills && category.skills.length > 0 ? (
                       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
                         {category.skills.map(skill => (
-                          <Card key={skill.id} className="p-3">
+                          <Card key={skill.id} className="p-3 shadow-sm hover:shadow-md transition-shadow">
                             <div className="flex items-center justify-between">
                               <div className="flex items-center gap-2">
-                                {skill.iconImageUrl ? <Image src={skill.iconImageUrl} alt={skill.name} width={16} height={16} className="rounded-sm" /> : <DefaultSkillIcon className="h-4 w-4 text-muted-foreground"/>}
+                                {skill.iconImageUrl ? (
+                                    <div className="relative h-5 w-5 rounded-sm overflow-hidden border dark:bg-secondary">
+                                        <Image src={skill.iconImageUrl} alt={skill.name} layout="fill" objectFit="contain" />
+                                    </div>
+                                ) : <DefaultSkillIcon className="h-4 w-4 text-muted-foreground"/>}
                                 <span className="text-sm font-medium">{skill.name}</span>
                               </div>
-                              <div className="flex space-x-1.5">
+                              <div className="flex space-x-1">
                                 <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleOpenSkillModal(category.id, skill)}><Edit className="h-3.5 w-3.5" /></Button>
                                 <Button variant="ghost" size="icon" className="h-7 w-7 hover:text-destructive" onClick={() => triggerSkillDeleteConfirmation(skill)}><Trash2 className="h-3.5 w-3.5" /></Button>
                               </div>
@@ -944,7 +958,8 @@ export default function AdminDashboardPage() {
               {(skillIconPreview || currentSkillIconUrlForPreview) && (<div className="mt-2 p-2 border rounded-md bg-muted aspect-square relative w-24 h-24 mx-auto"><Image src={skillIconPreview || currentSkillIconUrlForPreview || "https://placehold.co/100x100.png"} alt="Icon preview" fill objectFit="contain" className="rounded"/></div>)}
                <div>
                   <Label htmlFor="icon_image_url_skill" className="text-xs text-muted-foreground">
-                    Or enter Icon Image URL (upload will override).
+                    Or enter Icon Image URL (upload will override). You can find icon names on 
+                    <Link href="https://lucide.dev/icons/" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline"> Lucide Icons</Link>.
                   </Label>
                   <Input id="icon_image_url_skill" {...skillForm.register("icon_image_url")} placeholder="https://example.com/icon.png"/>
                   {skillForm.formState.errors.icon_image_url && <p className="text-destructive text-sm mt-1">{skillForm.formState.errors.icon_image_url.message}</p>}
@@ -979,3 +994,5 @@ export default function AdminDashboardPage() {
     </SectionWrapper>
   );
 }
+
+    
