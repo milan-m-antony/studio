@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { UploadCloud, UserCircle as AboutMeIcon, Trash2 } from 'lucide-react';
+import { UploadCloud, UserCircle as AboutMeIcon, Trash2 } from 'lucide-react'; // Ensure Trash2 is imported
 import { supabase } from '@/lib/supabaseClient';
 import type { AboutContent } from '@/types/supabase';
 import Image from 'next/image';
@@ -40,7 +40,7 @@ export default function AboutManager() {
   const [isLoadingAbout, setIsLoadingAbout] = useState(false);
   const [aboutImageFile, setAboutImageFile] = useState<File | null>(null);
   const [aboutImagePreview, setAboutImagePreview] = useState<string | null>(null);
-  const [currentDbAboutImageUrl, setCurrentDbAboutImageUrl] = useState<string | null>(null);
+  const [currentDbAboutImageUrl, setCurrentDbAboutImageUrl] = useState<string | null>(null); // To track the image URL from DB
 
   const aboutForm = useForm<AboutContentFormData>({
     resolver: zodResolver(aboutContentSchema),
@@ -52,21 +52,24 @@ export default function AboutManager() {
     }
   });
 
-  const currentAboutImageUrlForForm = aboutForm.watch('image_url');
+  const currentAboutImageUrlForForm = aboutForm.watch('image_url'); // Watch the URL field from the form
 
   useEffect(() => {
     fetchAboutContent();
   }, []);
 
   useEffect(() => {
-    if (aboutImageFile) {
+    if (aboutImageFile) { // If a new file is selected for upload
       const reader = new FileReader();
       reader.onloadend = () => setAboutImagePreview(reader.result as string);
       reader.readAsDataURL(aboutImageFile);
-    } else if (currentAboutImageUrlForForm && currentAboutImageUrlForForm.trim() !== '') {
+    } else if (currentAboutImageUrlForForm && currentAboutImageUrlForForm.trim() !== '') { // If there's a URL in the form field (could be manually entered or from DB)
       setAboutImagePreview(currentAboutImageUrlForForm);
-    } else {
-      setAboutImagePreview(currentDbAboutImageUrl || null);
+    } else if (currentDbAboutImageUrl) { // Fallback to the initially loaded DB image URL if form URL is cleared and no new file
+        setAboutImagePreview(currentDbAboutImageUrl)
+    }
+     else { // No file, no form URL, no DB URL
+      setAboutImagePreview(null);
     }
   }, [aboutImageFile, currentAboutImageUrlForForm, currentDbAboutImageUrl]);
 
@@ -95,35 +98,34 @@ export default function AboutManager() {
         image_url: data.image_url || '',
         image_tagline: data.image_tagline || '',
       });
-      setCurrentDbAboutImageUrl(data.image_url || null);
-      setAboutImagePreview(data.image_url || null);
+      setCurrentDbAboutImageUrl(data.image_url || null); // Store the DB image URL
+      setAboutImagePreview(data.image_url || null); // Set initial preview
     } else {
        aboutForm.reset({ id: PRIMARY_ABOUT_CONTENT_ID, headline_main: '', headline_code_keyword: '', headline_connector: '', headline_creativity_keyword: '', paragraph1: '', paragraph2: '', paragraph3: '', image_url: '', image_tagline: ''});
        setCurrentDbAboutImageUrl(null);
        setAboutImagePreview(null);
     }
-    setAboutImageFile(null);
+    setAboutImageFile(null); // Clear any stale file selection
     setIsLoadingAbout(false);
   };
 
   const handleAboutImageFileChange = (event: ChangeEvent<HTMLInputElement>) => {
     if (event.target.files?.[0]) {
       setAboutImageFile(event.target.files[0]);
-      // Clearing the form's image_url field makes sure the uploaded file takes precedence.
-      // The useEffect for preview will handle showing the new file.
+      // Clear the form's image_url field if a file is chosen, file upload takes precedence
       aboutForm.setValue('image_url', ''); 
     } else {
       setAboutImageFile(null);
-      // If file input is cleared, revert preview based on current form URL or DB URL
+      // If file input is cleared, preview should revert based on form's URL field or DB URL
       const formUrl = aboutForm.getValues('image_url');
       setAboutImagePreview(formUrl && formUrl.trim() !== '' ? formUrl : currentDbAboutImageUrl || null);
     }
   };
 
   const handleDeleteCurrentImage = () => {
-    setAboutImageFile(null); 
-    setAboutImagePreview(null); 
-    aboutForm.setValue('image_url', ''); 
+    setAboutImageFile(null); // Clear any selected file for upload
+    setAboutImagePreview(null); // Clear the visual preview
+    aboutForm.setValue('image_url', ''); // Clear the URL in the form data, marking it for deletion on save
     toast({
       title: "Image Marked for Removal",
       description: "The current image will be removed from storage when you save changes.",
@@ -132,25 +134,26 @@ export default function AboutManager() {
   };
 
   const onAboutSubmit: SubmitHandler<AboutContentFormData> = async (formData) => {
-    let imageUrlToSave = formData.image_url; 
+    let imageUrlToSave = formData.image_url; // URL from text input, or will be overridden by upload
     let oldImageStoragePath: string | null = null;
 
+    // Determine if an old image existed and needs to be deleted from storage
     if (currentDbAboutImageUrl) {
         const pathParts = currentDbAboutImageUrl.split('/about-images/');
-        if (pathParts.length > 1 && !pathParts[1].startsWith('http')) {
+        if (pathParts.length > 1 && !pathParts[1].startsWith('http')) { // Basic check to avoid trying to parse external URLs as paths
             oldImageStoragePath = pathParts[1];
         }
     }
 
-    if (aboutImageFile) { 
+    if (aboutImageFile) { // If a new file was selected for upload
       const fileExt = aboutImageFile.name.split('.').pop();
-      const fileName = `about_me_image.${Date.now()}.${fileExt}`;
-      const filePath = `${fileName}`; 
+      const fileName = `about_me_image.${Date.now()}.${fileExt}`; // Unique filename
+      const filePath = `${fileName}`; // Path within the bucket
 
       toast({ title: "Uploading About Me Image", description: "Please wait..." });
       const { data: uploadData, error: uploadError } = await supabase.storage
-        .from('about-images')
-        .upload(filePath, aboutImageFile, { cacheControl: '3600', upsert: false }); 
+        .from('about-images') // Bucket name
+        .upload(filePath, aboutImageFile, { cacheControl: '3600', upsert: false }); // upsert: false to avoid overwriting if name somehow collides, though timestamp makes it unlikely
 
       if (uploadError) {
         console.error("Error uploading About Me image:", JSON.stringify(uploadError, null, 2));
@@ -162,18 +165,16 @@ export default function AboutManager() {
         toast({ title: "Error", description: "Failed to get public URL for uploaded About Me image.", variant: "destructive" });
         return;
       }
-      imageUrlToSave = publicUrlData.publicUrl;
+      imageUrlToSave = publicUrlData.publicUrl; // This will be saved to the database
     } else if (formData.image_url === '' && currentDbAboutImageUrl) {
-      // This case handles when the delete button was clicked, or URL manually cleared.
-      // oldImageStoragePath is already set if currentDbAboutImageUrl existed.
-      // imageUrlToSave is already empty string or null from formData.
+        // Image was explicitly cleared (e.g., by delete button), imageUrlToSave is already correctly empty or null
     }
 
 
     const dataForUpsert = {
       ...formData,
       id: PRIMARY_ABOUT_CONTENT_ID, 
-      image_url: imageUrlToSave || null, 
+      image_url: imageUrlToSave || null, // Ensure null if empty string
       updated_at: new Date().toISOString(),
     };
     
@@ -187,20 +188,22 @@ export default function AboutManager() {
     } else {
       toast({ title: "Success", description: "About Me content saved successfully." });
 
-      if (oldImageStoragePath && (imageUrlToSave !== currentDbAboutImageUrl)) { // If there was an old image and it's different from the new one (or new one is null)
+      // If an old image existed and the new URL is different (or new URL is null), delete old image from storage
+      if (oldImageStoragePath && (imageUrlToSave !== currentDbAboutImageUrl)) {
         console.log("[AboutManager] Attempting to delete old About Me image from storage:", oldImageStoragePath);
         const { error: storageDeleteError } = await supabase.storage.from('about-images').remove([oldImageStoragePath]);
         if (storageDeleteError) {
           console.warn("[AboutManager] Error deleting old About Me image from storage:", JSON.stringify(storageDeleteError, null, 2));
-          toast({ title: "Storage Warning", description: `Old image file (${oldImageStoragePath.split('/').pop()}) could not be deleted from storage. DB link updated.`, variant: "default" });
+          // Optionally, inform the user about this non-critical error
+          // toast({ title: "Storage Warning", description: `Old image file (${oldImageStoragePath.split('/').pop()}) could not be deleted. DB link updated.`, variant: "default" });
         } else {
           console.log("[AboutManager] Old About Me image successfully deleted from storage:", oldImageStoragePath);
         }
       }
-      fetchAboutContent(); 
-      router.refresh(); 
+      fetchAboutContent(); // Re-fetch to update the form and currentDbAboutImageUrl
+      router.refresh(); // Revalidate Next.js cache for public pages
     }
-    setAboutImageFile(null); 
+    setAboutImageFile(null); // Clear file input after submission
   };
 
   return (
@@ -231,11 +234,17 @@ export default function AboutManager() {
             <div className="space-y-2">
               <Label htmlFor="about_image_file">About Me Image File</Label>
               <div className="flex items-center gap-3">
-                <Input id="about_image_file" type="file" accept="image/*" onChange={handleAboutImageFileChange} className="flex-grow" />
+                <Input 
+                  id="about_image_file" 
+                  type="file" 
+                  accept="image/*" 
+                  onChange={handleAboutImageFileChange} 
+                  className="flex-grow" 
+                />
                 <UploadCloud className="h-6 w-6 text-muted-foreground"/>
               </div>
               
-              {aboutImagePreview && aboutImagePreview.trim() !== '' && (
+              {aboutImagePreview && ( // Conditionally render preview container and delete button
                 <div className="mt-2 p-2 border rounded-md bg-muted aspect-video relative w-full max-w-sm mx-auto">
                   <Image 
                     src={aboutImagePreview} 
@@ -258,9 +267,19 @@ export default function AboutManager() {
               )}
 
               <div>
-                <Label htmlFor="image_url_about" className="text-xs text-muted-foreground">Or enter Image URL (upload or deleting file will override)</Label>
-                <Input id="image_url_about" {...aboutForm.register("image_url")} placeholder="https://example.com/about-image.png" />
-                {aboutForm.formState.errors.image_url && <p className="text-destructive text-sm mt-1">{aboutForm.formState.errors.image_url.message}</p>}
+                <Label htmlFor="image_url_about" className="text-xs text-muted-foreground">
+                  Or enter Image URL (upload or deleting file will override)
+                </Label>
+                <Input 
+                  id="image_url_about" 
+                  {...aboutForm.register("image_url")} 
+                  placeholder="https://example.com/about-image.png" 
+                />
+                {aboutForm.formState.errors.image_url && (
+                  <p className="text-destructive text-sm mt-1">
+                    {aboutForm.formState.errors.image_url.message}
+                  </p>
+                )}
               </div>
             </div>
 
@@ -274,4 +293,4 @@ export default function AboutManager() {
   );
 }
 
-    
+  
