@@ -117,7 +117,7 @@ interface MappedSkillCategory {
   name: string;
   iconImageUrl: string | null;
   sort_order: number | null;
-  skills: SkillType[];
+  skills: SkillType[]; // Already MappedSkillType
   created_at: string;
 }
 
@@ -265,9 +265,9 @@ export default function AdminDashboardPage() {
         id: p.id,
         title: p.title,
         description: p.description,
-        imageUrl: p.image_url, // Map from snake_case
-        liveDemoUrl: p.live_demo_url, // Map
-        repoUrl: p.repo_url, // Map
+        imageUrl: p.image_url,
+        liveDemoUrl: p.live_demo_url,
+        repoUrl: p.repo_url,
         tags: p.tags,
         status: p.status as ProjectStatus | null,
         progress: p.progress,
@@ -299,13 +299,13 @@ export default function AdminDashboardPage() {
       const mappedData: MappedSkillCategory[] = data.map(cat => ({
         id: cat.id,
         name: cat.name,
-        iconImageUrl: cat.icon_image_url, // Map from snake_case
+        iconImageUrl: cat.icon_image_url,
         sort_order: cat.sort_order,
         created_at: cat.created_at,
         skills: (cat.skills || []).map((s: any) => ({
           id: s.id,
           name: s.name,
-          iconImageUrl: s.icon_image_url, // Map from snake_case
+          iconImageUrl: s.icon_image_url,
           description: s.description,
           categoryId: s.category_id,
         })),
@@ -564,11 +564,11 @@ export default function AdminDashboardPage() {
     if (aboutImageFile) {
       const fileExt = aboutImageFile.name.split('.').pop();
       const fileName = `about_me_image.${Date.now()}.${fileExt}`;
-      const filePath = `${fileName}`;
+      const filePath = `${fileName}`; // Store at root of 'about-images' bucket
       toast({ title: "Uploading About Me Image", description: "Please wait...", variant: "default" });
       const { data: uploadData, error: uploadError } = await supabase.storage
         .from('about-images')
-        .upload(filePath, aboutImageFile, { cacheControl: '3600', upsert: false });
+        .upload(filePath, aboutImageFile, { cacheControl: '3600', upsert: false }); // upsert: false to avoid overwriting different files if name collides by chance, though Date.now() makes this rare
 
       if (uploadError) {
         console.error("Error uploading About Me image:", JSON.stringify(uploadError, null, 2));
@@ -583,26 +583,24 @@ export default function AdminDashboardPage() {
       imageUrlToSave = publicUrlData.publicUrl;
     }
 
-    const aboutDataToSave = {
-      ...formData,
-      id: PRIMARY_ABOUT_CONTENT_ID,
+    const dataForUpsert = {
+      ...formData, // Includes ID from form (which is PRIMARY_ABOUT_CONTENT_ID)
+      id: PRIMARY_ABOUT_CONTENT_ID, // Explicitly ensure the ID is the fixed one
       image_url: imageUrlToSave || null,
       updated_at: new Date().toISOString(),
     };
     
-    const { id: formId, ...dataForUpsert } = aboutDataToSave;
-
     const { error: upsertError } = await supabase
       .from('about_content')
-      .upsert(dataForUpsert, { onConflict: 'id' });
+      .upsert(dataForUpsert, { onConflict: 'id' }); // Ensure 'id' is part of dataForUpsert
 
     if (upsertError) {
       console.error("Error saving About Me content:", JSON.stringify(upsertError, null, 2));
       toast({ title: "Error", description: `Failed to save About Me content: ${upsertError.message}`, variant: "destructive" });
     } else {
       toast({ title: "Success", description: "About Me content saved successfully." });
-      fetchAboutContent();
-      router.refresh();
+      fetchAboutContent(); // Refresh the form with latest data
+      router.refresh(); // Revalidate public page if it fetches this data
     }
   };
 
@@ -819,7 +817,7 @@ export default function AdminDashboardPage() {
                     {(categoryIconPreview || currentCategoryIconUrlForPreview) && (<div className="mt-2 p-2 border rounded-md bg-muted aspect-square relative w-24 h-24 mx-auto"><Image src={categoryIconPreview || currentCategoryIconUrlForPreview || "https://placehold.co/100x100.png"} alt="Icon preview" fill objectFit="contain" className="rounded dark:filter dark:brightness-0 dark:invert"/></div>)}
                      <div>
                         <Label htmlFor="icon_image_url_category" className="text-xs text-muted-foreground">
-                          Or enter Icon Image URL (upload will override). You can find icons at <Link href="https://lucide.dev/icons/" target="_blank" rel="noopener noreferrer" className="text-primary underline">lucide.dev/icons</Link>.
+                          Or enter Icon Image URL (upload will override).
                         </Label>
                         <Input id="icon_image_url_category" {...categoryForm.register("icon_image_url")} placeholder="https://example.com/icon.png"/>
                         {categoryForm.formState.errors.icon_image_url && <p className="text-destructive text-sm mt-1">{categoryForm.formState.errors.icon_image_url.message}</p>}
@@ -976,3 +974,5 @@ export default function AdminDashboardPage() {
     </SectionWrapper>
   );
 }
+
+  
