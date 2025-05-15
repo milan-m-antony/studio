@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useEffect, useState, type FormEvent, type ChangeEvent } from 'react';
+import React, { useEffect, useState, type FormEvent, type ChangeEvent } from 'next/navigation';
 import { useRouter } from 'next/navigation';
 import SectionWrapper from '@/components/ui/SectionWrapper';
 import SectionTitle from '@/components/ui/SectionTitle';
@@ -115,7 +115,6 @@ export default function AdminDashboardPage() {
   const [projectImageFile, setProjectImageFile] = useState<File | null>(null);
   const [projectImagePreview, setProjectImagePreview] = useState<string | null>(null);
 
-  // Skills state
   const [skillCategories, setSkillCategories] = useState<SkillCategoryAdminState[]>([]);
   const [isLoadingSkills, setIsLoadingSkills] = useState(false);
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
@@ -123,7 +122,6 @@ export default function AdminDashboardPage() {
   const [showCategoryDeleteConfirm, setShowCategoryDeleteConfirm] = useState(false);
   const [categoryToDelete, setCategoryToDelete] = useState<SkillCategoryAdminState | null>(null);
   const [categoryIconFile, setCategoryIconFile] = useState<File | null>(null);
-  // Removed categoryIconPreview state and useEffect as it's handled by the form field now
 
   const [isSkillModalOpen, setIsSkillModalOpen] = useState(false);
   const [currentSkill, setCurrentSkill] = useState<(SkillFormData & {id?: string}) | null>(null);
@@ -131,7 +129,6 @@ export default function AdminDashboardPage() {
   const [showSkillDeleteConfirm, setShowSkillDeleteConfirm] = useState(false);
   const [skillToDelete, setSkillToDelete] = useState<SkillType | null>(null);
   const [skillIconFile, setSkillIconFile] = useState<File | null>(null);
-  // Removed skillIconPreview state and useEffect as it's handled by the form field now
 
   const projectForm = useForm<ProjectFormData>({
     resolver: zodResolver(projectSchema),
@@ -178,9 +175,7 @@ export default function AdminDashboardPage() {
     }
   }, [projectImageFile, currentProject]);
 
-  // For category icon preview, relying on currentCategoryIconUrlForPreview form watch
   const categoryIconPreview = currentCategoryIconUrlForPreview || (categoryIconFile ? URL.createObjectURL(categoryIconFile) : null);
-  // For skill icon preview, relying on currentSkillIconUrlForPreview form watch
   const skillIconPreview = currentSkillIconUrlForPreview || (skillIconFile ? URL.createObjectURL(skillIconFile) : null);
 
 
@@ -192,7 +187,7 @@ export default function AdminDashboardPage() {
       projectForm.setValue('image_url', currentProject.imageUrl || '');
       projectForm.setValue('live_demo_url', currentProject.liveDemoUrl || '');
       projectForm.setValue('repo_url', currentProject.repoUrl || '');
-      projectForm.setValue('tags', currentProject.tags); // Should be string
+      projectForm.setValue('tags', currentProject.tags);
       projectForm.setValue('status', currentProject.status || 'Concept');
       projectForm.setValue('progress', currentProject.progress === null || currentProject.progress === undefined ? null : Number(currentProject.progress));
       setProjectImageFile(null);
@@ -215,7 +210,6 @@ export default function AdminDashboardPage() {
         sort_order: currentCategory.sort_order === null || currentCategory.sort_order === undefined ? 0 : Number(currentCategory.sort_order),
       });
       setCategoryIconFile(null);
-      // Preview handled by watched value
     } else {
       categoryForm.reset({ name: '', icon_image_url: '', sort_order: 0 });
       setCategoryIconFile(null);
@@ -232,7 +226,6 @@ export default function AdminDashboardPage() {
         description: currentSkill.description || '',
       });
       setSkillIconFile(null);
-      // Preview handled by watched value
     } else {
       skillForm.reset({ category_id: parentCategoryIdForNewSkill || '', name: '', icon_image_url: '', description: ''});
       setSkillIconFile(null);
@@ -252,10 +245,10 @@ export default function AdminDashboardPage() {
         id: p.id,
         title: p.title,
         description: p.description,
-        imageUrl: p.image_url, // Map from image_url
-        liveDemoUrl: p.live_demo_url, // Map
-        repoUrl: p.repo_url, // Map
-        tags: p.tags, // Assumed to be string[] | null from DB
+        imageUrl: p.image_url,
+        liveDemoUrl: p.live_demo_url,
+        repoUrl: p.repo_url,
+        tags: p.tags,
         status: p.status as ProjectStatus,
         progress: p.progress,
         created_at: p.created_at,
@@ -281,12 +274,12 @@ export default function AdminDashboardPage() {
       const mappedCategories: SkillCategoryAdminState[] = data.map(cat => ({
         id: cat.id,
         name: cat.name,
-        iconImageUrl: cat.icon_image_url, // Map from new column
+        iconImageUrl: cat.icon_image_url,
         sort_order: cat.sort_order,
         skills: (cat.skills || []).map((sk: any) => ({
             id: sk.id,
             name: sk.name,
-            iconImageUrl: sk.icon_image_url, // Map from new column
+            iconImageUrl: sk.icon_image_url,
             description: sk.description,
             categoryId: sk.category_id
         })) as SkillType[],
@@ -321,7 +314,7 @@ export default function AdminDashboardPage() {
   const handleProjectImageFileChange = (event: ChangeEvent<HTMLInputElement>) => {
     if (event.target.files && event.target.files[0]) {
       const file = event.target.files[0]; setProjectImageFile(file);
-      projectForm.setValue('image_url', ''); // Clear URL if file is selected
+      projectForm.setValue('image_url', '');
     } else {
       setProjectImageFile(null);
       if (currentProject?.imageUrl) setProjectImagePreview(currentProject.imageUrl); else setProjectImagePreview(null);
@@ -332,10 +325,9 @@ export default function AdminDashboardPage() {
     if (event.target.files && event.target.files[0]) {
         const file = event.target.files[0];
         setCategoryIconFile(file);
-        categoryForm.setValue('icon_image_url', ''); // Clear URL if file is selected
+        categoryForm.setValue('icon_image_url', '');
     } else {
         setCategoryIconFile(null);
-        // Preview will update based on form watch
     }
   };
 
@@ -343,10 +335,9 @@ export default function AdminDashboardPage() {
     if (event.target.files && event.target.files[0]) {
         const file = event.target.files[0];
         setSkillIconFile(file);
-        skillForm.setValue('icon_image_url', ''); // Clear URL if file is selected
+        skillForm.setValue('icon_image_url', '');
     } else {
         setSkillIconFile(null);
-        // Preview will update based on form watch
     }
   };
 
@@ -379,7 +370,7 @@ export default function AdminDashboardPage() {
       if (updateError) { console.error("Error updating project (raw Supabase error object):", JSON.stringify(updateError, null, 2)); toast({ title: "Error", description: `Failed to update project: ${updateError.message || 'Supabase error.'}`, variant: "destructive" }); }
       else { toast({ title: "Success", description: "Project updated successfully." }); }
     } else {
-      const { error: insertError } = await supabase.from('projects').insert(projectDataToSave as any); // Use 'as any' carefully
+      const { error: insertError } = await supabase.from('projects').insert(projectDataToSave as any);
       if (insertError) { console.error("Error adding project (raw Supabase error object):", JSON.stringify(insertError, null, 2)); toast({ title: "Error", description: `Failed to add project: ${insertError.message || 'Supabase returned an error without a specific message. Check RLS policies or console for details.'}`, variant: "destructive" }); }
       else { toast({ title: "Success", description: "Project added successfully." }); }
     }
@@ -406,8 +397,8 @@ export default function AdminDashboardPage() {
     } else {
         console.log("[AdminDashboard] Project deleted successfully from Supabase.");
         toast({ title: "Success", description: "Project deleted successfully." });
-        fetchProjects(); // Refresh the list of projects
-        router.refresh(); // Revalidate Next.js cache for public pages
+        fetchProjects();
+        router.refresh();
     }
     setShowProjectDeleteConfirm(false);
     setProjectToDelete(null);
@@ -423,7 +414,6 @@ const triggerDeleteConfirmation = (project: Project) => {
     setIsProjectModalOpen(true);
   };
 
-  // Skill Category Handlers
   const onCategorySubmit: SubmitHandler<SkillCategoryFormData> = async (formData) => {
     let iconUrlToSave = formData.icon_image_url;
 
@@ -448,15 +438,15 @@ const triggerDeleteConfirmation = (project: Project) => {
 
     const categoryData = {
       name: formData.name,
-      icon_image_url: iconUrlToSave || null, // Use uploaded URL or existing/entered one
+      icon_image_url: iconUrlToSave || null,
       sort_order: Number(formData.sort_order || 0)
     };
 
-    if (currentCategory?.id) { // Update
+    if (currentCategory?.id) {
       const { error } = await supabase.from('skill_categories').update(categoryData).eq('id', currentCategory.id);
       if (error) { toast({ title: "Error", description: `Failed to update category: ${error.message}`, variant: "destructive" }); }
       else { toast({ title: "Success", description: "Category updated." }); }
-    } else { // Add
+    } else {
       const { error } = await supabase.from('skill_categories').insert(categoryData);
       if (error) { toast({ title: "Error", description: `Failed to add category: ${error.message}`, variant: "destructive" }); }
       else { toast({ title: "Success", description: "Category added." }); }
@@ -492,9 +482,8 @@ const triggerDeleteConfirmation = (project: Project) => {
     setShowCategoryDeleteConfirm(false); setCategoryToDelete(null);
   };
 
-  // Skill Handlers
   const onSkillSubmit: SubmitHandler<SkillFormData> = async (formData) => {
-    let iconUrlToSave = formData.icon_image_url; // This now comes directly from the form
+    let iconUrlToSave = formData.icon_image_url;
 
     if (skillIconFile) {
         const fileExt = skillIconFile.name.split('.').pop();
@@ -512,21 +501,21 @@ const triggerDeleteConfirmation = (project: Project) => {
             toast({ title: "Error", description: "Failed to get public URL for uploaded skill icon.", variant: "destructive" });
             return;
         }
-        iconUrlToSave = publicUrlData.publicUrl; // Override if file uploaded
+        iconUrlToSave = publicUrlData.publicUrl;
     }
 
     const skillDataToSave = {
         category_id: formData.category_id,
         name: formData.name,
-        icon_image_url: iconUrlToSave || null, // Use uploaded URL or existing/entered one
+        icon_image_url: iconUrlToSave || null,
         description: formData.description || null,
     };
 
-    if (currentSkill?.id) { // Update
+    if (currentSkill?.id) {
       const { error } = await supabase.from('skills').update(skillDataToSave).eq('id', currentSkill.id);
       if (error) { toast({ title: "Error", description: `Failed to update skill: ${error.message}`, variant: "destructive" }); }
       else { toast({ title: "Success", description: "Skill updated." }); }
-    } else { // Add
+    } else {
       const { error } = await supabase.from('skills').insert(skillDataToSave);
       if (error) { toast({ title: "Error", description: `Failed to add skill: ${error.message}`, variant: "destructive" }); }
       else { toast({ title: "Success", description: "Skill added." }); }
@@ -548,7 +537,7 @@ const triggerDeleteConfirmation = (project: Project) => {
             description: skill.description || '',
         });
     } else {
-        setCurrentSkill(null); // For adding new skill
+        setCurrentSkill(null);
     }
     skillForm.setValue('category_id', category_id);
     setIsSkillModalOpen(true);
@@ -675,7 +664,7 @@ const triggerDeleteConfirmation = (project: Project) => {
                   </div>
                   <div className="flex space-x-2 self-start sm:self-center shrink-0">
                     <Button variant="outline" size="sm" onClick={() => handleOpenProjectModal(project)}><Edit className="mr-1.5 h-3.5 w-3.5" /> Edit</Button>
-                     <Button variant="destructive" size="sm" onClick={() => triggerDeleteConfirmation(project)}>
+                    <Button variant="destructive" size="sm" onClick={() => triggerDeleteConfirmation(project)}>
                          <Trash2 className="mr-1.5 h-3.5 w-3.5" /> Delete
                     </Button>
                   </div>
@@ -766,8 +755,14 @@ const triggerDeleteConfirmation = (project: Project) => {
                 </div>
               )}
                <div>
-                <Label htmlFor="icon_image_url_category" className="text-xs text-muted-foreground">Or enter Icon Image URL (upload will override)</Label>
-                <Input id="icon_image_url_category" {...categoryForm.register("icon_image_url")} placeholder="https://example.com/icon.png" />
+                <Label htmlFor="icon_image_url_category" className="text-xs text-muted-foreground">
+                    Or enter Icon Image URL (upload will override) - Visit
+                    <Link href="https://lucide.dev/icons/" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline px-1">
+                         Lucide
+                    </Link>
+                    to find icon names.
+                </Label>
+                <Input id="icon_image_url_category" {...categoryForm.register("icon_image_url")} placeholder="https://example.com/icon.png or leave blank for Lucide" />
                 {categoryForm.formState.errors.icon_image_url && <p className="text-destructive text-sm mt-1">{categoryForm.formState.errors.icon_image_url.message}</p>}
               </div>
             </div>
@@ -802,8 +797,14 @@ const triggerDeleteConfirmation = (project: Project) => {
                 </div>
               )}
                <div>
-                <Label htmlFor="icon_image_url_skill" className="text-xs text-muted-foreground">Or enter Icon Image URL (upload will override)</Label>
-                <Input id="icon_image_url_skill" {...skillForm.register("icon_image_url")} placeholder="https://example.com/icon.png" />
+                 <Label htmlFor="icon_image_url_skill" className="text-xs text-muted-foreground">
+                    Or enter Icon Image URL (upload will override) - Visit
+                    <Link href="https://lucide.dev/icons/" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline px-1">
+                         Lucide
+                    </Link>
+                    to find icon names.
+                </Label>
+                <Input id="icon_image_url_skill" {...skillForm.register("icon_image_url")} placeholder="https://example.com/icon.png or leave blank for Lucide" />
                 {skillForm.formState.errors.icon_image_url && <p className="text-destructive text-sm mt-1">{skillForm.formState.errors.icon_image_url.message}</p>}
               </div>
             </div>
@@ -823,7 +824,7 @@ const triggerDeleteConfirmation = (project: Project) => {
 
       {/* Skill Delete Confirmation Modal */}
       <AlertDialog open={showSkillDeleteConfirm} onOpenChange={setShowSkillDeleteConfirm}>
-         <AlertDialogContent className="bg-destructive border-destructive text-destructive-foreground"><AlertDialogHeader><AlertDialogTitle className="text-destructive-foreground">Delete Skill: {skillToDelete?.name}?</AlertDialogTitle><AlertDialogDescription className="text-destructive-foreground/90">This action cannot be undone.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel onClick={() => {setShowSkillDeleteConfirm(false); setSkillToDelete(null);}} className={cn(buttonVariants({ variant: "outline" }), "border-destructive-foreground/40 text-destructive-foreground hover:bg-destructive-foreground/10 hover:text-destructive-foreground hover:border-destructive-foreground/60")}>Cancel</AlertDialogCancel><AlertDialogAction onClick={() => {if (skillToDelete) performDeleteSkill(skillToDelete.id);}} className={cn(buttonVariants({ variant: "default" }), "bg-destructive-foreground text-destructive hover:bg-destructive-foreground/90")}>Delete Skill</AlertDialogAction></AlertDialogFooter></AlertDialogContent>
+         <AlertDialogContent className="bg-destructive border-destructive text-destructive-foreground"><AlertDialogHeader><AlertDialogTitle className="text-destructive-foreground">Delete Skill: {skillToDelete?.name}?</AlertDialogTitle><AlertDialogDescription className="text-destructive-foreground/90">This action cannot be undone.</AlertDialogDescription></AlertDialogFooter><AlertDialogFooter><AlertDialogCancel onClick={() => {setShowSkillDeleteConfirm(false); setSkillToDelete(null);}} className={cn(buttonVariants({ variant: "outline" }), "border-destructive-foreground/40 text-destructive-foreground hover:bg-destructive-foreground/10 hover:text-destructive-foreground hover:border-destructive-foreground/60")}>Cancel</AlertDialogCancel><AlertDialogAction onClick={() => {if (skillToDelete) performDeleteSkill(skillToDelete.id);}} className={cn(buttonVariants({ variant: "default" }), "bg-destructive-foreground text-destructive hover:bg-destructive-foreground/90")}>Delete Skill</AlertDialogAction></AlertDialogFooter></AlertDialogContent>
       </AlertDialog>
 
       <Card className="mb-8 shadow-lg">
@@ -833,3 +834,5 @@ const triggerDeleteConfirmation = (project: Project) => {
     </SectionWrapper>
   );
 }
+
+    
