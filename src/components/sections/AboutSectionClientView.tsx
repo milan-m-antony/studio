@@ -130,7 +130,7 @@ export default function AboutSectionClientView({ content }: AboutSectionClientVi
             alt="Milan working on a project"
             layout="fill"
             objectFit="cover"
-            className="transition-transform duration-500 group-hover:scale-105"
+            className="transition-transform duration-500 group-hover:scale-105" // Removed dark mode invert classes
             data-ai-hint="developer working"
             priority
           />
