@@ -12,21 +12,22 @@ import ContactSection from '@/components/sections/ContactSection';
 export const dynamic = "force-dynamic"; // Ensures the page is dynamically rendered
 
 // Define the expected props for the HomePage component
+// Next.js page components receive params and searchParams as objects.
 interface HomePageProps {
   params: { [key: string]: string | string[] | undefined };
   searchParams: { [key: string]: string | string[] | undefined };
 }
 
-export default function HomePage({ params, searchParams }: HomePageProps) {
+export default function HomePage(props: HomePageProps) {
   // Unwrap both params and searchParams using React.use()
-  // This is a defensive measure. Even if not directly used in this component's JSX,
-  // it makes them "safe" if Next.js internals or nested server components
-  // try to enumerate their keys before they are fully resolved.
-  const resolvedParams = params ? use(params) : {};
-  const resolvedSearchParams = searchParams ? use(searchParams) : {};
+  // This must be done before these props are used in any way that
+  // assumes they are plain JavaScript objects (like Object.keys, spreading, etc.)
+  // Next.js guarantees that params and searchParams are objects, even if empty.
+  const resolvedPageParams = use(props.params);
+  const resolvedSearchParams = use(props.searchParams);
 
-  // For debugging, you can log the resolved params:
-  // console.log("Resolved Page Params on server:", resolvedParams);
+  // For debugging purposes, you can log them on the server:
+  // console.log("Resolved Page Params on server:", resolvedPageParams);
   // console.log("Resolved Search Params on server:", resolvedSearchParams);
 
   return (
