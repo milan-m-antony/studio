@@ -8,7 +8,7 @@ import SectionTitle from '@/components/ui/SectionTitle';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { ShieldCheck, LogOut, AlertTriangle, LogIn, Home } from 'lucide-react';
 import Link from 'next/link';
@@ -91,7 +91,6 @@ export default function AdminDashboardPage() {
   if (!isAuthenticatedForRender) {
     return (
       <SectionWrapper className="flex items-center justify-center min-h-screen bg-gradient-to-br from-background to-muted/50">
-        {/* Removed p-8 from Card to rely on child components' default padding */}
         <Card className="w-full max-w-md shadow-2xl"> 
           <CardHeader className="text-center">
             <div className="mx-auto mb-4 p-3 bg-primary rounded-full inline-block">
@@ -133,9 +132,11 @@ export default function AdminDashboardPage() {
     <SectionWrapper>
       <SectionTitle subtitle="Manage portfolio content.">Admin Dashboard</SectionTitle>
       <div className="flex justify-between items-center mb-8">
-        <Button asChild>
+        <Button asChild className="mb-0">
           <Link href="/">
-            <Home className="mr-2 h-4 w-4"/>Back to Portfolio
+            <span>
+                <Home className="mr-2 h-4 w-4"/>Back to Portfolio
+            </span>
           </Link>
         </Button>
         <Button variant="outline" onClick={handleLogout}><LogOut className="mr-2 h-4 w-4" /> Logout</Button>
