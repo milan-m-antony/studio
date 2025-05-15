@@ -6,7 +6,7 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/componen
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
-import type { Project, ProjectStatus } from '@/types/supabase'; // Use Supabase type
+import type { Project, ProjectStatus } from '@/types/supabase'; 
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 
@@ -25,14 +25,14 @@ const statusConfig: Record<ProjectStatus, { icon: LucideIcon; label: string; bad
 
 
 export default function ProjectCard({ project }: ProjectCardProps) {
-  const currentStatusConfig = project.status ? statusConfig[project.status] : statusConfig['Concept']; // Default to Concept if status is null
+  const currentStatusConfig = project.status ? statusConfig[project.status] : statusConfig['Concept']; 
   const isActionable = project.status === 'Deployed' || project.status === 'Completed';
 
   let liveDemoButton = null;
   if (project.liveDemoUrl) {
     if (isActionable) {
       liveDemoButton = (
-        <Button asChild variant="outline" className="flex-1 group/button hover:border-primary">
+        <Button asChild variant="outline" className="flex-1 group/button hover:border-primary min-w-0">
           <Link href={project.liveDemoUrl} target="_blank" rel="noopener noreferrer">
             <ExternalLink className="mr-2 h-4 w-4 group-hover/button:text-primary transition-colors" />
             <span className="group-hover/button:text-primary transition-colors">Live Demo</span>
@@ -44,7 +44,7 @@ export default function ProjectCard({ project }: ProjectCardProps) {
         <TooltipProvider>
           <Tooltip>
             <TooltipTrigger asChild>
-              <Button variant="outline" className="flex-1" disabled>
+              <Button variant="outline" className="flex-1 min-w-0" disabled>
                 <ExternalLink className="mr-2 h-4 w-4" /> Live Demo
               </Button>
             </TooltipTrigger>
@@ -60,7 +60,7 @@ export default function ProjectCard({ project }: ProjectCardProps) {
       <TooltipProvider>
         <Tooltip>
           <TooltipTrigger asChild>
-            <Button variant="outline" className="flex-1" disabled>
+            <Button variant="outline" className="flex-1 min-w-0" disabled>
               <ExternalLink className="mr-2 h-4 w-4" /> Live Demo
             </Button>
           </TooltipTrigger>
@@ -75,8 +75,8 @@ export default function ProjectCard({ project }: ProjectCardProps) {
   let sourceCodeButton = null;
   if (project.repoUrl) {
      sourceCodeButton = ( 
-        <Button asChild variant="outline" className="flex-1 group/button hover:border-primary" disabled={!isActionable}>
-          <Link href={isActionable ? project.repoUrl : '#'} target={isActionable ? "_blank" : undefined} rel={isActionable ? "noopener noreferrer" : undefined} aria-disabled={!isActionable}>
+        <Button asChild variant="outline" className="flex-1 group/button hover:border-primary min-w-0" disabled={!isActionable}>
+          <Link href={isActionable && project.repoUrl ? project.repoUrl : '#'} target={isActionable && project.repoUrl ? "_blank" : undefined} rel={isActionable && project.repoUrl ? "noopener noreferrer" : undefined} aria-disabled={!isActionable}>
             <Github className="mr-2 h-4 w-4 group-hover/button:text-primary transition-colors" />
             <span className="group-hover/button:text-primary transition-colors">Source Code</span>
           </Link>
@@ -87,7 +87,7 @@ export default function ProjectCard({ project }: ProjectCardProps) {
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button variant="outline" className="flex-1" disabled>
+                <Button variant="outline" className="flex-1 min-w-0" disabled>
                     <Github className="mr-2 h-4 w-4" /> Source Code
                 </Button>
               </TooltipTrigger>
@@ -103,7 +103,7 @@ export default function ProjectCard({ project }: ProjectCardProps) {
       <TooltipProvider>
         <Tooltip>
           <TooltipTrigger asChild>
-            <Button variant="outline" className="flex-1" disabled>
+            <Button variant="outline" className="flex-1 min-w-0" disabled>
               <Github className="mr-2 h-4 w-4" /> Source Code
             </Button>
           </TooltipTrigger>
@@ -124,8 +124,8 @@ export default function ProjectCard({ project }: ProjectCardProps) {
           alt={project.title || 'Project image'}
           layout="fill"
           objectFit="cover"
-          className="transition-transform duration-300 group-hover:scale-105" // Removed dark mode invert
-          data-ai-hint={project.imageHint || 'project abstract'}
+          className="transition-transform duration-300 group-hover:scale-105"
+          data-ai-hint={project.title || 'project abstract'}
         />
       </div>
       <CardHeader>
