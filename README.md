@@ -22,5 +22,5 @@ NEXT_PUBLIC_SUPABASE_URL=https://yggjwqbwhapjngewnzvg.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlnZ2p3cWJ3aGFwam5nZXduenZnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDcxOTk1NTQsImV4cCI6MjA2Mjc3NTU1NH0.-trd-C-dle-6Wat0qfWecA64mK4DGWigSQ6f8X9H_ss 
 
 # backup project completely working with limited setup 
-today
-backup date=wed-14-may 10:15
+
+backup date=thu-15-may 11:45
