@@ -40,7 +40,7 @@ export default function AboutManager() {
   const [isLoadingAbout, setIsLoadingAbout] = useState(false);
   const [aboutImageFile, setAboutImageFile] = useState<File | null>(null);
   const [aboutImagePreview, setAboutImagePreview] = useState<string | null>(null);
-  const [currentDbAboutImageUrl, setCurrentDbAboutImageUrl] = useState<string | null>(null);
+  const [currentDbAboutImageUrl, setCurrentDbAboutImageUrl] = useState<string | null>(null); // To track the image URL from DB
 
   const aboutForm = useForm<AboutContentFormData>({
     resolver: zodResolver(aboutContentSchema),
@@ -52,6 +52,7 @@ export default function AboutManager() {
     }
   });
 
+  // Watch the image_url field from the form to update preview if URL is typed/pasted
   const currentAboutImageUrlForForm = aboutForm.watch('image_url');
 
   useEffect(() => {
@@ -95,8 +96,9 @@ export default function AboutManager() {
         image_tagline: data.image_tagline || '',
       });
       setAboutImagePreview(data.image_url || null); // Directly set preview from fetched data
-      setCurrentDbAboutImageUrl(data.image_url || null);
+      setCurrentDbAboutImageUrl(data.image_url || null); // Store the DB image URL
     } else {
+       // If no data, reset form and set current DB image URL to null
        aboutForm.reset({ id: PRIMARY_ABOUT_CONTENT_ID, headline_main: '', headline_code_keyword: '', headline_connector: '', headline_creativity_keyword: '', paragraph1: '', paragraph2: '', paragraph3: '', image_url: '', image_tagline: ''});
        setAboutImagePreview(null);
        setCurrentDbAboutImageUrl(null);
@@ -130,16 +132,27 @@ export default function AboutManager() {
 
   const onAboutSubmit: SubmitHandler<AboutContentFormData> = async (formData) => {
     let imageUrlToSave = formData.image_url; // This starts with the form's current image_url value
+    let oldImageToDeletePath: string | null = null;
+
+    // Determine if an old image needs to be deleted from storage
+    if (currentDbAboutImageUrl && currentDbAboutImageUrl !== imageUrlToSave) {
+      // An old image existed and is different from what will be saved (or if new URL is empty)
+      const pathParts = currentDbAboutImageUrl.split('/about-images/');
+      if (pathParts.length > 1) {
+        oldImageToDeletePath = pathParts[1];
+      }
+    }
 
     // Handle new file upload
     if (aboutImageFile) {
       const fileExt = aboutImageFile.name.split('.').pop();
-      const fileName = `about_me_image.${Date.now()}.${fileExt}`;
-      const filePath = `${fileName}`;
+      const fileName = `about_me_image.${Date.now()}.${fileExt}`; // Unique filename
+      const filePath = `${fileName}`; // Path within the bucket
+
       toast({ title: "Uploading About Me Image", description: "Please wait..." });
       const { error: uploadError } = await supabase.storage
         .from('about-images')
-        .upload(filePath, aboutImageFile, { cacheControl: '3600', upsert: false });
+        .upload(filePath, aboutImageFile, { cacheControl: '3600', upsert: false }); // upsert false to always create new
 
       if (uploadError) {
         console.error("Error uploading About Me image:", JSON.stringify(uploadError, null, 2));
@@ -152,15 +165,24 @@ export default function AboutManager() {
         return;
       }
       imageUrlToSave = publicUrlData.publicUrl; // New URL from upload
+
+      // If a new file was uploaded and there was a different old image, ensure oldImageToDeletePath is set
+      if (currentDbAboutImageUrl && currentDbAboutImageUrl !== imageUrlToSave) {
+         const pathPartsOld = currentDbAboutImageUrl.split('/about-images/');
+         if (pathPartsOld.length > 1 && !pathPartsOld[1].startsWith('http')) {
+            oldImageToDeletePath = pathPartsOld[1];
+         }
+      }
     }
+
 
     const dataForUpsert = {
       ...formData,
-      id: PRIMARY_ABOUT_CONTENT_ID,
+      id: PRIMARY_ABOUT_CONTENT_ID, // Ensure the fixed ID is used for upsert
       image_url: imageUrlToSave || null, // Ensure empty string becomes null for DB
       updated_at: new Date().toISOString(),
     };
-
+    
     const { error: upsertError } = await supabase
       .from('about_content')
       .upsert(dataForUpsert, { onConflict: 'id' });
@@ -171,20 +193,19 @@ export default function AboutManager() {
     } else {
       toast({ title: "Success", description: "About Me content saved successfully." });
 
-      // Delete old image from storage if it existed and is different from the new one (or if new one is null/empty)
-      if (currentDbAboutImageUrl && currentDbAboutImageUrl !== imageUrlToSave) {
-        const oldImagePath = currentDbAboutImageUrl.substring(currentDbAboutImageUrl.indexOf('/about-images/') + '/about-images/'.length);
-        if (oldImagePath && !oldImagePath.startsWith('http')) { // Basic check to avoid trying to delete external URLs
-          console.log("[AboutManager] Deleting old About Me image from storage:", oldImagePath);
-          const { error: storageDeleteError } = await supabase.storage.from('about-images').remove([oldImagePath]);
-          if (storageDeleteError) {
-            console.warn("[AboutManager] Error deleting old About Me image from storage:", JSON.stringify(storageDeleteError, null, 2));
-            toast({ title: "Storage Warning", description: `Old image file could not be deleted from storage: ${storageDeleteError.message}. The database link is updated.`, variant: "default" });
-          }
+      // If DB update was successful and an old image path was marked for deletion, delete it from storage
+      if (oldImageToDeletePath) {
+        console.log("[AboutManager] Attempting to delete old About Me image from storage:", oldImageToDeletePath);
+        const { error: storageDeleteError } = await supabase.storage.from('about-images').remove([oldImageToDeletePath]);
+        if (storageDeleteError) {
+          console.warn("[AboutManager] Error deleting old About Me image from storage:", JSON.stringify(storageDeleteError, null, 2));
+          toast({ title: "Storage Warning", description: `Old image file could not be deleted from storage: ${storageDeleteError.message}. Database link is updated.`, variant: "default" });
+        } else {
+          console.log("[AboutManager] Old About Me image successfully deleted from storage.");
         }
       }
       fetchAboutContent(); // Re-fetch to update currentDbAboutImageUrl, form values, and preview
-      router.refresh();
+      router.refresh(); // Trigger re-fetch for server components on public site
     }
     setAboutImageFile(null); // Clear the file input after submission
   };
@@ -199,18 +220,24 @@ export default function AboutManager() {
         <CardDescription>Update the text, image, and tagline for your "About Me" section.</CardDescription>
       </CardHeader>
       <CardContent>
-        {isLoadingAbout ? (<p className="text-center text-muted-foreground">Loading About Me content...</p>) : (
+        {isLoadingAbout ? (
+          <p className="text-center text-muted-foreground">Loading About Me content...</p>
+        ) : (
           <form onSubmit={aboutForm.handleSubmit(onAboutSubmit)} className="grid gap-6 py-4">
+            {/* Headline fields */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div><Label htmlFor="headline_main">Headline Main</Label><Input id="headline_main" {...aboutForm.register("headline_main")} placeholder="e.g., Milan: Weaving "/>{aboutForm.formState.errors.headline_main && <p className="text-destructive text-sm mt-1">{aboutForm.formState.errors.headline_main.message}</p>}</div>
               <div><Label htmlFor="headline_code_keyword">Headline Code Keyword</Label><Input id="headline_code_keyword" {...aboutForm.register("headline_code_keyword")} placeholder="e.g., Code"/>{aboutForm.formState.errors.headline_code_keyword && <p className="text-destructive text-sm mt-1">{aboutForm.formState.errors.headline_code_keyword.message}</p>}</div>
               <div><Label htmlFor="headline_connector">Headline Connector</Label><Input id="headline_connector" {...aboutForm.register("headline_connector")} placeholder="e.g.,  with "/>{aboutForm.formState.errors.headline_connector && <p className="text-destructive text-sm mt-1">{aboutForm.formState.errors.headline_connector.message}</p>}</div>
               <div><Label htmlFor="headline_creativity_keyword">Headline Creativity Keyword</Label><Input id="headline_creativity_keyword" {...aboutForm.register("headline_creativity_keyword")} placeholder="e.g., Creativity"/>{aboutForm.formState.errors.headline_creativity_keyword && <p className="text-destructive text-sm mt-1">{aboutForm.formState.errors.headline_creativity_keyword.message}</p>}</div>
             </div>
+
+            {/* Paragraph fields */}
             <div><Label htmlFor="paragraph1">Paragraph 1</Label><Textarea id="paragraph1" {...aboutForm.register("paragraph1")} rows={3} />{aboutForm.formState.errors.paragraph1 && <p className="text-destructive text-sm mt-1">{aboutForm.formState.errors.paragraph1.message}</p>}</div>
             <div><Label htmlFor="paragraph2">Paragraph 2</Label><Textarea id="paragraph2" {...aboutForm.register("paragraph2")} rows={3} />{aboutForm.formState.errors.paragraph2 && <p className="text-destructive text-sm mt-1">{aboutForm.formState.errors.paragraph2.message}</p>}</div>
             <div><Label htmlFor="paragraph3">Paragraph 3</Label><Textarea id="paragraph3" {...aboutForm.register("paragraph3")} rows={3} />{aboutForm.formState.errors.paragraph3 && <p className="text-destructive text-sm mt-1">{aboutForm.formState.errors.paragraph3.message}</p>}</div>
-
+            
+            {/* Image Upload and URL field */}
             <div className="space-y-2">
               <Label htmlFor="about_image_file">About Me Image File</Label>
               <div className="flex items-center gap-3">
@@ -220,7 +247,8 @@ export default function AboutManager() {
               {(aboutImagePreview) && (
                 <div className="mt-2 p-2 border rounded-md bg-muted aspect-video relative w-full max-w-sm mx-auto">
                   <Image src={aboutImagePreview} alt="About Me image preview" fill objectFit="contain" className="rounded"/>
-                   <Button
+                  {/* Delete Image Button */}
+                  <Button
                     type="button"
                     variant="destructive"
                     size="icon"
@@ -239,8 +267,10 @@ export default function AboutManager() {
               </div>
             </div>
 
+            {/* Image Tagline */}
             <div><Label htmlFor="image_tagline">Image Tagline</Label><Input id="image_tagline" {...aboutForm.register("image_tagline")} placeholder="e.g., Fuelled by coffee & code."/>{aboutForm.formState.errors.image_tagline && <p className="text-destructive text-sm mt-1">{aboutForm.formState.errors.image_tagline.message}</p>}</div>
 
+            {/* Submit Button */}
             <Button type="submit" className="w-full sm:w-auto justify-self-start">Save About Content</Button>
           </form>
         )}
@@ -248,5 +278,6 @@ export default function AboutManager() {
     </Card>
   );
 }
+
 
     
