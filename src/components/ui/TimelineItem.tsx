@@ -1,15 +1,14 @@
-// src/components/ui/TimelineItem.tsx
+
 "use client";
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import type { TimelineEvent as SupabaseTimelineEvent } from '@/types/supabase';
 import { cn } from '@/lib/utils';
 import { useEffect, useRef, useState } from 'react';
-import * as LucideIcons from 'lucide-react'; // For dynamic primary icon
-import { Star as DefaultTimelineLucideIcon } from 'lucide-react'; // Explicit default
+import Image from 'next/image'; // For displaying image icons
 import React from 'react'; // For React.ElementType
 
-// A very simple hardcoded SVG to use as an ultimate fallback for timeline items.
+// Default inline SVG placeholder
 const DefaultTimelineSvgFallback = (props: React.SVGProps<SVGSVGElement>) => (
   <svg
     xmlns="http://www.w3.org/2000/svg"
@@ -28,7 +27,7 @@ const DefaultTimelineSvgFallback = (props: React.SVGProps<SVGSVGElement>) => (
 );
 
 interface TimelineItemProps {
-  event: SupabaseTimelineEvent;
+  event: SupabaseTimelineEvent; // Now expects iconImageUrl
   isLeft: boolean;
 }
 
@@ -45,7 +44,7 @@ export default function TimelineItem({ event, isLeft }: TimelineItemProps) {
         }
       },
       {
-        threshold: 0.1,
+        threshold: 0.1, // Make it trigger a bit earlier
       }
     );
 
@@ -61,40 +60,23 @@ export default function TimelineItem({ event, isLeft }: TimelineItemProps) {
     };
   }, []);
 
-  let IconComponent: React.ElementType = DefaultTimelineSvgFallback; // Start with the hardcoded SVG as the ultimate default
+  let IconContent: React.ReactNode;
 
-  // Try to get icon by name from event.iconName
-  if (event.iconName && typeof event.iconName === 'string' && event.iconName.trim() !== '') {
-    const FoundIcon = LucideIcons[event.iconName as keyof typeof LucideIcons];
-    if (FoundIcon && typeof FoundIcon === 'function') {
-      IconComponent = FoundIcon;
-    } else {
-      // console.warn(`TimelineItem: Lucide icon "${event.iconName}" not found or invalid for event "${event.title}". Trying explicit default Lucide icon (Star).`);
-      // Try the explicitly imported DefaultTimelineLucideIcon (Star)
-      if (typeof DefaultTimelineLucideIcon === 'function') {
-        IconComponent = DefaultTimelineLucideIcon;
-      } else {
-        // If even the direct import fails, we stick with the SVG.
-        // console.warn(`TimelineItem: Explicit default Lucide icon (Star) is also not a function for event "${event.title}". Rendering inline SVG.`);
-      }
-    }
+  if (event.iconImageUrl) {
+    IconContent = (
+      <div className="relative h-6 w-6 rounded-sm overflow-hidden">
+        <Image
+          src={event.iconImageUrl}
+          alt={`${event.title} icon`}
+          layout="fill"
+          objectFit="contain"
+          className="dark:filter dark:brightness-0 dark:invert"
+        />
+      </div>
+    );
   } else {
-    // If no event.iconName, try the explicitly imported DefaultTimelineLucideIcon (Star)
-    if (typeof DefaultTimelineLucideIcon === 'function') {
-      IconComponent = DefaultTimelineLucideIcon;
-    } else {
-      // console.warn(`TimelineItem: No iconName provided and explicit default Lucide icon (Star) is not a function for event "${event.title}". Rendering inline SVG.`);
-    }
+    IconContent = <DefaultTimelineSvgFallback className="h-6 w-6" />;
   }
-
-  // If IconComponent is still DefaultTimelineSvgFallback, it means all Lucide attempts failed.
-  // Or if it resolved to something that's not a function (e.g., if LucideIcons['SomeInvalidName'] was an object)
-  if (typeof IconComponent !== 'function') {
-      // The console.error that was previously here (and reported by the user) is now removed.
-      // The component will silently fall back to the DefaultTimelineSvgFallback.
-      IconComponent = DefaultTimelineSvgFallback;
-  }
-
 
   const colors = {
     work: 'bg-blue-500',
@@ -109,15 +91,15 @@ export default function TimelineItem({ event, isLeft }: TimelineItemProps) {
     <div
       ref={itemRef}
       className={cn(
-        "mb-8 flex justify-between items-center w-full",
+        "mb-8 flex justify-between items-center w-full transition-all duration-700 ease-out",
         isLeft ? "flex-row-reverse left-timeline" : "right-timeline",
-        isVisible ? 'animate-fadeIn' : 'opacity-0 translate-y-5'
+        isVisible ? 'opacity-100 translate-y-0 sm:translate-x-0' : 'opacity-0 translate-y-10 sm:translate-y-0 sm:translate-x-10'
       )}
     >
       <div className="order-1 w-5/12"></div>
       <div className="z-20 flex items-center order-1 shadow-xl w-12 h-12 rounded-full">
         <div className={cn("mx-auto rounded-full w-12 h-12 flex items-center justify-center text-white", typeColor)}>
-         <IconComponent className="h-6 w-6" />
+         {IconContent}
         </div>
       </div>
       <div className={cn("order-1 rounded-lg shadow-xl w-5/12 px-6 py-4", isLeft ? "bg-secondary" : "bg-card")}>

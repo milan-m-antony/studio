@@ -19,7 +19,6 @@ export interface Database {
           title: string
           description: string | null
           image_url: string | null
-          // image_hint: string | null // Removed
           live_demo_url: string | null
           repo_url: string | null
           tags: string[] | null
@@ -57,7 +56,7 @@ export interface Database {
         Row: {
           id: string
           name: string
-          icon_image_url: string | null // Changed from icon_name
+          icon_image_url: string | null
           sort_order: number | null
           created_at: string
         }
@@ -81,7 +80,7 @@ export interface Database {
         Row: {
           id: string
           name: string
-          icon_image_url: string | null // Changed from icon_name
+          icon_image_url: string | null
           description: string | null
           category_id: string | null
           created_at: string
@@ -150,7 +149,7 @@ export interface Database {
           date: string
           title: string
           description: string
-          icon_name: string // For Lucide icon name
+          icon_image_url: string | null // Changed from icon_name
           type: string
           sort_order: number | null
           created_at: string
@@ -160,7 +159,7 @@ export interface Database {
           date: string
           title: string
           description: string
-          icon_name: string
+          icon_image_url?: string | null // Changed from icon_name
           type: string
           sort_order?: number | null
           created_at?: string
@@ -170,7 +169,7 @@ export interface Database {
           date?: string
           title?: string
           description?: string
-          icon_name?: string
+          icon_image_url?: string | null // Changed from icon_name
           type?: string
           sort_order?: number | null
           created_at?: string
@@ -256,7 +255,7 @@ export interface Skill {
   iconImageUrl: string | null; // Mapped from icon_image_url
   description: string | null;
   categoryId?: string | null; // Mapped from category_id
-  created_at?: string; // Usually available
+  created_at?: string;
 }
 
 export interface SkillCategory {
@@ -264,9 +263,9 @@ export interface SkillCategory {
   name: string;
   iconImageUrl?: string | null; // Mapped from icon_image_url
   skills?: Skill[];
-  skillCount?: number; // Derived client-side
+  skillCount?: number;
   sort_order?: number | null;
-  created_at?: string; // Usually available
+  created_at?: string;
 }
 
 export type TimelineEventType = 'work' | 'education' | 'certification' | 'milestone';
@@ -276,10 +275,10 @@ export interface TimelineEvent {
   date: string;
   title: string;
   description: string;
-  iconName: string; // Mapped from icon_name
+  iconImageUrl: string | null; // Changed from iconName
   type: TimelineEventType;
   sort_order?: number | null;
-  created_at?: string; // Usually available
+  created_at?: string;
 }
 
 export interface Certification {

@@ -10,18 +10,16 @@ import type { TimelineEvent } from '@/types/supabase';
 async function getTimelineEvents(): Promise<TimelineEvent[]> {
   const { data, error, status, statusText } = await supabase
     .from('timeline_events')
-    .select('*')
+    .select('id, date, title, description, icon_image_url, type, sort_order, created_at') // Ensure icon_image_url is selected
     .order('sort_order', { ascending: true })
     .order('created_at', { ascending: false });
 
   if (error) {
     let errorMessage = 'Error fetching timeline events. ';
-    // Attempt to extract more specific Supabase error properties
     if (typeof error === 'object' && error !== null) {
       const supabaseError = error as { message?: string; details?: string; hint?: string; code?: string };
       errorMessage += `Message: ${supabaseError.message || 'N/A'}, Details: ${supabaseError.details || 'N/A'}, Hint: ${supabaseError.hint || 'N/A'}, Code: ${supabaseError.code || 'N/A'}. `;
     } else {
-      // Fallback for non-object errors or if properties are missing
       try {
         errorMessage += `Received error: ${JSON.stringify(error)}. `;
       } catch (e) {
@@ -30,8 +28,6 @@ async function getTimelineEvents(): Promise<TimelineEvent[]> {
     }
     errorMessage += `Status: ${status || 'N/A'} ${statusText || 'N/A'}.`;
     console.error(errorMessage);
-    // For more verbose logging if the above is still just '{}':
-    // console.error("Full Supabase error object:", error); 
     return [];
   }
 
@@ -46,21 +42,21 @@ async function getTimelineEvents(): Promise<TimelineEvent[]> {
   }
 
   return data.map(event => {
-    // Basic validation for required fields from the DB row
-    if (!event.id || !event.date || !event.title || !event.description || !event.icon_name || !event.type) {
-        console.warn('Skipping timeline event due to missing required fields:', event);
-        return null; // Will be filtered out later
+    if (!event.id || !event.date || !event.title || !event.description || !event.type) { // icon_image_url can be null
+        console.warn('Skipping timeline event due to missing required fields (excluding icon_image_url):', event);
+        return null; 
     }
     return {
         id: event.id,
         date: event.date,
         title: event.title,
         description: event.description,
-        iconName: event.icon_name,
+        iconImageUrl: event.icon_image_url, // Map from icon_image_url
         type: event.type as TimelineEvent['type'],
         sort_order: event.sort_order,
+        created_at: event.created_at,
     };
-  }).filter(event => event !== null) as TimelineEvent[]; // Filter out nulls and assert type
+  }).filter(event => event !== null) as TimelineEvent[]; 
 }
 
 
@@ -73,7 +69,7 @@ export default async function TimelineSection() {
         <SectionTitle subtitle="Follow my professional and educational path.">
           My Career Journey
         </SectionTitle>
-        <p className="text-center text-muted-foreground">No timeline events to display. Please check Supabase connection, RLS policies, table name ('timeline_events'), and ensure the table contains data.</p>
+        <p className="text-center text-muted-foreground">No timeline events to display. Please check Supabase connection, RLS policies, table name ('timeline_events'), and ensure the table contains data with the correct 'icon_image_url' column.</p>
       </SectionWrapper>
     );
   }
@@ -87,6 +83,7 @@ export default async function TimelineSection() {
         <div className="absolute border-opacity-20 border-border h-full border" style={{ left: '50%' }}></div>
         {timelineEvents.map((event, index) => (
           <div key={event.id}>
+            {/* Pass event which now includes iconImageUrl */}
             <TimelineItem event={event} isLeft={index % 2 !== 0} />
           </div>
         ))}
@@ -94,4 +91,3 @@ export default async function TimelineSection() {
     </SectionWrapper>
   );
 }
-

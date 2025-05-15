@@ -8,10 +8,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { PlusCircle, Edit, Trash2, MapPin, Briefcase, Award, GraduationCap, Star, HelpCircle } from 'lucide-react';
-import Link from 'next/link';
+import { PlusCircle, Edit, Trash2, MapPin, HelpCircle } from 'lucide-react'; // Removed specific icons, will use HelpCircle for display list
 import { supabase } from '@/lib/supabaseClient';
 import type { TimelineEvent, TimelineEventType } from '@/types/supabase';
+import Image from 'next/image'; // For displaying image icons
 import {
   Dialog,
   DialogContent,
@@ -37,14 +37,13 @@ import { z } from "zod";
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import * as LucideIcons from 'lucide-react';
 
 const timelineEventSchema = z.object({
   id: z.string().uuid().optional(),
   date: z.string().min(1, "Date is required"),
   title: z.string().min(3, "Title must be at least 3 characters"),
   description: z.string().min(10, "Description must be at least 10 characters"),
-  icon_name: z.string().min(1, "Icon name is required (e.g., Briefcase, Award)"),
+  icon_image_url: z.string().url("Must be a valid URL if provided.").optional().or(z.literal("")).nullable(), // Changed from icon_name
   type: z.enum(['work', 'education', 'certification', 'milestone']),
   sort_order: z.coerce.number().optional().nullable().default(0),
 });
@@ -52,10 +51,15 @@ type TimelineEventFormData = z.infer<typeof timelineEventSchema>;
 
 const timelineEventTypes: TimelineEventType[] = ['work', 'education', 'certification', 'milestone'];
 
-// For displaying icons in the list
-const IconDisplay = ({ iconName }: { iconName: string }) => {
-  const Icon = LucideIcons[iconName as keyof typeof LucideIcons] || HelpCircle;
-  return <Icon className="h-5 w-5 text-primary" />;
+const IconDisplay = ({ iconImageUrl, altText }: { iconImageUrl: string | null; altText: string }) => {
+  if (iconImageUrl) {
+    return (
+      <div className="h-6 w-6 relative rounded-sm overflow-hidden border dark:bg-secondary flex-shrink-0">
+        <Image src={iconImageUrl} alt={altText} layout="fill" objectFit="contain" className="dark:filter dark:brightness-0 dark:invert" />
+      </div>
+    );
+  }
+  return <HelpCircle className="h-5 w-5 text-muted-foreground flex-shrink-0" />; // Fallback if no image URL
 };
 
 export default function TimelineManager() {
@@ -71,7 +75,7 @@ export default function TimelineManager() {
 
   const eventForm = useForm<TimelineEventFormData>({
     resolver: zodResolver(timelineEventSchema),
-    defaultValues: { date: '', title: '', description: '', icon_name: '', type: 'milestone', sort_order: 0 }
+    defaultValues: { date: '', title: '', description: '', icon_image_url: '', type: 'milestone', sort_order: 0 }
   });
 
   useEffect(() => {
@@ -85,12 +89,12 @@ export default function TimelineManager() {
         date: currentEvent.date,
         title: currentEvent.title,
         description: currentEvent.description,
-        icon_name: currentEvent.iconName,
+        icon_image_url: currentEvent.iconImageUrl || '', // Changed from iconName
         type: currentEvent.type,
         sort_order: currentEvent.sort_order || 0,
       });
     } else {
-      eventForm.reset({ date: '', title: '', description: '', icon_name: '', type: 'milestone', sort_order: 0 });
+      eventForm.reset({ date: '', title: '', description: '', icon_image_url: '', type: 'milestone', sort_order: 0 });
     }
   }, [currentEvent, eventForm]);
 
@@ -107,11 +111,10 @@ export default function TimelineManager() {
       toast({ title: "Error", description: `Could not fetch timeline events: ${error.message}`, variant: "destructive" });
       setTimelineEvents([]);
     } else if (data) {
-      // Map icon_name to iconName for frontend consistency if your type uses iconName
       const mappedData = data.map(event => ({
         ...event,
-        iconName: event.icon_name, 
-        type: event.type as TimelineEventType // Ensure type safety
+        iconImageUrl: event.icon_image_url, // Map from icon_image_url
+        type: event.type as TimelineEventType
       }));
       setTimelineEvents(mappedData);
     } else {
@@ -121,12 +124,14 @@ export default function TimelineManager() {
   };
 
   const onEventSubmit: SubmitHandler<TimelineEventFormData> = async (formData) => {
+    // Ensure icon_image_url is null if empty string, otherwise keep the URL
     const dataToSave = {
         ...formData,
+        icon_image_url: formData.icon_image_url?.trim() === '' ? null : formData.icon_image_url,
         sort_order: formData.sort_order === null || formData.sort_order === undefined ? 0 : Number(formData.sort_order),
     };
 
-    if (formData.id) { // Update existing event
+    if (formData.id) {
       const { error } = await supabase
         .from('timeline_events')
         .update(dataToSave)
@@ -137,8 +142,8 @@ export default function TimelineManager() {
       } else {
         toast({ title: "Success", description: "Timeline event updated successfully." });
       }
-    } else { // Add new event
-      const { id, ...dataToInsert } = dataToSave; // Exclude id for insert
+    } else {
+      const { id, ...dataToInsert } = dataToSave;
       const { error } = await supabase
         .from('timeline_events')
         .insert(dataToInsert);
@@ -211,11 +216,9 @@ export default function TimelineManager() {
                 <div><Label htmlFor="title">Title</Label><Input id="title" {...eventForm.register("title")} />{eventForm.formState.errors.title && <p className="text-destructive text-sm mt-1">{eventForm.formState.errors.title.message}</p>}</div>
                 <div><Label htmlFor="description">Description</Label><Textarea id="description" {...eventForm.register("description")} rows={3} />{eventForm.formState.errors.description && <p className="text-destructive text-sm mt-1">{eventForm.formState.errors.description.message}</p>}</div>
                 <div>
-                  <Label htmlFor="icon_name">
-                    Icon Name (from <Link href="https://lucide.dev/icons/" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">Lucide Icons</Link>)
-                  </Label>
-                  <Input id="icon_name" {...eventForm.register("icon_name")} placeholder="e.g., Briefcase, Award"/>
-                  {eventForm.formState.errors.icon_name && <p className="text-destructive text-sm mt-1">{eventForm.formState.errors.icon_name.message}</p>}
+                  <Label htmlFor="icon_image_url">Icon Image URL (Optional)</Label>
+                  <Input id="icon_image_url" {...eventForm.register("icon_image_url")} placeholder="https://example.com/icon.png"/>
+                  {eventForm.formState.errors.icon_image_url && <p className="text-destructive text-sm mt-1">{eventForm.formState.errors.icon_image_url.message}</p>}
                 </div>
                 <div>
                   <Label htmlFor="type">Type</Label>
@@ -254,7 +257,7 @@ export default function TimelineManager() {
               <Card key={event.id} className="p-4 hover:shadow-md transition-shadow">
                 <div className="flex items-start gap-4">
                   <div className="flex-shrink-0 pt-1">
-                    <IconDisplay iconName={event.iconName} />
+                    <IconDisplay iconImageUrl={event.iconImageUrl} altText={`${event.title} icon`} />
                   </div>
                   <div className="flex-grow">
                     <div className="flex justify-between items-start">
