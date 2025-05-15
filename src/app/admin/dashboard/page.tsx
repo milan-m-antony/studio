@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useEffect, useState, type FormEvent, type ChangeEvent } from 'next'; // Removed 'next/navigation' as useRouter is imported separately
+import React, { useEffect, useState, type FormEvent, type ChangeEvent } from 'react'; // Corrected: useState, useEffect, etc., from 'react'
 import { useRouter } from 'next/navigation';
 import SectionWrapper from '@/components/ui/SectionWrapper';
 import SectionTitle from '@/components/ui/SectionTitle';
@@ -11,7 +11,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { ShieldCheck, LogOut, AlertTriangle, LogIn, PlusCircle, Edit, Trash2, Home, UploadCloud, Package as DefaultCategoryIcon, Cpu as DefaultSkillIcon } from 'lucide-react';
+import { ShieldCheck, LogOut, AlertTriangle, LogIn, PlusCircle, Edit, Trash2, Home, UploadCloud, Package as DefaultCategoryIcon, Cpu as DefaultSkillIcon, HelpCircle } from 'lucide-react';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabaseClient';
 import type { Project, ProjectStatus, SkillCategory, Skill as SkillType } from '@/types/supabase';
@@ -62,10 +62,11 @@ const projectSchema = z.object({
 
 type ProjectFormData = z.infer<typeof projectSchema>;
 
-type CurrentProjectEditState = Omit<Project, 'tags' | 'created_at' | 'liveDemoUrl' | 'repoUrl'> & {
+type CurrentProjectEditState = Omit<Project, 'tags' | 'created_at' | 'liveDemoUrl' | 'repoUrl' | 'imageUrl'> & {
     tags: string; // Form handles tags as a comma-separated string
     liveDemoUrl?: string | null;
     repoUrl?: string | null;
+    imageUrl?: string | null;
     created_at?: string;
 };
 
@@ -77,6 +78,11 @@ const skillCategorySchema = z.object({
 });
 type SkillCategoryFormData = z.infer<typeof skillCategorySchema>;
 
+type SkillCategoryAdminState = Omit<SkillCategory, 'iconImageUrl'> & {
+  iconImageUrl?: string | null;
+  skills: SkillType[];
+};
+
 const skillSchema = z.object({
   id: z.string().uuid().optional(),
   category_id: z.string().uuid("Category ID is required"),
@@ -85,12 +91,6 @@ const skillSchema = z.object({
   description: z.string().optional().nullable(),
 });
 type SkillFormData = z.infer<typeof skillSchema>;
-
-// Updated state type for skill categories in admin dashboard
-type SkillCategoryAdminState = Omit<SkillCategory, 'iconImageUrl'> & {
-  iconImageUrl?: string | null; // This will store the URL from Supabase
-  skills: SkillType[];
-};
 
 
 export default function AdminDashboardPage() {
@@ -120,6 +120,8 @@ export default function AdminDashboardPage() {
   const [showCategoryDeleteConfirm, setShowCategoryDeleteConfirm] = useState(false);
   const [categoryToDelete, setCategoryToDelete] = useState<SkillCategoryAdminState | null>(null);
   const [categoryIconFile, setCategoryIconFile] = useState<File | null>(null);
+  const [categoryIconPreview, setCategoryIconPreview] = useState<string | null>(null);
+
 
   // Skills State
   const [isSkillModalOpen, setIsSkillModalOpen] = useState(false);
@@ -128,6 +130,7 @@ export default function AdminDashboardPage() {
   const [showSkillDeleteConfirm, setShowSkillDeleteConfirm] = useState(false);
   const [skillToDelete, setSkillToDelete] = useState<SkillType | null>(null);
   const [skillIconFile, setSkillIconFile] = useState<File | null>(null);
+  const [skillIconPreview, setSkillIconPreview] = useState<string | null>(null);
 
 
   // Forms
@@ -146,11 +149,10 @@ export default function AdminDashboardPage() {
     defaultValues: { category_id: '', name: '', icon_image_url: '', description: '' }
   });
 
-  // Watched form values for previews
+  // Watched form values for previews (for manually entered URLs)
   const currentProjectImageUrlForPreview = projectForm.watch('image_url');
   const currentCategoryIconUrlForPreview = categoryForm.watch('icon_image_url');
   const currentSkillIconUrlForPreview = skillForm.watch('icon_image_url');
-
 
   useEffect(() => {
     setIsMounted(true);
@@ -177,9 +179,31 @@ export default function AdminDashboardPage() {
     }
   }, [projectImageFile, currentProject]);
 
-  // Computed preview URLs for category and skill icons (using form values or file objects)
-  const categoryIconPreview = currentCategoryIconUrlForPreview || (categoryIconFile ? URL.createObjectURL(categoryIconFile) : null);
-  const skillIconPreview = currentSkillIconUrlForPreview || (skillIconFile ? URL.createObjectURL(skillIconFile) : null);
+  // Category Icon Preview Effect
+  useEffect(() => {
+    if (categoryIconFile) {
+      const reader = new FileReader();
+      reader.onloadend = () => setCategoryIconPreview(reader.result as string);
+      reader.readAsDataURL(categoryIconFile);
+    } else if (currentCategory?.icon_image_url) {
+      setCategoryIconPreview(currentCategory.icon_image_url);
+    } else {
+      setCategoryIconPreview(null);
+    }
+  }, [categoryIconFile, currentCategory]);
+
+  // Skill Icon Preview Effect
+  useEffect(() => {
+    if (skillIconFile) {
+      const reader = new FileReader();
+      reader.onloadend = () => setSkillIconPreview(reader.result as string);
+      reader.readAsDataURL(skillIconFile);
+    } else if (currentSkill?.icon_image_url) {
+      setSkillIconPreview(currentSkill.icon_image_url);
+    } else {
+      setSkillIconPreview(null);
+    }
+  }, [skillIconFile, currentSkill]);
 
 
   // Effect to populate project form on edit
@@ -196,8 +220,8 @@ export default function AdminDashboardPage() {
         status: currentProject.status || 'Concept',
         progress: currentProject.progress === null || currentProject.progress === undefined ? null : Number(currentProject.progress),
       });
-      setProjectImageFile(null);
-      setProjectImagePreview(currentProject.imageUrl || null);
+      setProjectImageFile(null); // Clear any lingering file selection
+      // Preview will be handled by its own useEffect
     } else {
       projectForm.reset({ title: '', description: '', image_url: '', live_demo_url: '', repo_url: '', tags: '', status: 'Concept', progress: null });
       setProjectImageFile(null); setProjectImagePreview(null);
@@ -210,13 +234,13 @@ export default function AdminDashboardPage() {
       categoryForm.reset({
         id: currentCategory.id,
         name: currentCategory.name,
-        icon_image_url: currentCategory.icon_image_url || '', // Expecting string from currentCategory
+        icon_image_url: currentCategory.icon_image_url || '',
         sort_order: currentCategory.sort_order === null || currentCategory.sort_order === undefined ? 0 : Number(currentCategory.sort_order),
       });
       setCategoryIconFile(null);
     } else {
       categoryForm.reset({ name: '', icon_image_url: '', sort_order: 0 });
-      setCategoryIconFile(null);
+      setCategoryIconFile(null); setCategoryIconPreview(null);
     }
   }, [currentCategory, categoryForm]);
 
@@ -227,13 +251,13 @@ export default function AdminDashboardPage() {
         id: currentSkill.id,
         category_id: currentSkill.category_id || parentCategoryIdForNewSkill || '',
         name: currentSkill.name,
-        icon_image_url: currentSkill.icon_image_url || '', // Expecting string from currentSkill
+        icon_image_url: currentSkill.iconImageUrl || '',
         description: currentSkill.description || '',
       });
       setSkillIconFile(null);
     } else {
       skillForm.reset({ category_id: parentCategoryIdForNewSkill || '', name: '', icon_image_url: '', description: ''});
-      setSkillIconFile(null);
+      setSkillIconFile(null); setSkillIconPreview(null);
     }
   }, [currentSkill, parentCategoryIdForNewSkill, skillForm]);
 
@@ -267,7 +291,7 @@ export default function AdminDashboardPage() {
     setIsLoadingSkills(true);
     const { data, error: fetchError } = await supabase
       .from('skill_categories')
-      .select('*, skills (*, category_id)') // Ensure category_id is fetched for skills
+      .select('*, skills (*, category_id)')
       .order('sort_order', { ascending: true })
       .order('created_at', { foreignTable: 'skills', ascending: true });
 
@@ -279,14 +303,14 @@ export default function AdminDashboardPage() {
       const mappedCategories: SkillCategoryAdminState[] = data.map(cat => ({
         id: cat.id,
         name: cat.name,
-        iconImageUrl: cat.icon_image_url,
+        iconImageUrl: cat.icon_image_url, // This is from Supabase
         sort_order: cat.sort_order,
         skills: (cat.skills || []).map((sk: any) => ({
             id: sk.id,
             name: sk.name,
-            iconImageUrl: sk.icon_image_url,
+            iconImageUrl: sk.icon_image_url, // This is from Supabase
             description: sk.description,
-            categoryId: sk.category_id // Explicitly map categoryId
+            categoryId: sk.category_id
         })) as SkillType[],
       }));
       setSkillCategories(mappedCategories);
@@ -320,24 +344,24 @@ export default function AdminDashboardPage() {
   const handleProjectImageFileChange = (event: ChangeEvent<HTMLInputElement>) => {
     if (event.target.files && event.target.files[0]) {
       const file = event.target.files[0]; setProjectImageFile(file);
-      projectForm.setValue('image_url', '');
+      projectForm.setValue('image_url', ''); // Clear URL if file is chosen
     } else {
       setProjectImageFile(null);
-      if (currentProject?.imageUrl) setProjectImagePreview(currentProject.imageUrl); else setProjectImagePreview(null);
+      // Preview reset is handled by its useEffect
     }
   };
 
   const handleCategoryIconFileChange = (event: ChangeEvent<HTMLInputElement>) => {
     if (event.target.files && event.target.files[0]) {
         const file = event.target.files[0]; setCategoryIconFile(file);
-        categoryForm.setValue('icon_image_url', '');
+        categoryForm.setValue('icon_image_url', ''); // Clear URL if file is chosen
     } else { setCategoryIconFile(null); }
   };
 
   const handleSkillIconFileChange = (event: ChangeEvent<HTMLInputElement>) => {
     if (event.target.files && event.target.files[0]) {
         const file = event.target.files[0]; setSkillIconFile(file);
-        skillForm.setValue('icon_image_url', '');
+        skillForm.setValue('icon_image_url', ''); // Clear URL if file is chosen
     } else { setSkillIconFile(null); }
   };
 
@@ -361,7 +385,7 @@ export default function AdminDashboardPage() {
     const projectDataToSave = {
       title: formData.title, description: formData.description, image_url: imageUrlToSave || null,
       live_demo_url: formData.live_demo_url || null, repo_url: formData.repo_url || null,
-      tags: Array.isArray(formData.tags) ? formData.tags : [], // Ensure tags is an array for Supabase
+      tags: Array.isArray(formData.tags) ? formData.tags : [],
       status: formData.status,
       progress: formData.status === 'In Progress' && formData.progress !== undefined && formData.progress !== null ? Number(formData.progress) : null,
     };
@@ -375,8 +399,7 @@ export default function AdminDashboardPage() {
       if (insertError) { console.error("Error adding project (raw Supabase error object):", JSON.stringify(insertError, null, 2)); toast({ title: "Error", description: `Failed to add project: ${insertError.message || 'Supabase returned an error. Check RLS policies.'}`, variant: "destructive" }); }
       else { toast({ title: "Success", description: "Project added successfully." }); }
     }
-    setIsProjectModalOpen(false); setCurrentProject(null); setProjectImageFile(null); setProjectImagePreview(null);
-    const fileInput = document.getElementById('project_image_file') as HTMLInputElement; if (fileInput) fileInput.value = '';
+    setIsProjectModalOpen(false); setCurrentProject(null); setProjectImageFile(null);
     fetchProjects(); router.refresh();
   };
 
@@ -386,11 +409,11 @@ export default function AdminDashboardPage() {
         toast({ title: "Warning", description: "No project selected for deletion.", variant: "default" });
         return;
     }
-    console.log(`[AdminDashboard] Attempting to delete project ID: ${projectToDelete.id}`);
+    console.log(`[AdminDashboard] User confirmed delete. Project ID: ${projectToDelete.id}`);
     const { error: deleteError } = await supabase.from('projects').delete().eq('id', projectToDelete.id);
     if (deleteError) {
         console.error("[AdminDashboard] Error deleting project (raw Supabase error object):", JSON.stringify(deleteError, null, 2));
-        toast({ title: "Error", description: `Failed to delete project: ${deleteError.message || 'Supabase error.'}`, variant: "destructive" });
+        toast({ title: "Error", description: `Failed to delete project: ${deleteError.message || 'Supabase error. Check RLS policies or console.'}`, variant: "destructive" });
     } else {
         toast({ title: "Success", description: "Project deleted successfully." });
         fetchProjects(); router.refresh();
@@ -399,6 +422,7 @@ export default function AdminDashboardPage() {
   };
 
   const triggerDeleteConfirmation = (project: Project) => {
+    console.log("[AdminDashboard] Triggering delete confirmation for project:", project.title);
     setProjectToDelete(project); setShowProjectDeleteConfirm(true);
   };
 
@@ -436,7 +460,6 @@ export default function AdminDashboardPage() {
       else { toast({ title: "Success", description: "Category added." }); }
     }
     setIsCategoryModalOpen(false); setCurrentCategory(null); setCategoryIconFile(null);
-    const categoryIconInput = document.getElementById('category_icon_file') as HTMLInputElement; if (categoryIconInput) categoryIconInput.value = '';
     fetchSkillCategories(); router.refresh();
   };
 
@@ -485,14 +508,13 @@ export default function AdminDashboardPage() {
       else { toast({ title: "Success", description: "Skill added." }); }
     }
     setIsSkillModalOpen(false); setCurrentSkill(null); setParentCategoryIdForNewSkill(null); setSkillIconFile(null);
-    const skillIconInput = document.getElementById('skill_icon_file') as HTMLInputElement; if (skillIconInput) skillIconInput.value = '';
     fetchSkillCategories(); router.refresh();
   };
 
   const handleOpenSkillModal = (category_id: string, skill?: SkillType) => {
     setParentCategoryIdForNewSkill(category_id);
     setCurrentSkill(skill ? { ...skill, icon_image_url: skill.iconImageUrl || '', category_id: skill.categoryId || category_id } : null);
-    skillForm.setValue('category_id', category_id); // Ensure category_id is set for new skills
+    skillForm.setValue('category_id', category_id);
     setIsSkillModalOpen(true);
   };
 
@@ -572,7 +594,7 @@ export default function AdminDashboardPage() {
             Manage Projects
             <Dialog open={isProjectModalOpen} onOpenChange={(isOpen) => {
                 setIsProjectModalOpen(isOpen);
-                if (!isOpen) { setCurrentProject(null); setProjectImageFile(null); setProjectImagePreview(null); projectForm.reset(); }
+                if (!isOpen) { setCurrentProject(null); setProjectImageFile(null); projectForm.reset(); }
              }}>
               <DialogTrigger asChild>
                 <Button onClick={() => handleOpenProjectModal()}><PlusCircle className="mr-2 h-4 w-4" /> Add Project</Button>
@@ -593,7 +615,7 @@ export default function AdminDashboardPage() {
                   <div><Label htmlFor="tags">Tags (comma-separated)</Label><Input id="tags" {...projectForm.register("tags")} placeholder="React, Next.js, Supabase" /></div>
                   <div><Label htmlFor="status">Status</Label><select id="status" {...projectForm.register("status")} className="w-full p-2 border rounded-md bg-background text-sm focus:ring-ring focus:border-input">{(['Concept', 'Prototype', 'In Progress', 'Completed', 'Deployed', 'Archived'] as ProjectStatus[]).map(s => (<option key={s} value={s}>{s}</option>))} </select></div>
                   <div><Label htmlFor="progress">Progress (0-100, for 'In Progress')</Label><Input id="progress" type="number" {...projectForm.register("progress", {setValueAs: (v) => (v === '' || v === null || v === undefined ? null : Number(v))})} />{projectForm.formState.errors.progress && <p className="text-destructive text-sm mt-1">{projectForm.formState.errors.progress.message}</p>}</div>
-                  <DialogFooter><DialogClose asChild><Button type="button" variant="outline" onClick={() => { setProjectImageFile(null); setProjectImagePreview(null); projectForm.reset();}}>Cancel</Button></DialogClose><Button type="submit">{currentProject?.id ? 'Save Changes' : 'Add Project'}</Button></DialogFooter>
+                  <DialogFooter><DialogClose asChild><Button type="button" variant="outline" onClick={() => { setProjectImageFile(null); projectForm.reset();}}>Cancel</Button></DialogClose><Button type="submit">{currentProject?.id ? 'Save Changes' : 'Add Project'}</Button></DialogFooter>
                 </form>
               </DialogContent>
             </Dialog>
@@ -643,7 +665,7 @@ export default function AdminDashboardPage() {
               </DialogTrigger>
               <DialogContent>
                 <DialogHeader><DialogTitle>{currentCategory?.id ? 'Edit Skill Category' : 'Add New Skill Category'}</DialogTitle></DialogHeader>
-                <form onSubmit={categoryForm.handleSubmit(onCategorySubmit)} className="grid gap-4 py-4">
+                <form onSubmit={categoryForm.handleSubmit(onCategorySubmit)} className="grid gap-4 py-4  max-h-[80vh] overflow-y-auto p-2 scrollbar-hide">
                   <div><Label htmlFor="categoryName">Name</Label><Input id="categoryName" {...categoryForm.register("name")} />{categoryForm.formState.errors.name && <p className="text-destructive text-sm mt-1">{categoryForm.formState.errors.name.message}</p>}</div>
                   <div className="space-y-2">
                     <Label htmlFor="category_icon_file">Category Icon File</Label>
@@ -651,7 +673,7 @@ export default function AdminDashboardPage() {
                       <Input id="category_icon_file" type="file" accept="image/*" onChange={handleCategoryIconFileChange} className="flex-grow" />
                       <UploadCloud className="h-6 w-6 text-muted-foreground"/>
                     </div>
-                    {categoryIconPreview && (<div className="mt-2 p-2 border rounded-md bg-muted aspect-square relative w-24 h-24 mx-auto dark:bg-secondary"><Image src={categoryIconPreview} alt="Category icon preview" layout="fill" objectFit="contain" className="rounded dark:filter dark:brightness-0 dark:invert"/></div>)}
+                    {(categoryIconPreview || currentCategoryIconUrlForPreview) && (<div className="mt-2 p-2 border rounded-md bg-muted aspect-square relative w-24 h-24 mx-auto dark:bg-secondary"><Image src={categoryIconPreview || currentCategoryIconUrlForPreview || "https://placehold.co/100x100.png"} alt="Category icon preview" layout="fill" objectFit="contain" className="rounded dark:filter dark:brightness-0 dark:invert"/></div>)}
                     <div><Label htmlFor="icon_image_url_category" className="text-xs text-muted-foreground">Or enter Icon Image URL (upload will override)</Label><Input id="icon_image_url_category" {...categoryForm.register("icon_image_url")} placeholder="https://example.com/icon.png" />{categoryForm.formState.errors.icon_image_url && <p className="text-destructive text-sm mt-1">{categoryForm.formState.errors.icon_image_url.message}</p>}</div>
                   </div>
                   <div><Label htmlFor="categorySortOrder">Sort Order</Label><Input id="categorySortOrder" type="number" {...categoryForm.register("sort_order")} /></div>
@@ -717,7 +739,7 @@ export default function AdminDashboardPage() {
       }}>
         <DialogContent>
           <DialogHeader><DialogTitle>{currentSkill?.id ? 'Edit Skill' : 'Add New Skill'}</DialogTitle></DialogHeader>
-          <form onSubmit={skillForm.handleSubmit(onSkillSubmit)} className="grid gap-4 py-4">
+          <form onSubmit={skillForm.handleSubmit(onSkillSubmit)} className="grid gap-4 py-4 max-h-[80vh] overflow-y-auto p-2 scrollbar-hide">
             <Controller name="category_id" control={skillForm.control} render={({ field }) => <input type="hidden" {...field} />} />
             <div><Label htmlFor="skillName">Skill Name</Label><Input id="skillName" {...skillForm.register("name")} />{skillForm.formState.errors.name && <p className="text-destructive text-sm mt-1">{skillForm.formState.errors.name.message}</p>}</div>
             <div className="space-y-2">
@@ -726,7 +748,7 @@ export default function AdminDashboardPage() {
                 <Input id="skill_icon_file" type="file" accept="image/*" onChange={handleSkillIconFileChange} className="flex-grow" />
                 <UploadCloud className="h-6 w-6 text-muted-foreground"/>
               </div>
-              {skillIconPreview && (<div className="mt-2 p-2 border rounded-md bg-muted aspect-square relative w-24 h-24 mx-auto dark:bg-secondary"><Image src={skillIconPreview} alt="Skill icon preview" layout="fill" objectFit="contain" className="rounded dark:filter dark:brightness-0 dark:invert"/></div>)}
+              {(skillIconPreview || currentSkillIconUrlForPreview) && (<div className="mt-2 p-2 border rounded-md bg-muted aspect-square relative w-24 h-24 mx-auto dark:bg-secondary"><Image src={skillIconPreview || currentSkillIconUrlForPreview || "https://placehold.co/100x100.png" } alt="Skill icon preview" layout="fill" objectFit="contain" className="rounded dark:filter dark:brightness-0 dark:invert"/></div>)}
               <div><Label htmlFor="icon_image_url_skill" className="text-xs text-muted-foreground">Or enter Icon Image URL (upload will override)</Label><Input id="icon_image_url_skill" {...skillForm.register("icon_image_url")} placeholder="https://example.com/icon.png" />{skillForm.formState.errors.icon_image_url && <p className="text-destructive text-sm mt-1">{skillForm.formState.errors.icon_image_url.message}</p>}</div>
             </div>
             <div><Label htmlFor="skillDescription">Description (Optional)</Label><Textarea id="skillDescription" {...skillForm.register("description")} /></div>
@@ -752,5 +774,5 @@ export default function AdminDashboardPage() {
     </SectionWrapper>
   );
 }
-    
+
     
