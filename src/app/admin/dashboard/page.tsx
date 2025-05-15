@@ -568,7 +568,7 @@ export default function AdminDashboardPage() {
       toast({ title: "Uploading About Me Image", description: "Please wait...", variant: "default" });
       const { data: uploadData, error: uploadError } = await supabase.storage
         .from('about-images')
-        .upload(filePath, aboutImageFile, { cacheControl: '3600', upsert: false }); // upsert: false to avoid overwriting different files if name collides by chance, though Date.now() makes this rare
+        .upload(filePath, aboutImageFile, { cacheControl: '3600', upsert: false }); 
 
       if (uploadError) {
         console.error("Error uploading About Me image:", JSON.stringify(uploadError, null, 2));
@@ -584,23 +584,23 @@ export default function AdminDashboardPage() {
     }
 
     const dataForUpsert = {
-      ...formData, // Includes ID from form (which is PRIMARY_ABOUT_CONTENT_ID)
-      id: PRIMARY_ABOUT_CONTENT_ID, // Explicitly ensure the ID is the fixed one
+      ...formData,
+      id: PRIMARY_ABOUT_CONTENT_ID, 
       image_url: imageUrlToSave || null,
       updated_at: new Date().toISOString(),
     };
     
     const { error: upsertError } = await supabase
       .from('about_content')
-      .upsert(dataForUpsert, { onConflict: 'id' }); // Ensure 'id' is part of dataForUpsert
+      .upsert(dataForUpsert, { onConflict: 'id' });
 
     if (upsertError) {
       console.error("Error saving About Me content:", JSON.stringify(upsertError, null, 2));
       toast({ title: "Error", description: `Failed to save About Me content: ${upsertError.message}`, variant: "destructive" });
     } else {
       toast({ title: "Success", description: "About Me content saved successfully." });
-      fetchAboutContent(); // Refresh the form with latest data
-      router.refresh(); // Revalidate public page if it fetches this data
+      fetchAboutContent(); 
+      router.refresh(); 
     }
   };
 
@@ -771,7 +771,7 @@ export default function AdminDashboardPage() {
             <div className="space-y-4">
             {projects.map((project) => (
                 <Card key={project.id} className="flex flex-col sm:flex-row justify-between items-start sm:items-center p-4 hover:shadow-md transition-shadow">
-                   {project.imageUrl && ( <div className="w-24 h-16 relative mr-4 mb-2 sm:mb-0 flex-shrink-0 rounded overflow-hidden border dark:bg-secondary"> <Image src={project.imageUrl} alt={project.title || "Project image"} layout="fill" objectFit="cover" className="dark:filter dark:brightness-0 dark:invert" /> </div> )}
+                   {project.imageUrl && ( <div className="w-24 h-16 relative mr-4 mb-2 sm:mb-0 flex-shrink-0 rounded overflow-hidden border dark:bg-secondary"> <Image src={project.imageUrl} alt={project.title || "Project image"} layout="fill" objectFit="cover" /> </div> )}
                   <div className="flex-grow mb-3 sm:mb-0">
                     <h4 className="font-semibold text-lg">{project.title}</h4>
                     <p className="text-sm text-muted-foreground">Status: <span className={`font-medium ${project.status === 'Deployed' ? 'text-green-600' : project.status === 'In Progress' ? 'text-blue-600' : 'text-gray-600'}`}>{project.status}</span>{project.status === 'In Progress' && project.progress != null && ` (${project.progress}%)`}</p>
@@ -779,9 +779,11 @@ export default function AdminDashboardPage() {
                   </div>
                   <div className="flex space-x-2 self-start sm:self-center shrink-0">
                     <Button variant="outline" size="sm" onClick={() => handleOpenProjectModal(project)}><Edit className="mr-1.5 h-3.5 w-3.5" /> Edit</Button>
-                    <Button variant="destructive" size="sm" onClick={() => triggerDeleteConfirmation(project)}>
-                        <Trash2 className="mr-1.5 h-3.5 w-3.5" /> Delete
-                    </Button>
+                    
+                       <Button variant="destructive" size="sm" onClick={() => triggerDeleteConfirmation(project)}>
+                          <Trash2 className="mr-1.5 h-3.5 w-3.5" /> Delete
+                       </Button>
+                  
                   </div>
                 </Card>
             ))}</div>
