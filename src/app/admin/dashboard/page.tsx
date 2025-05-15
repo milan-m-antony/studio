@@ -100,7 +100,6 @@ const aboutContentSchema = z.object({
 type AboutContentFormData = z.infer<typeof aboutContentSchema>;
 
 
-// Interface matching the data structure after Supabase fetch and mapping
 interface MappedProject {
   id: string;
   title: string;
@@ -108,7 +107,7 @@ interface MappedProject {
   imageUrl: string | null;
   liveDemoUrl: string | null;
   repoUrl: string | null;
-  tags: string[] | null; // This will be an array after mapping
+  tags: string[] | null;
   status: ProjectStatus | null;
   progress: number | null;
   created_at: string;
@@ -118,7 +117,7 @@ interface MappedSkillCategory {
   name: string;
   iconImageUrl: string | null;
   sort_order: number | null;
-  skills: SkillType[]; // SkillType already has iconImageUrl
+  skills: SkillType[];
   created_at: string;
 }
 
@@ -136,7 +135,7 @@ export default function AdminDashboardPage() {
   const [projects, setProjects] = useState<MappedProject[]>([]);
   const [isLoadingProjects, setIsLoadingProjects] = useState(false);
   const [isProjectModalOpen, setIsProjectModalOpen] = useState(false);
-  const [currentProject, setCurrentProject] = useState<ProjectFormData & { id?: string } | null>(null);
+  const [currentProject, setCurrentProject] = useState<MappedProject | null>(null);
   const [showProjectDeleteConfirm, setShowProjectDeleteConfirm] = useState(false);
   const [projectToDelete, setProjectToDelete] = useState<MappedProject | null>(null);
   const [projectImageFile, setProjectImageFile] = useState<File | null>(null);
@@ -146,7 +145,7 @@ export default function AdminDashboardPage() {
   const [skillCategories, setSkillCategories] = useState<MappedSkillCategory[]>([]);
   const [isLoadingSkills, setIsLoadingSkills] = useState(false);
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
-  const [currentCategory, setCurrentCategory] = useState<(SkillCategoryFormData & { id?: string }) | null>(null);
+  const [currentCategory, setCurrentCategory] = useState<(MappedSkillCategory & { icon_image_url?: string }) | null>(null);
   const [showCategoryDeleteConfirm, setShowCategoryDeleteConfirm] = useState(false);
   const [categoryToDelete, setCategoryToDelete] = useState<MappedSkillCategory | null>(null);
   const [categoryIconFile, setCategoryIconFile] = useState<File | null>(null);
@@ -154,7 +153,7 @@ export default function AdminDashboardPage() {
 
   // Skills State
   const [isSkillModalOpen, setIsSkillModalOpen] = useState(false);
-  const [currentSkill, setCurrentSkill] = useState<(SkillFormData & { id?: string }) | null>(null);
+  const [currentSkill, setCurrentSkill] = useState<(SkillType & { icon_image_url?: string }) | null>(null);
   const [parentCategoryIdForNewSkill, setParentCategoryIdForNewSkill] = useState<string | null>(null);
   const [showSkillDeleteConfirm, setShowSkillDeleteConfirm] = useState(false);
   const [skillToDelete, setSkillToDelete] = useState<SkillType | null>(null);
@@ -220,8 +219,8 @@ export default function AdminDashboardPage() {
     if (currentProject) {
       projectForm.reset({
         id: currentProject.id, title: currentProject.title, description: currentProject.description || '',
-        image_url: currentProject.image_url || '', live_demo_url: currentProject.live_demo_url || '', repo_url: currentProject.repo_url || '',
-        tags: typeof currentProject.tags === 'string' ? currentProject.tags : (currentProject.tags || []).join(', '),
+        image_url: currentProject.imageUrl || '', live_demo_url: currentProject.liveDemoUrl || '', repo_url: currentProject.repoUrl || '',
+        tags: (currentProject.tags || []).join(', '),
         status: currentProject.status || 'Concept',
         progress: currentProject.progress === null || currentProject.progress === undefined ? null : Number(currentProject.progress),
       });
@@ -232,7 +231,7 @@ export default function AdminDashboardPage() {
   useEffect(() => {
     if (currentCategory) {
       categoryForm.reset({
-        id: currentCategory.id, name: currentCategory.name, icon_image_url: currentCategory.icon_image_url || '',
+        id: currentCategory.id, name: currentCategory.name, icon_image_url: currentCategory.iconImageUrl || '',
         sort_order: currentCategory.sort_order === null || currentCategory.sort_order === undefined ? 0 : Number(currentCategory.sort_order),
       });
       setCategoryIconFile(null);
@@ -242,8 +241,8 @@ export default function AdminDashboardPage() {
   useEffect(() => {
     if (currentSkill) {
       skillForm.reset({
-        id: currentSkill.id, category_id: currentSkill.category_id || parentCategoryIdForNewSkill || '', name: currentSkill.name,
-        icon_image_url: currentSkill.icon_image_url || '', description: currentSkill.description || '',
+        id: currentSkill.id, category_id: currentSkill.categoryId || parentCategoryIdForNewSkill || '', name: currentSkill.name,
+        icon_image_url: currentSkill.iconImageUrl || '', description: currentSkill.description || '',
       });
       setSkillIconFile(null);
     } else { skillForm.reset({ category_id: parentCategoryIdForNewSkill || '', name: '', icon_image_url: '', description: ''}); setSkillIconFile(null); setSkillIconPreview(null); }
@@ -266,9 +265,9 @@ export default function AdminDashboardPage() {
         id: p.id,
         title: p.title,
         description: p.description,
-        imageUrl: p.image_url,
-        liveDemoUrl: p.live_demo_url,
-        repoUrl: p.repo_url,
+        imageUrl: p.image_url, // Map from snake_case
+        liveDemoUrl: p.live_demo_url, // Map
+        repoUrl: p.repo_url, // Map
         tags: p.tags,
         status: p.status as ProjectStatus | null,
         progress: p.progress,
@@ -300,13 +299,13 @@ export default function AdminDashboardPage() {
       const mappedData: MappedSkillCategory[] = data.map(cat => ({
         id: cat.id,
         name: cat.name,
-        iconImageUrl: cat.icon_image_url,
+        iconImageUrl: cat.icon_image_url, // Map from snake_case
         sort_order: cat.sort_order,
         created_at: cat.created_at,
-        skills: (cat.skills || []).map((s: any) => ({ // Use 'any' for intermediate Supabase row type for skills
+        skills: (cat.skills || []).map((s: any) => ({
           id: s.id,
           name: s.name,
-          iconImageUrl: s.icon_image_url,
+          iconImageUrl: s.icon_image_url, // Map from snake_case
           description: s.description,
           categoryId: s.category_id,
         })),
@@ -353,7 +352,41 @@ export default function AdminDashboardPage() {
 
 
   // Auth handlers
-  const handleLoginSubmit = (e: FormEvent) => { e.preventDefault(); setError(''); const trimmedUsername = username.trim(); const trimmedPassword = password.trim(); if (trimmedUsername === process.env.NEXT_PUBLIC_ADMIN_USERNAME && trimmedPassword === process.env.NEXT_PUBLIC_ADMIN_PASSWORD) { if (typeof window !== 'undefined') localStorage.setItem('isAdminAuthenticated', 'true'); window.dispatchEvent(new CustomEvent('authChange')); setIsAuthenticatedForRender(true); fetchProjects(); fetchSkillCategories(); fetchAboutContent(); } else { setError("Invalid username or password."); setIsAuthenticatedForRender(false); }};
+  const handleLoginSubmit = (e: FormEvent) => {
+    e.preventDefault();
+    setError('');
+    const trimmedUsername = username.trim();
+    const trimmedPassword = password.trim();
+
+    // Diagnostic logs - these will appear in the browser console
+    console.log('[Admin Login] Attempting login...');
+    console.log('[Admin Login] Entered Username:', `"${trimmedUsername}"`); // Log entered username
+    const expectedUsername = process.env.NEXT_PUBLIC_ADMIN_USERNAME;
+    console.log('[Admin Login] Expected Username from env:', `"${expectedUsername}"`); // Log expected username
+    
+    const usernameMatch = trimmedUsername === expectedUsername;
+    const passwordMatch = trimmedPassword === process.env.NEXT_PUBLIC_ADMIN_PASSWORD;
+
+    console.log('[Admin Login] Username match status:', usernameMatch);
+    console.log('[Admin Login] Password match status (not logging actual passwords):', passwordMatch);
+
+
+    if (usernameMatch && passwordMatch) {
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('isAdminAuthenticated', 'true');
+        window.dispatchEvent(new CustomEvent('authChange'));
+      }
+      setIsAuthenticatedForRender(true);
+      fetchProjects();
+      fetchSkillCategories();
+      fetchAboutContent();
+      console.log('[Admin Login] Login successful.');
+    } else {
+      setError("Invalid username or password.");
+      setIsAuthenticatedForRender(false);
+      console.log('[Admin Login] Login failed.');
+    }
+  };
   const handleLogout = () => { if (typeof window !== 'undefined') localStorage.removeItem('isAdminAuthenticated'); window.dispatchEvent(new CustomEvent('authChange')); setIsAuthenticatedForRender(false); setUsername(''); setPassword(''); setProjects([]); setSkillCategories([]); aboutForm.reset(); setAboutImagePreview(null); };
 
 
@@ -371,11 +404,11 @@ export default function AdminDashboardPage() {
     if (projectImageFile) {
       const fileExt = projectImageFile.name.split('.').pop();
       const fileName = `${Date.now()}.${fileExt}`;
-      const filePath = `projects/${fileName}`; // Store in a 'projects' folder in the bucket
+      const filePath = `projects/${fileName}`;
       toast({ title: "Uploading Project Image", description: "Please wait...", variant: "default" });
       const { data: uploadData, error: uploadError } = await supabase.storage
-        .from('project-images') // Ensure this bucket exists and is configured
-        .upload(filePath, projectImageFile, { cacheControl: '3600', upsert: formData.id ? true : false }); // upsert if editing, new if adding
+        .from('project-images')
+        .upload(filePath, projectImageFile, { cacheControl: '3600', upsert: !!formData.id });
 
       if (uploadError) {
         console.error("Error uploading project image:", JSON.stringify(uploadError, null, 2));
@@ -392,13 +425,13 @@ export default function AdminDashboardPage() {
 
     const projectDataToSave = {
       ...formData,
-      image_url: imageUrlToSave || null, // Ensure it's null if empty, not ""
-      progress: formData.progress === undefined || formData.progress === null ? null : Number(formData.progress), // Ensure progress is number or null
+      image_url: imageUrlToSave || null,
+      progress: formData.progress === undefined || formData.progress === null ? null : Number(formData.progress),
       live_demo_url: formData.live_demo_url || null,
       repo_url: formData.repo_url || null,
     };
 
-    if (formData.id) { // Update existing project
+    if (formData.id) {
       const { error: updateError } = await supabase
         .from('projects')
         .update(projectDataToSave)
@@ -409,11 +442,11 @@ export default function AdminDashboardPage() {
       } else {
         toast({ title: "Success", description: "Project updated successfully." });
       }
-    } else { // Add new project
-      const { id, ...dataToInsert } = projectDataToSave; // Exclude 'id' if it was part of formData but undefined
+    } else {
+      const { id, ...dataToInsert } = projectDataToSave;
       const { error: insertError } = await supabase
         .from('projects')
-        .insert(dataToInsert as any); // Using 'as any' temporarily if type mismatches are complex, ensure dataToInsert matches Supabase schema
+        .insert(dataToInsert as any);
       if (insertError) {
         console.error("Error adding project (raw Supabase error object):", JSON.stringify(insertError, null, 2));
         toast({ title: "Error", description: `Failed to add project: ${insertError.message || 'Supabase returned an error without a specific message. Check RLS policies or console for details.'}`, variant: "destructive" });
@@ -425,7 +458,7 @@ export default function AdminDashboardPage() {
     setIsProjectModalOpen(false);
     setProjectImageFile(null);
     projectForm.reset();
-    router.refresh(); // Revalidate public page cache
+    router.refresh();
   };
 
   const onCategorySubmit: SubmitHandler<SkillCategoryFormData> = async (formData) => {
@@ -518,7 +551,7 @@ export default function AdminDashboardPage() {
       if (insertError) { toast({ title: "Error adding skill", description: insertError.message, variant: "destructive" }); }
       else { toast({ title: "Success", description: "Skill added." }); }
     }
-    fetchSkillCategories(); // Re-fetch categories to update skill lists
+    fetchSkillCategories();
     setIsSkillModalOpen(false);
     setSkillIconFile(null);
     skillForm.reset();
@@ -576,75 +609,72 @@ export default function AdminDashboardPage() {
   // Delete handlers
   const handleDeleteProject = async () => {
     if (!projectToDelete) return;
-    console.log("[AdminDashboard] Attempting to delete project ID:", projectToDelete.id); // Log 1
+    console.log("[AdminDashboard] Attempting to delete project ID:", projectToDelete.id);
     
-    // Optional: Delete image from storage if it exists and belongs to this project
     if (projectToDelete.imageUrl) {
         const imagePath = projectToDelete.imageUrl.substring(projectToDelete.imageUrl.indexOf('/project-images/') + '/project-images/'.length);
-        if (imagePath && !imagePath.startsWith('http')) { // Basic check if it's a path within the bucket
+        if (imagePath && !imagePath.startsWith('http')) {
             console.log("[AdminDashboard] Attempting to delete image from storage:", imagePath);
             const { error: storageError } = await supabase.storage.from('project-images').remove([imagePath]);
             if (storageError) {
-                console.warn("Error deleting image from storage, proceeding with DB delete:", JSON.stringify(storageError, null, 2));
-                // Non-critical, so we don't return, just warn.
+                console.warn("[AdminDashboard] Error deleting project image from storage, proceeding with DB delete:", JSON.stringify(storageError, null, 2));
             }
         }
     }
     
-    console.log("[AdminDashboard] Proceeding with Supabase DB delete call..."); // Log 3
+    console.log("[AdminDashboard] Proceeding with Supabase DB delete call for project...");
     const { error: deleteError } = await supabase
       .from('projects')
       .delete()
       .eq('id', projectToDelete.id);
 
     if (deleteError) {
-      console.error("Error deleting project (raw Supabase error object):", JSON.stringify(deleteError, null, 2)); // Log 4
+      console.error("[AdminDashboard] Error deleting project from DB (raw Supabase error object):", JSON.stringify(deleteError, null, 2));
       toast({ title: "Error", description: `Failed to delete project: ${deleteError.message || 'An unexpected error occurred.'}`, variant: "destructive" });
     } else {
-      console.log("[AdminDashboard] Project deleted successfully from DB."); // Log 5
+      console.log("[AdminDashboard] Project deleted successfully from DB.");
       toast({ title: "Success", description: "Project deleted successfully." });
-      fetchProjects(); // Refresh project list
-      router.refresh(); // Revalidate public page cache
+      fetchProjects();
+      router.refresh();
     }
     setShowProjectDeleteConfirm(false);
     setProjectToDelete(null);
   };
 
   const performDeleteCategory = async (categoryId: string) => {
-    // Check if category has skills
     const category = skillCategories.find(cat => cat.id === categoryId);
     if (category && category.skills && category.skills.length > 0) {
       toast({ title: "Action Denied", description: "Cannot delete category: It still contains skills. Please delete its skills first.", variant: "destructive" });
       return;
     }
-    // Optional: Delete category icon from storage
     if (category?.iconImageUrl) {
       const imagePath = category.iconImageUrl.substring(category.iconImageUrl.indexOf('/category-icons/') + '/category-icons/'.length);
       if(imagePath && !imagePath.startsWith('http')) {
-          await supabase.storage.from('category-icons').remove([imagePath]);
+          const {error: storageError} = await supabase.storage.from('category-icons').remove([imagePath]);
+          if (storageError) console.warn("[AdminDashboard] Error deleting category icon from storage:", JSON.stringify(storageError, null, 2));
       }
     }
 
     const { error } = await supabase.from('skill_categories').delete().eq('id', categoryId);
-    if (error) { toast({ title: "Error deleting category", description: error.message, variant: "destructive" }); }
+    if (error) { console.error("[AdminDashboard] Error deleting category from DB:", JSON.stringify(error, null, 2)); toast({ title: "Error deleting category", description: error.message, variant: "destructive" }); }
     else { toast({ title: "Success", description: "Category deleted." }); fetchSkillCategories(); router.refresh(); }
     setShowCategoryDeleteConfirm(false);
     setCategoryToDelete(null);
   };
 
   const performDeleteSkill = async (skillId: string) => {
-    // Optional: Delete skill icon from storage
     const skillToDeleteData = skillCategories.flatMap(cat => cat.skills).find(s => s.id === skillId);
      if (skillToDeleteData?.iconImageUrl) {
       const imagePath = skillToDeleteData.iconImageUrl.substring(skillToDeleteData.iconImageUrl.indexOf('/skill-icons/') + '/skill-icons/'.length);
        if(imagePath && !imagePath.startsWith('http')) {
-          await supabase.storage.from('skill-icons').remove([imagePath]);
+          const {error: storageError} = await supabase.storage.from('skill-icons').remove([imagePath]);
+          if (storageError) console.warn("[AdminDashboard] Error deleting skill icon from storage:", JSON.stringify(storageError, null, 2));
       }
     }
 
     const { error } = await supabase.from('skills').delete().eq('id', skillId);
-    if (error) { toast({ title: "Error deleting skill", description: error.message, variant: "destructive" }); }
-    else { toast({ title: "Success", description: "Skill deleted." }); fetchSkillCategories(); router.refresh(); } // Re-fetch categories to update skill counts/lists
+    if (error) { console.error("[AdminDashboard] Error deleting skill from DB:", JSON.stringify(error, null, 2)); toast({ title: "Error deleting skill", description: error.message, variant: "destructive" }); }
+    else { toast({ title: "Success", description: "Skill deleted." }); fetchSkillCategories(); router.refresh(); }
     setShowSkillDeleteConfirm(false);
     setSkillToDelete(null);
   };
@@ -652,8 +682,8 @@ export default function AdminDashboardPage() {
 
   // Modal triggers / openers
   const triggerDeleteConfirmation = (project: MappedProject) => { setProjectToDelete(project); setShowProjectDeleteConfirm(true);};
-  const handleOpenProjectModal = (project?: MappedProject) => { setCurrentProject(project ? { ...project, tags: Array.isArray(project.tags) ? project.tags.join(', ') : (project.tags || '') } : null); setIsProjectModalOpen(true); };
-  const handleOpenCategoryModal = (category?: MappedSkillCategory) => { setCurrentCategory(category ? { id: category.id, name: category.name, icon_image_url: category.iconImageUrl || '', sort_order: category.sort_order || 0 } : null); setIsCategoryModalOpen(true); };
+  const handleOpenProjectModal = (project?: MappedProject) => { setCurrentProject(project || null); setIsProjectModalOpen(true); };
+  const handleOpenCategoryModal = (category?: MappedSkillCategory) => { setCurrentCategory(category ? { ...category, icon_image_url: category.iconImageUrl || '' } : null); setIsCategoryModalOpen(true); };
   const triggerCategoryDeleteConfirmation = (category: MappedSkillCategory) => { setCategoryToDelete(category); setShowCategoryDeleteConfirm(true); };
   const handleOpenSkillModal = (category_id: string, skill?: SkillType) => { setParentCategoryIdForNewSkill(category_id); setCurrentSkill(skill ? { ...skill, icon_image_url: skill.iconImageUrl || '', category_id: skill.categoryId || category_id } : null); skillForm.setValue('category_id', category_id); setIsSkillModalOpen(true); };
   const triggerSkillDeleteConfirmation = (skill: SkillType) => { setSkillToDelete(skill); setShowSkillDeleteConfirm(true); };
@@ -686,7 +716,7 @@ export default function AdminDashboardPage() {
               <Button type="submit" className="w-full text-lg py-3"><LogIn className="mr-2 h-5 w-5" /> Log In</Button>
             </form>
           </CardContent>
-          <CardFooter className="mt-6 flex flex-col items-center space-y-2">
+           <CardFooter className="mt-6 flex flex-col items-center space-y-2">
              <Link href="/" className={cn(buttonVariants({ variant: "link" }), "text-muted-foreground hover:text-primary flex items-center")}>
                 <Home className="mr-2 h-4 w-4" />Back to Portfolio
             </Link>
@@ -780,7 +810,7 @@ export default function AdminDashboardPage() {
             <Dialog open={isCategoryModalOpen} onOpenChange={(isOpen) => { setIsCategoryModalOpen(isOpen); if (!isOpen) { setCurrentCategory(null); setCategoryIconFile(null); categoryForm.reset(); }}}>
               <DialogTrigger asChild><Button onClick={() => handleOpenCategoryModal()}><PlusCircle className="mr-2 h-4 w-4" /> Add Category</Button></DialogTrigger>
               <DialogContent className="sm:max-w-[425px]">
-                <DialogHeader><DialogTitle>{currentCategory?.id ? 'Edit Category' : 'Add New Category'}</DialogTitle></DialogHeader>
+                <DialogHeader><DialogTitle>{currentCategory?.id ? 'Edit Skill Category' : 'Add New Skill Category'}</DialogTitle></DialogHeader>
                 <form onSubmit={categoryForm.handleSubmit(onCategorySubmit)} className="grid gap-4 py-4">
                   <div><Label htmlFor="categoryName">Name</Label><Input id="categoryName" {...categoryForm.register("name")} />{categoryForm.formState.errors.name && <p className="text-destructive text-sm mt-1">{categoryForm.formState.errors.name.message}</p>}</div>
                   <div className="space-y-2">
@@ -789,7 +819,7 @@ export default function AdminDashboardPage() {
                     {(categoryIconPreview || currentCategoryIconUrlForPreview) && (<div className="mt-2 p-2 border rounded-md bg-muted aspect-square relative w-24 h-24 mx-auto"><Image src={categoryIconPreview || currentCategoryIconUrlForPreview || "https://placehold.co/100x100.png"} alt="Icon preview" fill objectFit="contain" className="rounded dark:filter dark:brightness-0 dark:invert"/></div>)}
                      <div>
                         <Label htmlFor="icon_image_url_category" className="text-xs text-muted-foreground">
-                          Or enter Icon URL (upload will override). You can find icons at <Link href="https://lucide.dev/icons/" target="_blank" rel="noopener noreferrer" className="text-primary underline">lucide.dev/icons</Link>.
+                          Or enter Icon Image URL (upload will override). You can find icons at <Link href="https://lucide.dev/icons/" target="_blank" rel="noopener noreferrer" className="text-primary underline">lucide.dev/icons</Link>.
                         </Label>
                         <Input id="icon_image_url_category" {...categoryForm.register("icon_image_url")} placeholder="https://example.com/icon.png"/>
                         {categoryForm.formState.errors.icon_image_url && <p className="text-destructive text-sm mt-1">{categoryForm.formState.errors.icon_image_url.message}</p>}
@@ -911,7 +941,7 @@ export default function AdminDashboardPage() {
               {(skillIconPreview || currentSkillIconUrlForPreview) && (<div className="mt-2 p-2 border rounded-md bg-muted aspect-square relative w-24 h-24 mx-auto"><Image src={skillIconPreview || currentSkillIconUrlForPreview || "https://placehold.co/100x100.png"} alt="Icon preview" fill objectFit="contain" className="rounded dark:filter dark:brightness-0 dark:invert"/></div>)}
                <div>
                   <Label htmlFor="icon_image_url_skill" className="text-xs text-muted-foreground">
-                    Or enter Icon URL (upload will override). You can find icons at <Link href="https://lucide.dev/icons/" target="_blank" rel="noopener noreferrer" className="text-primary underline">lucide.dev/icons</Link>.
+                    Or enter Icon Image URL (upload will override).
                   </Label>
                   <Input id="icon_image_url_skill" {...skillForm.register("icon_image_url")} placeholder="https://example.com/icon.png"/>
                   {skillForm.formState.errors.icon_image_url && <p className="text-destructive text-sm mt-1">{skillForm.formState.errors.icon_image_url.message}</p>}
@@ -925,7 +955,7 @@ export default function AdminDashboardPage() {
 
       <AlertDialog open={showCategoryDeleteConfirm} onOpenChange={setShowCategoryDeleteConfirm}>
          <AlertDialogContent className="bg-destructive border-destructive text-destructive-foreground">
-            <AlertDialogHeader><AlertDialogTitle className="text-destructive-foreground">Delete Category: {categoryToDelete?.name}?</AlertDialogTitle><AlertDialogDescription className="text-destructive-foreground/90">This will also delete all skills within this category. This action cannot be undone.</AlertDialogDescription></AlertDialogHeader>
+            <AlertDialogHeader><AlertDialogTitle className="text-destructive-foreground">Delete Category: {categoryToDelete?.name}?</AlertDialogTitle><AlertDialogDescription className="text-destructive-foreground/90">This will delete the category. This action cannot be undone. Ensure all skills within are moved or deleted first if necessary.</AlertDialogDescription></AlertDialogHeader>
             <AlertDialogFooter>
                 <AlertDialogCancel onClick={() => { setShowCategoryDeleteConfirm(false); setCategoryToDelete(null);}} className={cn(buttonVariants({ variant: "outline" }), "border-destructive-foreground/40 text-destructive-foreground", "hover:bg-destructive-foreground/10 hover:text-destructive-foreground hover:border-destructive-foreground/60")}>Cancel</AlertDialogCancel>
                 <AlertDialogAction onClick={() => categoryToDelete && performDeleteCategory(categoryToDelete.id)} className={cn(buttonVariants({ variant: "default" }), "bg-destructive-foreground text-destructive", "hover:bg-destructive-foreground/90")}>Delete Category</AlertDialogAction>
