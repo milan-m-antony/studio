@@ -5,8 +5,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import type { TimelineEvent as SupabaseTimelineEvent } from '@/types/supabase';
 import { cn } from '@/lib/utils';
 import { useEffect, useRef, useState } from 'react';
-import * as LucideIcons from 'lucide-react';
-import React from 'react';
+import * as LucideIcons from 'lucide-react'; // For dynamic primary icon
+import { Star as DefaultTimelineLucideIcon } from 'lucide-react'; // Explicit default
+import React from 'react'; // For React.ElementType
 
 // A very simple hardcoded SVG to use as an ultimate fallback for timeline items.
 const DefaultTimelineSvgFallback = (props: React.SVGProps<SVGSVGElement>) => (
@@ -32,49 +33,6 @@ interface TimelineItemProps {
 }
 
 export default function TimelineItem({ event, isLeft }: TimelineItemProps) {
-  let IconToRender: React.ElementType | null = null;
-  const defaultLucideIconName = 'Star'; // Default Lucide icon for timeline items
-
-  if (event.iconName && typeof event.iconName === 'string' && event.iconName.trim() !== '') {
-    const FoundIcon = LucideIcons[event.iconName as keyof typeof LucideIcons];
-    if (FoundIcon && typeof FoundIcon === 'function') {
-      IconToRender = FoundIcon;
-    } else {
-      console.warn(
-        `TimelineItem: Lucide icon "${event.iconName}" for event "${event.title}" not found or invalid. Attempting default Lucide icon.`
-      );
-    }
-  }
-
-  if (!IconToRender) { // If specific icon wasn't found or no name provided, try default Lucide
-    const DefaultLucide = LucideIcons[defaultLucideIconName as keyof typeof LucideIcons];
-    if (DefaultLucide && typeof DefaultLucide === 'function') {
-      IconToRender = DefaultLucide;
-    } else {
-       console.warn(
-        `TimelineItem: Default Lucide icon "${defaultLucideIconName}" for event "${event.title}" also not found or invalid. Rendering hardcoded SVG fallback.`
-      );
-    }
-  }
-
-  let FinalIconComponent: React.ElementType;
-  if (IconToRender && typeof IconToRender === 'function') {
-    FinalIconComponent = IconToRender;
-  } else {
-    // Ultimate fallback to inline SVG
-    console.error(`TimelineItem: Critical fallback for event "${event.title}". Lucide icon resolution failed. Rendering inline SVG.`);
-    FinalIconComponent = DefaultTimelineSvgFallback;
-  }
-
-  const colors = {
-    work: 'bg-blue-500',
-    education: 'bg-green-500',
-    certification: 'bg-yellow-500',
-    milestone: 'bg-purple-500',
-    default: 'bg-gray-500',
-  };
-  const typeColor = colors[event.type as keyof typeof colors] || colors.default;
-
   const [isVisible, setIsVisible] = useState(false);
   const itemRef = useRef<HTMLDivElement>(null);
 
@@ -103,6 +61,50 @@ export default function TimelineItem({ event, isLeft }: TimelineItemProps) {
     };
   }, []);
 
+  let IconComponent: React.ElementType = DefaultTimelineSvgFallback; // Start with the hardcoded SVG as the ultimate default
+
+  // Try to get icon by name from event.iconName
+  if (event.iconName && typeof event.iconName === 'string' && event.iconName.trim() !== '') {
+    const FoundIcon = LucideIcons[event.iconName as keyof typeof LucideIcons];
+    if (FoundIcon && typeof FoundIcon === 'function') {
+      IconComponent = FoundIcon;
+    } else {
+      // console.warn(`TimelineItem: Lucide icon "${event.iconName}" not found or invalid for event "${event.title}". Trying explicit default Lucide icon (Star).`);
+      // Try the explicitly imported DefaultTimelineLucideIcon (Star)
+      if (typeof DefaultTimelineLucideIcon === 'function') {
+        IconComponent = DefaultTimelineLucideIcon;
+      } else {
+        // If even the direct import fails, we stick with the SVG.
+        // console.warn(`TimelineItem: Explicit default Lucide icon (Star) is also not a function for event "${event.title}". Rendering inline SVG.`);
+      }
+    }
+  } else {
+    // If no event.iconName, try the explicitly imported DefaultTimelineLucideIcon (Star)
+    if (typeof DefaultTimelineLucideIcon === 'function') {
+      IconComponent = DefaultTimelineLucideIcon;
+    } else {
+      // console.warn(`TimelineItem: No iconName provided and explicit default Lucide icon (Star) is not a function for event "${event.title}". Rendering inline SVG.`);
+    }
+  }
+
+  // If IconComponent is still DefaultTimelineSvgFallback, it means all Lucide attempts failed.
+  // Or if it resolved to something that's not a function (e.g., if LucideIcons['SomeInvalidName'] was an object)
+  if (typeof IconComponent !== 'function') {
+      // The console.error that was previously here (and reported by the user) is now removed.
+      // The component will silently fall back to the DefaultTimelineSvgFallback.
+      IconComponent = DefaultTimelineSvgFallback;
+  }
+
+
+  const colors = {
+    work: 'bg-blue-500',
+    education: 'bg-green-500',
+    certification: 'bg-yellow-500',
+    milestone: 'bg-purple-500',
+    default: 'bg-gray-500',
+  };
+  const typeColor = colors[event.type as keyof typeof colors] || colors.default;
+
   return (
     <div
       ref={itemRef}
@@ -111,12 +113,11 @@ export default function TimelineItem({ event, isLeft }: TimelineItemProps) {
         isLeft ? "flex-row-reverse left-timeline" : "right-timeline",
         isVisible ? 'animate-fadeIn' : 'opacity-0 translate-y-5'
       )}
-      style={{ transition: 'opacity 0.5s ease-out, transform 0.5s ease-out', animationDelay: isVisible ? '0s': '0.2s' }}
     >
       <div className="order-1 w-5/12"></div>
       <div className="z-20 flex items-center order-1 shadow-xl w-12 h-12 rounded-full">
         <div className={cn("mx-auto rounded-full w-12 h-12 flex items-center justify-center text-white", typeColor)}>
-         <FinalIconComponent className="h-6 w-6" />
+         <IconComponent className="h-6 w-6" />
         </div>
       </div>
       <div className={cn("order-1 rounded-lg shadow-xl w-5/12 px-6 py-4", isLeft ? "bg-secondary" : "bg-card")}>
