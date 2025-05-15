@@ -6,8 +6,6 @@ import { useRouter } from 'next/navigation';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-// Textarea not used, can be removed if not planned for future.
-// import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { UploadCloud, PlusCircle, Edit, Trash2, Award as CertificateIcon } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
@@ -48,14 +46,11 @@ const certificationSchema = z.object({
 });
 type CertificationFormData = z.infer<typeof certificationSchema>;
 
-// MappedCertification is effectively the same as Certification from supabase types after mapping
-// interface MappedCertification extends Certification {} // Not strictly needed if Certification type is already camelCased for imageUrl/verifyUrl
-
 export default function CertificationsManager() {
   const router = useRouter();
   const { toast } = useToast();
 
-  const [certifications, setCertifications] = useState<Certification[]>([]); // Use Certification type directly
+  const [certifications, setCertifications] = useState<Certification[]>([]);
   const [isLoadingCertifications, setIsLoadingCertifications] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [currentCertification, setCurrentCertification] = useState<Certification | null>(null);
@@ -69,13 +64,12 @@ export default function CertificationsManager() {
     defaultValues: { title: '', issuer: '', date: '', image_url: '', verify_url: '' }
   });
 
-  const currentCertificationImageUrlForPreviewWatcher = certificationForm.watch('image_url'); // For manual URL input reaction
+  const currentCertificationImageUrlForPreviewWatcher = certificationForm.watch('image_url');
 
   useEffect(() => {
     fetchCertifications();
   }, []);
 
-  // Effect to populate form and set initial preview when editing
   useEffect(() => {
     if (currentCertification) {
       certificationForm.reset({
@@ -86,37 +80,38 @@ export default function CertificationsManager() {
         image_url: currentCertification.imageUrl || '',
         verify_url: currentCertification.verifyUrl || '',
       });
-      setCertificationImageFile(null); // Clear any selected file
-      setCertificationImagePreview(currentCertification.imageUrl || null); // Set preview from loaded data
+      setCertificationImageFile(null);
+      setCertificationImagePreview(currentCertification.imageUrl || null);
+      console.log("[CertManager] Editing. Set preview from currentCertification.imageUrl:", currentCertification.imageUrl);
     } else {
       certificationForm.reset({ title: '', issuer: '', date: '', image_url: '', verify_url: '' });
       setCertificationImageFile(null);
-      setCertificationImagePreview(null); // Clear preview for new form
+      setCertificationImagePreview(null);
+       console.log("[CertManager] New form. Cleared preview.");
     }
   }, [currentCertification, certificationForm]);
 
-
-  // Effect to update preview based on new file upload or changes to the image_url form field
   useEffect(() => {
+    let newPreviewUrl: string | null = null;
     if (certificationImageFile) {
-      // New file selected, generate and set its preview
       const reader = new FileReader();
       reader.onloadend = () => {
-        setCertificationImagePreview(reader.result as string);
+        newPreviewUrl = reader.result as string;
+        setCertificationImagePreview(newPreviewUrl);
+        console.log("[CertManager] Preview updated from new file:", newPreviewUrl);
       };
       reader.readAsDataURL(certificationImageFile);
+      return; 
+    } else if (currentCertificationImageUrlForPreviewWatcher && currentCertificationImageUrlForPreviewWatcher.trim() !== '') {
+      newPreviewUrl = currentCertificationImageUrlForPreviewWatcher;
+      console.log("[CertManager] Preview updated from form URL watcher:", newPreviewUrl);
+    } else if (currentCertification && currentCertification.imageUrl) {
+      newPreviewUrl = currentCertification.imageUrl; // Fallback if form field is cleared during edit
+      console.log("[CertManager] Preview fell back to currentCertification.imageUrl:", newPreviewUrl);
     } else {
-      // No new file. Preview should reflect the form's image_url field
-      // (which could be from initial load or manually typed)
-      // If that's empty, and we're editing, fall back to original image.
-      if (currentCertificationImageUrlForPreviewWatcher && currentCertificationImageUrlForPreviewWatcher.trim() !== '') {
-        setCertificationImagePreview(currentCertificationImageUrlForPreviewWatcher);
-      } else if (currentCertification && currentCertification.imageUrl) {
-        setCertificationImagePreview(currentCertification.imageUrl); // Fallback to original if form field is cleared during edit
-      } else {
-        setCertificationImagePreview(null); // No image
-      }
+      console.log("[CertManager] No valid source for preview, setting to null.");
     }
+    setCertificationImagePreview(newPreviewUrl);
   }, [certificationImageFile, currentCertificationImageUrlForPreviewWatcher, currentCertification]);
 
 
@@ -134,7 +129,7 @@ export default function CertificationsManager() {
     } else if (data) {
       const mappedData: Certification[] = data.map(c => ({
         ...c,
-        imageUrl: c.image_url,
+        imageUrl: c.image_url, // Ensure mapping if DB uses snake_case
         verifyUrl: c.verify_url,
       }));
       setCertifications(mappedData);
@@ -147,10 +142,9 @@ export default function CertificationsManager() {
   const handleCertificationImageFileChange = (event: ChangeEvent<HTMLInputElement>) => {
     if (event.target.files?.[0]) {
       setCertificationImageFile(event.target.files[0]);
-      certificationForm.setValue('image_url', ''); // Clear URL if file is chosen, file preview will take over
+      certificationForm.setValue('image_url', ''); 
     } else {
       setCertificationImageFile(null);
-      // If file is deselected, the preview will update via useEffect based on form's image_url or currentCertification
     }
   };
 
@@ -159,15 +153,14 @@ export default function CertificationsManager() {
     let oldImageStoragePathToDelete: string | null = null;
     const existingCertificationImageUrl = currentCertification?.imageUrl;
 
-
-    if (existingCertificationImageUrl) { // If we are editing an existing project
+    if (existingCertificationImageUrl) {
         const pathParts = existingCertificationImageUrl.split('/certification-images/');
         if (pathParts.length > 1 && !pathParts[1].startsWith('http')) { 
             oldImageStoragePathToDelete = pathParts[1];
         }
     }
     
-    if (certificationImageFile) { // A new file is being uploaded
+    if (certificationImageFile) {
       const fileExt = certificationImageFile.name.split('.').pop();
       const fileName = `cert_${Date.now()}.${fileExt}`; 
       const filePath = `${fileName}`; 
@@ -175,7 +168,7 @@ export default function CertificationsManager() {
       toast({ title: "Uploading Certificate Image", description: "Please wait..." });
       const { data: uploadData, error: uploadError } = await supabase.storage
         .from('certification-images') 
-        .upload(filePath, certificationImageFile, { cacheControl: '3600', upsert: false }); // upsert: false to avoid conflicts
+        .upload(filePath, certificationImageFile, { cacheControl: '3600', upsert: false });
 
       if (uploadError) {
         console.error("Error uploading certificate image:", JSON.stringify(uploadError, null, 2));
@@ -187,20 +180,18 @@ export default function CertificationsManager() {
         toast({ title: "Error", description: "Failed to get public URL for uploaded image.", variant: "destructive" });
         return;
       }
-      imageUrlToSaveInDb = publicUrlData.publicUrl; // This is the new URL to save
+      imageUrlToSaveInDb = publicUrlData.publicUrl;
     }
-    // No new file uploaded. imageUrlToSaveInDb remains what's in formData.image_url.
-    // If formData.image_url is empty (because user cleared it), imageUrlToSaveInDb will be empty or null.
-
+    
     const dataForSupabase = {
       title: formData.title,
       issuer: formData.issuer,
       date: formData.date,
-      image_url: imageUrlToSaveInDb || null, // Save new URL, manually entered URL, or null if cleared
+      image_url: imageUrlToSaveInDb || null,
       verify_url: formData.verify_url || null,
     };
     
-    if (formData.id) { // Update existing certification
+    if (formData.id) {
       const { error: updateError } = await supabase
         .from('certifications')
         .update(dataForSupabase)
@@ -210,14 +201,13 @@ export default function CertificationsManager() {
         toast({ title: "Error", description: `Failed to update certification: ${updateError.message}`, variant: "destructive" });
       } else {
         toast({ title: "Success", description: "Certification updated successfully." });
-        // Delete old image if a new one was uploaded OR if the URL was cleared/changed
         if (oldImageStoragePathToDelete && imageUrlToSaveInDb !== existingCertificationImageUrl) {
             console.log("[CertManager] Attempting to delete old cert image from storage:", oldImageStoragePathToDelete);
             const { error: storageDeleteError } = await supabase.storage.from('certification-images').remove([oldImageStoragePathToDelete]);
             if (storageDeleteError) console.warn("[CertManager] Error deleting old cert image from storage:", JSON.stringify(storageDeleteError, null, 2));
         }
       }
-    } else { // Add new certification
+    } else {
       const { error: insertError } = await supabase
         .from('certifications')
         .insert(dataForSupabase);
@@ -231,7 +221,6 @@ export default function CertificationsManager() {
     fetchCertifications();
     setIsModalOpen(false);
     setCertificationImageFile(null); 
-    // certificationForm.reset(); // Form is reset when currentCertification changes or modal closes
     router.refresh();
   };
   
@@ -271,7 +260,7 @@ export default function CertificationsManager() {
   };
 
   const handleOpenModal = (certification?: Certification) => {
-    setCurrentCertification(certification || null); // This will trigger the useEffect to reset form and preview
+    setCurrentCertification(certification || null);
     setIsModalOpen(true);
   };
 
@@ -286,7 +275,7 @@ export default function CertificationsManager() {
       </CardHeader>
       <CardContent>
         <div className="mb-6 text-right">
-          <Dialog open={isModalOpen} onOpenChange={(isOpen) => { setIsModalOpen(isOpen); if (!isOpen) { setCurrentCertification(null); /* Form and preview reset handled by useEffect on currentCertification change */ } }}>
+          <Dialog open={isModalOpen} onOpenChange={(isOpen) => { setIsModalOpen(isOpen); if (!isOpen) { setCurrentCertification(null); } }}>
             <DialogTrigger asChild>
               <Button onClick={() => handleOpenModal()}>
                 <PlusCircle className="mr-2 h-4 w-4" /> Add Certification
@@ -307,14 +296,13 @@ export default function CertificationsManager() {
                     <Input id="cert_image_file" type="file" accept="image/*" onChange={handleCertificationImageFileChange} className="flex-grow" />
                     <UploadCloud className="h-6 w-6 text-muted-foreground"/>
                   </div>
-                  {/* Simplified preview rendering */}
                   {certificationImagePreview && (
                     <div className="mt-2 p-2 border rounded-md bg-muted aspect-video relative w-full max-w-xs mx-auto">
                       <Image 
                         src={certificationImagePreview} 
                         alt="Certificate image preview" 
                         fill 
-                        className="rounded object-contain dark:filter dark:brightness-0 dark:invert"
+                        className="rounded object-contain" // Removed dark mode inversion filter
                         sizes="(max-width: 480px) 100vw, 33vw"
                       />
                     </div>
@@ -331,7 +319,7 @@ export default function CertificationsManager() {
                 <div><Label htmlFor="certVerifyUrl">Verification URL (Optional)</Label><Input id="certVerifyUrl" {...certificationForm.register("verify_url")} placeholder="https://example.com/verify/123" />{certificationForm.formState.errors.verify_url && <p className="text-destructive text-sm mt-1">{certificationForm.formState.errors.verify_url.message}</p>}</div>
                 
                 <DialogFooter>
-                  <DialogClose asChild><Button type="button" variant="outline" onClick={() => { /* Let onOpenChange handle reset */ }}>Cancel</Button></DialogClose>
+                  <DialogClose asChild><Button type="button" variant="outline">Cancel</Button></DialogClose>
                   <Button type="submit">{currentCertification?.id ? 'Save Changes' : 'Add Certification'}</Button>
                 </DialogFooter>
               </form>
@@ -349,7 +337,13 @@ export default function CertificationsManager() {
               <Card key={cert.id} className="flex flex-col sm:flex-row justify-between items-start sm:items-center p-4 hover:shadow-md transition-shadow">
                 {cert.imageUrl && (
                   <div className="w-24 h-16 relative mr-4 mb-2 sm:mb-0 flex-shrink-0 rounded overflow-hidden border bg-muted">
-                    <Image src={cert.imageUrl} alt={cert.title} layout="fill" objectFit="contain" className="dark:filter dark:brightness-0 dark:invert" />
+                    <Image 
+                      src={cert.imageUrl} 
+                      alt={cert.title} 
+                      fill 
+                      className="object-contain" // Removed dark mode inversion filter for admin list as well
+                      sizes="(max-width: 200px) 100vw, 96px" // Adjusted sizes for this smaller display
+                    />
                   </div>
                 )}
                 <div className="flex-grow mb-3 sm:mb-0">
@@ -387,3 +381,5 @@ export default function CertificationsManager() {
     </Card>
   );
 }
+
+    
