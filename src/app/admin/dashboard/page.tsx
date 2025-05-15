@@ -118,10 +118,12 @@ export default function AdminDashboardPage() {
   const [skillCategories, setSkillCategories] = useState<SkillCategoryAdminState[]>([]);
   const [isLoadingSkills, setIsLoadingSkills] = useState(false);
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
-  const [currentCategory, setCurrentCategory] = useState<SkillCategoryFormData & { id?: string } | null>(null);
+  const [currentCategory, setCurrentCategory] = useState<(SkillCategoryFormData & { id?: string }) | null>(null);
   const [showCategoryDeleteConfirm, setShowCategoryDeleteConfirm] = useState(false);
   const [categoryToDelete, setCategoryToDelete] = useState<SkillCategoryAdminState | null>(null);
   const [categoryIconFile, setCategoryIconFile] = useState<File | null>(null);
+  // const [categoryIconPreviewComponent, setCategoryIconPreviewComponent] = useState<React.ReactNode | null>(null);
+
 
   const [isSkillModalOpen, setIsSkillModalOpen] = useState(false);
   const [currentSkill, setCurrentSkill] = useState<(SkillFormData & {id?: string}) | null>(null);
@@ -129,6 +131,8 @@ export default function AdminDashboardPage() {
   const [showSkillDeleteConfirm, setShowSkillDeleteConfirm] = useState(false);
   const [skillToDelete, setSkillToDelete] = useState<SkillType | null>(null);
   const [skillIconFile, setSkillIconFile] = useState<File | null>(null);
+  // const [skillIconPreviewComponent, setSkillIconPreviewComponent] = useState<React.ReactNode | null>(null);
+
 
   const projectForm = useForm<ProjectFormData>({
     resolver: zodResolver(projectSchema),
@@ -150,6 +154,9 @@ export default function AdminDashboardPage() {
   const currentProjectImageUrlForPreview = projectForm.watch('image_url');
   const currentCategoryIconUrlForPreview = categoryForm.watch('icon_image_url');
   const currentSkillIconUrlForPreview = skillForm.watch('icon_image_url');
+
+  // const currentCategoryIconName = categoryForm.watch('icon_name');
+  // const currentSkillIconName = skillForm.watch('icon_name');
 
   useEffect(() => {
     setIsMounted(true);
@@ -187,7 +194,7 @@ export default function AdminDashboardPage() {
       projectForm.setValue('image_url', currentProject.imageUrl || '');
       projectForm.setValue('live_demo_url', currentProject.liveDemoUrl || '');
       projectForm.setValue('repo_url', currentProject.repoUrl || '');
-      projectForm.setValue('tags', currentProject.tags);
+      projectForm.setValue('tags', currentProject.tags); // Should already be a string here
       projectForm.setValue('status', currentProject.status || 'Concept');
       projectForm.setValue('progress', currentProject.progress === null || currentProject.progress === undefined ? null : Number(currentProject.progress));
       setProjectImageFile(null);
@@ -232,6 +239,34 @@ export default function AdminDashboardPage() {
     }
   }, [currentSkill, parentCategoryIdForNewSkill, skillForm]);
 
+  // // Effect for Category Icon Preview - COMMENTING OUT
+  // useEffect(() => {
+  //   if (currentCategoryIconName) {
+  //     const Icon = LucideIcons[currentCategoryIconName as keyof typeof LucideIcons] as React.ElementType | undefined;
+  //     if (Icon && typeof Icon === 'function') {
+  //       setCategoryIconPreviewComponent(() => <Icon className="h-8 w-8 text-foreground" />);
+  //     } else {
+  //       setCategoryIconPreviewComponent(null);
+  //     }
+  //   } else {
+  //     setCategoryIconPreviewComponent(null);
+  //   }
+  // }, [currentCategoryIconName]);
+
+  // // Effect for Skill Icon Preview - COMMENTING OUT
+  // useEffect(() => {
+  //   if (currentSkillIconName) {
+  //     const Icon = LucideIcons[currentSkillIconName as keyof typeof LucideIcons] as React.ElementType | undefined;
+  //     if (Icon && typeof Icon === 'function') {
+  //       setSkillIconPreviewComponent(() => <Icon className="h-8 w-8 text-foreground" />);
+  //     } else {
+  //       setSkillIconPreviewComponent(null);
+  //     }
+  //   } else {
+  //     setSkillIconPreviewComponent(null);
+  //   }
+  // }, [currentSkillIconName]);
+
 
   const fetchProjects = async () => {
     setIsLoadingProjects(true);
@@ -245,9 +280,9 @@ export default function AdminDashboardPage() {
         id: p.id,
         title: p.title,
         description: p.description,
-        imageUrl: p.image_url,
-        liveDemoUrl: p.live_demo_url,
-        repoUrl: p.repo_url,
+        imageUrl: p.image_url, // Map snake_case to camelCase
+        liveDemoUrl: p.live_demo_url, // Map snake_case to camelCase
+        repoUrl: p.repo_url, // Map snake_case to camelCase
         tags: p.tags,
         status: p.status as ProjectStatus,
         progress: p.progress,
@@ -262,7 +297,7 @@ export default function AdminDashboardPage() {
     setIsLoadingSkills(true);
     const { data, error: fetchError } = await supabase
       .from('skill_categories')
-      .select('*, skills (*)')
+      .select('*, skills (*)') // skills will also have icon_image_url
       .order('sort_order', { ascending: true })
       .order('created_at', { foreignTable: 'skills', ascending: true });
 
@@ -274,12 +309,12 @@ export default function AdminDashboardPage() {
       const mappedCategories: SkillCategoryAdminState[] = data.map(cat => ({
         id: cat.id,
         name: cat.name,
-        iconImageUrl: cat.icon_image_url,
+        iconImageUrl: cat.icon_image_url, // Mapped for category
         sort_order: cat.sort_order,
         skills: (cat.skills || []).map((sk: any) => ({
             id: sk.id,
             name: sk.name,
-            iconImageUrl: sk.icon_image_url,
+            iconImageUrl: sk.icon_image_url, // Mapped for skill
             description: sk.description,
             categoryId: sk.category_id
         })) as SkillType[],
@@ -314,9 +349,10 @@ export default function AdminDashboardPage() {
   const handleProjectImageFileChange = (event: ChangeEvent<HTMLInputElement>) => {
     if (event.target.files && event.target.files[0]) {
       const file = event.target.files[0]; setProjectImageFile(file);
-      projectForm.setValue('image_url', '');
+      projectForm.setValue('image_url', ''); // Clear URL if file is chosen
     } else {
       setProjectImageFile(null);
+      // Optionally reset preview if no file, or keep existing URL's preview
       if (currentProject?.imageUrl) setProjectImagePreview(currentProject.imageUrl); else setProjectImagePreview(null);
     }
   };
@@ -325,7 +361,7 @@ export default function AdminDashboardPage() {
     if (event.target.files && event.target.files[0]) {
         const file = event.target.files[0];
         setCategoryIconFile(file);
-        categoryForm.setValue('icon_image_url', '');
+        categoryForm.setValue('icon_image_url', ''); // Clear URL if file is chosen
     } else {
         setCategoryIconFile(null);
     }
@@ -335,7 +371,7 @@ export default function AdminDashboardPage() {
     if (event.target.files && event.target.files[0]) {
         const file = event.target.files[0];
         setSkillIconFile(file);
-        skillForm.setValue('icon_image_url', '');
+        skillForm.setValue('icon_image_url', ''); // Clear URL if file is chosen
     } else {
         setSkillIconFile(null);
     }
@@ -438,7 +474,7 @@ const triggerDeleteConfirmation = (project: Project) => {
 
     const categoryData = {
       name: formData.name,
-      icon_image_url: iconUrlToSave || null,
+      icon_image_url: iconUrlToSave || null, // Save the URL
       sort_order: Number(formData.sort_order || 0)
     };
 
@@ -507,7 +543,7 @@ const triggerDeleteConfirmation = (project: Project) => {
     const skillDataToSave = {
         category_id: formData.category_id,
         name: formData.name,
-        icon_image_url: iconUrlToSave || null,
+        icon_image_url: iconUrlToSave || null, // Save the URL
         description: formData.description || null,
     };
 
@@ -756,13 +792,9 @@ const triggerDeleteConfirmation = (project: Project) => {
               )}
                <div>
                 <Label htmlFor="icon_image_url_category" className="text-xs text-muted-foreground">
-                    Or enter Icon Image URL (upload will override) - Visit
-                    <Link href="https://lucide.dev/icons/" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline px-1">
-                         Lucide
-                    </Link>
-                    to find icon names.
+                    Or enter Icon Image URL (upload will override).
                 </Label>
-                <Input id="icon_image_url_category" {...categoryForm.register("icon_image_url")} placeholder="https://example.com/icon.png or leave blank for Lucide" />
+                <Input id="icon_image_url_category" {...categoryForm.register("icon_image_url")} placeholder="https://example.com/icon.png" />
                 {categoryForm.formState.errors.icon_image_url && <p className="text-destructive text-sm mt-1">{categoryForm.formState.errors.icon_image_url.message}</p>}
               </div>
             </div>
@@ -798,13 +830,9 @@ const triggerDeleteConfirmation = (project: Project) => {
               )}
                <div>
                  <Label htmlFor="icon_image_url_skill" className="text-xs text-muted-foreground">
-                    Or enter Icon Image URL (upload will override) - Visit
-                    <Link href="https://lucide.dev/icons/" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline px-1">
-                         Lucide
-                    </Link>
-                    to find icon names.
+                    Or enter Icon Image URL (upload will override).
                 </Label>
-                <Input id="icon_image_url_skill" {...skillForm.register("icon_image_url")} placeholder="https://example.com/icon.png or leave blank for Lucide" />
+                <Input id="icon_image_url_skill" {...skillForm.register("icon_image_url")} placeholder="https://example.com/icon.png" />
                 {skillForm.formState.errors.icon_image_url && <p className="text-destructive text-sm mt-1">{skillForm.formState.errors.icon_image_url.message}</p>}
               </div>
             </div>
