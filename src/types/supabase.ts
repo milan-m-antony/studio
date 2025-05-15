@@ -56,21 +56,21 @@ export interface Database {
         Row: {
           id: string
           name: string
-          icon_image_url: string | null 
+          icon_image_url: string | null
           sort_order: number | null
           created_at: string
         }
         Insert: {
           id?: string
           name: string
-          icon_image_url?: string | null 
+          icon_image_url?: string | null
           sort_order?: number | null
           created_at?: string
         }
         Update: {
           id?: string
           name?: string
-          icon_image_url?: string | null 
+          icon_image_url?: string | null
           sort_order?: number | null
           created_at?: string
         }
@@ -80,7 +80,7 @@ export interface Database {
         Row: {
           id: string
           name: string
-          icon_image_url: string | null 
+          icon_image_url: string | null
           description: string | null
           category_id: string | null
           created_at: string
@@ -88,7 +88,7 @@ export interface Database {
         Insert: {
           id?: string
           name: string
-          icon_image_url?: string | null 
+          icon_image_url?: string | null
           description?: string | null
           category_id?: string | null
           created_at?: string
@@ -96,7 +96,7 @@ export interface Database {
         Update: {
           id?: string
           name?: string
-          icon_image_url?: string | null 
+          icon_image_url?: string | null
           description?: string | null
           category_id?: string | null
           created_at?: string
@@ -110,7 +110,7 @@ export interface Database {
           }
         ]
       }
-      certifications: { 
+      certifications: {
         Row: {
           id: string
           title: string
@@ -146,7 +146,7 @@ export interface Database {
           date: string
           title: string
           description: string
-          icon_image_url: string | null 
+          icon_image_url: string | null // Changed from icon_name
           type: string
           sort_order: number | null
           created_at: string
@@ -156,7 +156,7 @@ export interface Database {
           date: string
           title: string
           description: string
-          icon_image_url?: string | null 
+          icon_image_url?: string | null
           type: string
           sort_order?: number | null
           created_at?: string
@@ -166,7 +166,7 @@ export interface Database {
           date?: string
           title?: string
           description?: string
-          icon_image_url?: string | null 
+          icon_image_url?: string | null
           type?: string
           sort_order?: number | null
           created_at?: string
@@ -215,6 +215,151 @@ export interface Database {
         }
         Relationships: []
       }
+      resume_experience: {
+        Row: {
+          id: string
+          job_title: string
+          company_name: string
+          date_range: string | null
+          description_points: string[] | null
+          icon_name: string | null
+          sort_order: number | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          job_title: string
+          company_name: string
+          date_range?: string | null
+          description_points?: string[] | null
+          icon_name?: string | null
+          sort_order?: number | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          job_title?: string
+          company_name?: string
+          date_range?: string | null
+          description_points?: string[] | null
+          icon_name?: string | null
+          sort_order?: number | null
+          created_at?: string
+        }
+        Relationships: []
+      }
+      resume_education: {
+        Row: {
+          id: string
+          degree_or_certification: string
+          institution_name: string
+          date_range: string | null
+          description: string | null
+          icon_name: string | null
+          sort_order: number | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          degree_or_certification: string
+          institution_name: string
+          date_range?: string | null
+          description?: string | null
+          icon_name?: string | null
+          sort_order?: number | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          degree_or_certification?: string
+          institution_name?: string
+          date_range?: string | null
+          description?: string | null
+          icon_name?: string | null
+          sort_order?: number | null
+          created_at?: string
+        }
+        Relationships: []
+      }
+      resume_key_skill_categories: {
+        Row: {
+          id: string
+          category_name: string
+          icon_name: string | null
+          sort_order: number | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          category_name: string
+          icon_name?: string | null
+          sort_order?: number | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          category_name?: string
+          icon_name?: string | null
+          sort_order?: number | null
+          created_at?: string
+        }
+        Relationships: []
+      }
+      resume_key_skills: {
+        Row: {
+          id: string
+          skill_name: string
+          category_id: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          skill_name: string
+          category_id?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          skill_name?: string
+          category_id?: string | null
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "resume_key_skills_category_id_fkey"
+            columns: ["category_id"]
+            referencedRelation: "resume_key_skill_categories"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      resume_languages: {
+        Row: {
+          id: string
+          language_name: string
+          proficiency: string | null
+          icon_name: string | null
+          sort_order: number | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          language_name: string
+          proficiency?: string | null
+          icon_name?: string | null
+          sort_order?: number | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          language_name?: string
+          proficiency?: string | null
+          icon_name?: string | null
+          sort_order?: number | null
+          created_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -237,9 +382,9 @@ export interface Project {
   id: string;
   title: string;
   description: string | null;
-  imageUrl: string | null; 
-  liveDemoUrl?: string | null; 
-  repoUrl?: string | null;   
+  imageUrl: string | null;
+  liveDemoUrl?: string | null;
+  repoUrl?: string | null;
   tags: string[] | null;
   status: ProjectStatus | null;
   progress?: number | null;
@@ -249,18 +394,18 @@ export interface Project {
 export interface Skill {
   id: string;
   name: string;
-  iconImageUrl: string | null; 
+  iconImageUrl: string | null; // Changed from iconName
   description: string | null;
-  categoryId?: string | null; 
+  categoryId?: string | null;
   created_at?: string;
 }
 
 export interface SkillCategory {
   id: string;
   name: string;
-  iconImageUrl?: string | null; 
+  iconImageUrl?: string | null; // Changed from iconName
   skills?: Skill[];
-  skillCount?: number; 
+  skillCount?: number;
   sort_order?: number | null;
   created_at?: string;
 }
@@ -272,7 +417,7 @@ export interface TimelineEvent {
   date: string;
   title: string;
   description: string;
-  iconImageUrl: string | null; 
+  iconImageUrl: string | null; // Changed from iconName
   type: TimelineEventType;
   sort_order?: number | null;
   created_at?: string;
@@ -283,9 +428,10 @@ export interface Certification {
   title: string;
   issuer: string;
   date: string;
-  imageUrl: string | null; 
-  verifyUrl?: string | null; 
+  imageUrl: string | null; // Changed from image_url
+  verifyUrl?: string | null; // Changed from verify_url
   created_at: string;
+  // image_hint was removed
 }
 
 export interface AboutContent {
@@ -297,9 +443,55 @@ export interface AboutContent {
   paragraph1: string | null;
   paragraph2: string | null;
   paragraph3: string | null;
-  imageUrl: string | null; 
+  imageUrl: string | null; // Changed from image_url
   image_tagline: string | null;
   updated_at?: string;
 }
 
-    
+// Resume Section Types
+export interface ResumeExperience {
+  id: string;
+  job_title: string;
+  company_name: string;
+  date_range: string | null;
+  description_points: string[] | null;
+  icon_name: string | null; // Optional Lucide icon name
+  sort_order?: number | null;
+  created_at: string;
+}
+
+export interface ResumeEducation {
+  id: string;
+  degree_or_certification: string;
+  institution_name: string;
+  date_range: string | null;
+  description: string | null;
+  icon_name: string | null; // Optional Lucide icon name
+  sort_order?: number | null;
+  created_at: string;
+}
+
+export interface ResumeKeySkill {
+  id: string;
+  skill_name: string;
+  category_id?: string | null; // Foreign key to resume_key_skill_categories
+  created_at?: string;
+}
+
+export interface ResumeKeySkillCategory {
+  id: string;
+  category_name: string;
+  icon_name: string | null; // Optional Lucide icon name
+  skills?: ResumeKeySkill[]; // For joining data
+  sort_order?: number | null;
+  created_at?: string;
+}
+
+export interface ResumeLanguage {
+  id: string;
+  language_name: string;
+  proficiency: string | null;
+  icon_name: string | null; // Optional Lucide icon name
+  sort_order?: number | null;
+  created_at: string;
+}

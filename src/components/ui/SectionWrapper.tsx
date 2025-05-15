@@ -11,7 +11,7 @@ export default function SectionWrapper({ children, className, id, ...props }: Se
   return (
     <section
       id={id}
-      className={cn('py-16 md:py-24', className)}
+      className={cn('py-16 md:py-24', className)} // Maintained original padding
       {...props}
     >
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">

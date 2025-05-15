@@ -15,7 +15,8 @@ import ProjectsManager from '@/components/admin/ProjectsManager';
 import SkillsManager from '@/components/admin/SkillsManager';
 import AboutManager from '@/components/admin/AboutManager';
 import TimelineManager from '@/components/admin/TimelineManager';
-import CertificationsManager from '@/components/admin/CertificationsManager'; // Import the new manager
+import CertificationsManager from '@/components/admin/CertificationsManager';
+import ResumeManager from '@/components/admin/ResumeManager'; // Import the new ResumeManager
 import SectionWrapper from '@/components/ui/SectionWrapper';
 
 export default function AdminDashboardPage() {
@@ -86,7 +87,7 @@ export default function AdminDashboardPage() {
   if (!isAuthenticatedForRender) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-black p-4">
-        <Card className="w-full max-w-md shadow-2xl"> 
+        <Card className="w-full max-w-md shadow-2xl">
           <CardHeader className="text-center">
             <div className="mx-auto mb-4 p-3 bg-primary rounded-full inline-block">
               <ShieldCheck className="h-10 w-10 text-primary-foreground" />
@@ -137,7 +138,8 @@ export default function AdminDashboardPage() {
         <SkillsManager />
         <AboutManager />
         <TimelineManager />
-        <CertificationsManager /> {/* Add the new manager here */}
+        <CertificationsManager />
+        <ResumeManager /> {/* Add the new ResumeManager here */}
       </div>
     </SectionWrapper>
   );
