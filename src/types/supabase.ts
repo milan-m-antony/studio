@@ -60,7 +60,7 @@ export interface Database {
         Row: {
           id: string
           name: string
-          icon_image_url: string | null
+          icon_image_url: string | null // Changed from icon_name
           sort_order: number | null
           created_at: string
         }
@@ -92,7 +92,7 @@ export interface Database {
         Insert: {
           id?: string
           name: string
-          icon_image_url?: string | null // Changed from icon_name
+          icon_image_url?: string | null
           description?: string | null
           category_id?: string | null
           created_at?: string
@@ -100,7 +100,7 @@ export interface Database {
         Update: {
           id?: string
           name?: string
-          icon_image_url?: string | null // Changed from icon_name
+          icon_image_url?: string | null
           description?: string | null
           category_id?: string | null
           created_at?: string
@@ -180,6 +180,48 @@ export interface Database {
         }
         Relationships: []
       }
+      about_content: { // New table for About Me section
+        Row: {
+          id: string // Should be a fixed UUID for the single entry
+          headline_main: string | null
+          headline_code_keyword: string | null
+          headline_connector: string | null
+          headline_creativity_keyword: string | null
+          paragraph1: string | null
+          paragraph2: string | null
+          paragraph3: string | null
+          image_url: string | null
+          image_tagline: string | null
+          updated_at: string
+        }
+        Insert: {
+          id: string // Must be provided for upsert, or use a default if table allows
+          headline_main?: string | null
+          headline_code_keyword?: string | null
+          headline_connector?: string | null
+          headline_creativity_keyword?: string | null
+          paragraph1?: string | null
+          paragraph2?: string | null
+          paragraph3?: string | null
+          image_url?: string | null
+          image_tagline?: string | null
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          headline_main?: string | null
+          headline_code_keyword?: string | null
+          headline_connector?: string | null
+          headline_creativity_keyword?: string | null
+          paragraph1?: string | null
+          paragraph2?: string | null
+          paragraph3?: string | null
+          image_url?: string | null
+          image_tagline?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -202,9 +244,9 @@ export interface Project {
   id: string;
   title: string;
   description: string | null;
-  imageUrl: string | null; // Corresponds to image_url in DB
-  liveDemoUrl?: string | null; // Corresponds to live_demo_url in DB
-  repoUrl?: string | null; // Corresponds to repo_url in DB
+  imageUrl: string | null;
+  liveDemoUrl?: string | null;
+  repoUrl?: string | null;
   tags: string[] | null;
   status: ProjectStatus | null;
   progress?: number | null;
@@ -214,7 +256,7 @@ export interface Project {
 export interface Skill {
   id: string;
   name: string;
-  iconImageUrl: string | null; // Changed from iconName, corresponds to icon_image_url in DB
+  iconImageUrl: string | null;
   description: string | null;
   categoryId?: string | null;
 }
@@ -222,9 +264,9 @@ export interface Skill {
 export interface SkillCategory {
   id: string;
   name: string;
-  iconImageUrl?: string | null; // Corresponds to icon_image_url in DB
+  iconImageUrl?: string | null;
   skills?: Skill[];
-  skillCount?: number; // UI helper, not in DB
+  skillCount?: number;
   sort_order?: number | null;
 }
 
@@ -235,7 +277,7 @@ export interface TimelineEvent {
   date: string;
   title: string;
   description: string;
-  iconName: string; // Lucide icon name, corresponds to icon_name in DB
+  iconName: string;
   type: TimelineEventType;
   sort_order?: number | null;
 }
@@ -245,8 +287,23 @@ export interface Certification {
   title: string;
   issuer: string;
   date: string;
-  imageUrl: string | null; // Corresponds to image_url in DB
+  imageUrl: string | null;
   imageHint: string | null;
-  verifyUrl?: string | null; // Corresponds to verify_url in DB
+  verifyUrl?: string | null;
   created_at: string;
+}
+
+// New type for About Content
+export interface AboutContent {
+  id: string; // This will be a fixed UUID
+  headline_main: string | null;
+  headline_code_keyword: string | null;
+  headline_connector: string | null;
+  headline_creativity_keyword: string | null;
+  paragraph1: string | null;
+  paragraph2: string | null;
+  paragraph3: string | null;
+  imageUrl: string | null; // Corresponds to image_url in DB
+  image_tagline: string | null;
+  updated_at?: string;
 }
