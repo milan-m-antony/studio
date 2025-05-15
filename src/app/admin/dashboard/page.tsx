@@ -3,9 +3,9 @@
 
 import React, { useEffect, useState, type FormEvent, type ChangeEvent } from 'react';
 import { useRouter } from 'next/navigation';
-import SectionWrapper from '@/components/ui/SectionWrapper';
+// Removed SectionWrapper import as it's not used for the login form part anymore
 import SectionTitle from '@/components/ui/SectionTitle';
-import { Button, buttonVariants } from '@/components/ui/button';
+import { Button } from '@/components/ui/button'; // Removed buttonVariants as it wasn't used
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
@@ -15,6 +15,7 @@ import Link from 'next/link';
 import ProjectsManager from '@/components/admin/ProjectsManager';
 import SkillsManager from '@/components/admin/SkillsManager';
 import AboutManager from '@/components/admin/AboutManager';
+import SectionWrapper from '@/components/ui/SectionWrapper'; // Still needed for authenticated view
 
 export default function AdminDashboardPage() {
   const router = useRouter();
@@ -44,7 +45,8 @@ export default function AdminDashboardPage() {
     console.log('[Admin Login] Attempting login...');
     console.log('[Admin Login] Entered Username:', `"${trimmedUsername}"`);
     console.log('[Admin Login] Expected Username from env:', `"${expectedUsername}"`);
-    // console.log('[Admin Login] Expected Password from env (masked for security):', expectedPassword ? "****" : "MISSING");
+    console.log('[Admin Login] Password match status (not logging actual passwords):', trimmedPassword === expectedPassword);
+
 
     const usernameMatch = trimmedUsername === expectedUsername;
     const passwordMatch = trimmedPassword === expectedPassword;
@@ -74,12 +76,11 @@ export default function AdminDashboardPage() {
     setIsAuthenticatedForRender(false);
     setUsername('');
     setPassword('');
-    // No need to clear component-specific data here as they manage their own state
   };
 
 
   if (!isMounted) {
-    return (
+    return ( // Keep using SectionWrapper for loading state for consistency if desired
       <SectionWrapper>
         <div className="flex justify-center items-center min-h-screen">
           <p className="text-muted-foreground">Loading dashboard...</p>
@@ -90,7 +91,8 @@ export default function AdminDashboardPage() {
 
   if (!isAuthenticatedForRender) {
     return (
-      <SectionWrapper className="flex items-center justify-center min-h-screen bg-gradient-to-br from-background to-muted/50">
+      // Use a dedicated div for full-screen centering of the login card
+      <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-background to-muted/50 p-4">
         <Card className="w-full max-w-md shadow-2xl"> 
           <CardHeader className="text-center">
             <div className="mx-auto mb-4 p-3 bg-primary rounded-full inline-block">
@@ -114,20 +116,16 @@ export default function AdminDashboardPage() {
             </form>
           </CardContent>
            <CardFooter className="mt-6 flex flex-col items-center space-y-2">
-             <Button variant="link" className="text-muted-foreground hover:text-primary p-0 h-auto" asChild>
-                <Link href="/">
-                    <span>
-                        <Home className="mr-2 h-4 w-4 inline-block" />Back to Portfolio
-                    </span>
-                </Link>
-             </Button>
+             <Link href="/" className="inline-flex items-center justify-center text-sm font-medium text-muted-foreground hover:text-primary transition-colors p-0 h-auto">
+                <Home className="mr-2 h-4 w-4 inline-block" />Back to Portfolio
+             </Link>
           </CardFooter>
         </Card>
-      </SectionWrapper>
+      </div>
     );
   }
 
-  // Authenticated View
+  // Authenticated View (uses SectionWrapper for consistent page content layout)
   return (
     <SectionWrapper>
       <SectionTitle subtitle="Manage portfolio content.">Admin Dashboard</SectionTitle>
@@ -146,7 +144,6 @@ export default function AdminDashboardPage() {
         <ProjectsManager />
         <SkillsManager />
         <AboutManager />
-        {/* Future sections like CertificationsManager, TimelineManager can be added here */}
       </div>
     </SectionWrapper>
   );
