@@ -56,21 +56,21 @@ export interface Database {
         Row: {
           id: string
           name: string
-          icon_image_url: string | null // Changed from icon_name
+          icon_image_url: string | null 
           sort_order: number | null
           created_at: string
         }
         Insert: {
           id?: string
           name: string
-          icon_image_url?: string | null // Changed
+          icon_image_url?: string | null 
           sort_order?: number | null
           created_at?: string
         }
         Update: {
           id?: string
           name?: string
-          icon_image_url?: string | null // Changed
+          icon_image_url?: string | null 
           sort_order?: number | null
           created_at?: string
         }
@@ -80,7 +80,7 @@ export interface Database {
         Row: {
           id: string
           name: string
-          icon_image_url: string | null // Changed from icon_name
+          icon_image_url: string | null 
           description: string | null
           category_id: string | null
           created_at: string
@@ -88,7 +88,7 @@ export interface Database {
         Insert: {
           id?: string
           name: string
-          icon_image_url?: string | null // Changed
+          icon_image_url?: string | null 
           description?: string | null
           category_id?: string | null
           created_at?: string
@@ -96,7 +96,7 @@ export interface Database {
         Update: {
           id?: string
           name?: string
-          icon_image_url?: string | null // Changed
+          icon_image_url?: string | null 
           description?: string | null
           category_id?: string | null
           created_at?: string
@@ -110,14 +110,13 @@ export interface Database {
           }
         ]
       }
-      certifications: { // Ensure this matches your DB table
+      certifications: { 
         Row: {
           id: string
           title: string
           issuer: string
           date: string
           image_url: string | null
-          image_hint: string | null
           verify_url: string | null
           created_at: string
         }
@@ -127,7 +126,6 @@ export interface Database {
           issuer: string
           date: string
           image_url?: string | null
-          image_hint?: string | null
           verify_url?: string | null
           created_at?: string
         }
@@ -137,7 +135,6 @@ export interface Database {
           issuer?: string
           date?: string
           image_url?: string | null
-          image_hint?: string | null
           verify_url?: string | null
           created_at?: string
         }
@@ -149,7 +146,7 @@ export interface Database {
           date: string
           title: string
           description: string
-          icon_image_url: string | null // Changed from icon_name
+          icon_image_url: string | null 
           type: string
           sort_order: number | null
           created_at: string
@@ -159,7 +156,7 @@ export interface Database {
           date: string
           title: string
           description: string
-          icon_image_url?: string | null // Changed
+          icon_image_url?: string | null 
           type: string
           sort_order?: number | null
           created_at?: string
@@ -169,7 +166,7 @@ export interface Database {
           date?: string
           title?: string
           description?: string
-          icon_image_url?: string | null // Changed
+          icon_image_url?: string | null 
           type?: string
           sort_order?: number | null
           created_at?: string
@@ -240,9 +237,9 @@ export interface Project {
   id: string;
   title: string;
   description: string | null;
-  imageUrl: string | null; // Mapped from image_url
-  liveDemoUrl?: string | null; // Mapped from live_demo_url
-  repoUrl?: string | null;   // Mapped from repo_url
+  imageUrl: string | null; 
+  liveDemoUrl?: string | null; 
+  repoUrl?: string | null;   
   tags: string[] | null;
   status: ProjectStatus | null;
   progress?: number | null;
@@ -252,18 +249,18 @@ export interface Project {
 export interface Skill {
   id: string;
   name: string;
-  iconImageUrl: string | null; // Mapped from icon_image_url
+  iconImageUrl: string | null; 
   description: string | null;
-  categoryId?: string | null; // Mapped from category_id
+  categoryId?: string | null; 
   created_at?: string;
 }
 
 export interface SkillCategory {
   id: string;
   name: string;
-  iconImageUrl?: string | null; // Mapped from icon_image_url
+  iconImageUrl?: string | null; 
   skills?: Skill[];
-  skillCount?: number; // Optional, can be derived client-side
+  skillCount?: number; 
   sort_order?: number | null;
   created_at?: string;
 }
@@ -275,7 +272,7 @@ export interface TimelineEvent {
   date: string;
   title: string;
   description: string;
-  iconImageUrl: string | null; // Changed from iconName
+  iconImageUrl: string | null; 
   type: TimelineEventType;
   sort_order?: number | null;
   created_at?: string;
@@ -286,9 +283,8 @@ export interface Certification {
   title: string;
   issuer: string;
   date: string;
-  imageUrl: string | null; // Mapped from image_url in DB
-  imageHint: string | null; // Mapped from image_hint in DB
-  verifyUrl?: string | null; // Mapped from verify_url in DB
+  imageUrl: string | null; 
+  verifyUrl?: string | null; 
   created_at: string;
 }
 
@@ -301,7 +297,9 @@ export interface AboutContent {
   paragraph1: string | null;
   paragraph2: string | null;
   paragraph3: string | null;
-  imageUrl: string | null; // Mapped from image_url
+  imageUrl: string | null; 
   image_tagline: string | null;
   updated_at?: string;
 }
+
+    
