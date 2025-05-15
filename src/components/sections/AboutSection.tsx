@@ -1,140 +1,84 @@
 
-"use client";
+"use server"; // This component will now fetch data on the server.
 
 import SectionWrapper from '@/components/ui/SectionWrapper';
 import SectionTitle from '@/components/ui/SectionTitle';
-import Image from 'next/image';
-import { Button } from '@/components/ui/button';
-import Link from 'next/link';
-import { Download, Coffee } from 'lucide-react';
-import { useState, useEffect } from 'react';
+import AboutSectionClientView from './AboutSectionClientView'; // New client component
+import { supabase } from '@/lib/supabaseClient';
+import type { AboutContent } from '@/types/supabase';
 
-// Typewriter component for animating text
-const Typewriter = ({ text, speed = 100, onComplete, className }: { text: string, speed?: number, onComplete?: () => void, className?: string }) => {
-  const [displayedText, setDisplayedText] = useState('');
-  const [currentIndex, setCurrentIndex] = useState(0);
-  const [isCompleted, setIsCompleted] = useState(false);
+// This ID must match the one used in AdminDashboardPage.tsx and your database
+const PRIMARY_ABOUT_CONTENT_ID = '00000000-0000-0000-0000-000000000001';
 
-  useEffect(() => {
-    // Reset animation if text prop changes
-    setDisplayedText('');
-    setCurrentIndex(0);
-    setIsCompleted(false);
-  }, [text]);
+async function getAboutContent(): Promise<AboutContent | null> {
+  const { data, error } = await supabase
+    .from('about_content')
+    .select('*')
+    .eq('id', PRIMARY_ABOUT_CONTENT_ID)
+    .single(); // Use single() as we expect only one row for this ID
 
-  useEffect(() => {
-    if (!isCompleted && currentIndex < text.length) {
-      const timeoutId = setTimeout(() => {
-        setDisplayedText((prev) => prev + text[currentIndex]);
-        setCurrentIndex((prev) => prev + 1);
-      }, speed);
-      return () => clearTimeout(timeoutId);
-    } else if (!isCompleted && currentIndex === text.length && text.length > 0) {
-      // Call onComplete only once when text is fully displayed
-      setIsCompleted(true);
-      if (onComplete) {
-        onComplete();
-      }
-    }
-  }, [currentIndex, text, speed, onComplete, isCompleted]);
+  if (error) {
+    console.error('Error fetching About Me content:', error);
+    return null;
+  }
+  if (!data) {
+    console.warn('No About Me content found for ID:', PRIMARY_ABOUT_CONTENT_ID);
+    return null;
+  }
+  // Map Supabase row (snake_case) to AboutContent type (camelCase for imageUrl)
+  return {
+    id: data.id,
+    headline_main: data.headline_main,
+    headline_code_keyword: data.headline_code_keyword,
+    headline_connector: data.headline_connector,
+    headline_creativity_keyword: data.headline_creativity_keyword,
+    paragraph1: data.paragraph1,
+    paragraph2: data.paragraph2,
+    paragraph3: data.paragraph3,
+    imageUrl: data.image_url, // mapping
+    image_tagline: data.image_tagline,
+    updated_at: data.updated_at,
+  };
+}
 
-  // Render a non-breaking space if displayedText is empty to maintain layout
-  return <span className={className}>{displayedText || <>&nbsp;</>}</span>;
-};
+export default async function AboutSection() {
+  const aboutContent = await getAboutContent();
 
-export default function AboutSection() {
-  const [typingStage, setTypingStage] = useState(0);
-  const [offsetY, setOffsetY] = useState(0);
-
-  const handleScroll = () => {
-    if (typeof window !== 'undefined') {
-      setOffsetY(window.pageYOffset);
-    }
+  // Provide default/fallback content if nothing is fetched
+  const defaults: AboutContent = {
+    id: PRIMARY_ABOUT_CONTENT_ID,
+    headline_main: "Milan: Weaving ",
+    headline_code_keyword: "Code",
+    headline_connector: " with ",
+    headline_creativity_keyword: "Creativity",
+    paragraph1: "Hello! I'm Milan, a passionate Creative Developer...",
+    paragraph2: "With a foundation in Computer Science...",
+    paragraph3: "Beyond the screen, I enjoy exploring...",
+    imageUrl: "https://picsum.photos/seed/aboutmilan/600/800",
+    image_tagline: "Fuelled by coffee & code.",
   };
 
-  useEffect(() => {
-    // Start the first part of the animation chain after a short delay
-    const startTimer = setTimeout(() => setTypingStage(1), 500); // Delay to sync with section fade-in
-    
-    if (typeof window !== 'undefined') {
-      window.addEventListener('scroll', handleScroll);
-    }
-    return () => {
-      clearTimeout(startTimer);
-      if (typeof window !== 'undefined') {
-        window.removeEventListener('scroll', handleScroll);
-      }
-    };
-  }, []);
-  
-  const parallaxStyleContainer = (factor: number) => ({
-    transform: `translateY(${offsetY * factor}px)`,
-    transition: 'transform 0.2s ease-out' // Smooth transition for parallax container
-  });
-
-  const parallaxStyle = (factor: number) => ({
-    transform: `translateY(${offsetY * factor}px)`,
-    transition: 'transform 0.1s ease-out' // Smooth transition for parallax content
-  });
+  const contentToDisplay = aboutContent ? {
+    headline_main: aboutContent.headline_main || defaults.headline_main,
+    headline_code_keyword: aboutContent.headline_code_keyword || defaults.headline_code_keyword,
+    headline_connector: aboutContent.headline_connector || defaults.headline_connector,
+    headline_creativity_keyword: aboutContent.headline_creativity_keyword || defaults.headline_creativity_keyword,
+    paragraph1: aboutContent.paragraph1 || defaults.paragraph1,
+    paragraph2: aboutContent.paragraph2 || defaults.paragraph2,
+    paragraph3: aboutContent.paragraph3 || defaults.paragraph3,
+    imageUrl: aboutContent.imageUrl || defaults.imageUrl,
+    image_tagline: aboutContent.image_tagline || defaults.image_tagline,
+  } : { // Spread defaults if aboutContent is entirely null
+    ...defaults
+  };
 
 
   return (
-    <SectionWrapper id="about" className="section-fade-in bg-background overflow-hidden" style={{ animationDelay: '0.2s', ...parallaxStyleContainer(0.05) }}>
-      {/* SectionTitle is now a direct child, its own margin and centering will apply */}
+    <SectionWrapper id="about" className="section-fade-in bg-background overflow-hidden" style={{ animationDelay: '0.2s' }}>
       <SectionTitle subtitle="A little more about who I am and what I do.">
         About Me
       </SectionTitle>
-      
-      <div className="grid md:grid-cols-2 gap-12 items-center">
-        <div className="space-y-6 animate-fadeIn md:order-1" style={{animationDelay: '0.3s', ...parallaxStyle(0.15)}}>
-          <h3 className="text-3xl font-semibold text-foreground leading-tight min-h-[2.5em]"> {/* min-h to prevent layout shift */}
-            {typingStage === 0 && <span className="invisible">Milan: Weaving Code with Creativity</span>} {/* Placeholder for layout */}
-            {typingStage >= 1 && <Typewriter text="Milan: Weaving " speed={70} onComplete={() => setTypingStage(s => Math.max(s, 2))} />}
-            {typingStage >= 2 && <Typewriter text="Code" speed={120} className="text-primary" onComplete={() => setTypingStage(s => Math.max(s, 3))} />}
-            {typingStage >= 3 && <Typewriter text=" with " speed={70} onComplete={() => setTypingStage(s => Math.max(s, 4))} />}
-            {typingStage >= 4 && <Typewriter text="Creativity" speed={120} className="text-accent" />}
-          </h3>
-          <p className="text-muted-foreground text-lg">
-            Hello! I'm Milan, a passionate Creative Developer with a knack for transforming innovative ideas into engaging digital experiences. My journey in tech is driven by a relentless curiosity and a love for elegant problem-solving.
-          </p>
-          <p className="text-muted-foreground">
-            With a foundation in Computer Science and a keen eye for design, I specialize in full-stack development, focusing on creating intuitive user interfaces and robust backend systems. I thrive in collaborative environments, constantly learning and adapting to new technologies to deliver impactful solutions.
-          </p>
-          <p className="text-muted-foreground">
-            Beyond the screen, I enjoy exploring new coffee shops, hiking trails, and diving into a good book. Let's connect and build something amazing together!
-          </p>
-          <div className="flex flex-col sm:flex-row gap-4 pt-4">
-            <Button asChild size="lg">
-              <Link href="#contact">
-                Let's Talk <Coffee className="ml-2 h-5 w-5" />
-              </Link>
-            </Button>
-            <Button asChild variant="outline" size="lg">
-              <Link href="#resume"> 
-                My Resume <Download className="ml-2 h-5 w-5" />
-              </Link>
-            </Button>
-          </div>
-        </div>
-        <div 
-          className="relative h-96 md:h-[450px] rounded-lg overflow-hidden shadow-xl group animate-fadeIn hidden md:block md:order-2" 
-          style={{animationDelay: '0.4s', ...parallaxStyle(0.2)}}
-        >
-          <Image
-            src="https://picsum.photos/seed/aboutmilan/600/800"
-            alt="Milan working on a project"
-            layout="fill"
-            objectFit="cover"
-            className="transition-transform duration-500 group-hover:scale-105"
-            data-ai-hint="developer working"
-            priority
-          />
-          <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent"></div>
-           <div className="absolute bottom-4 left-4 text-white bg-black/40 p-3 rounded-md shadow-md">
-            <p className="text-sm font-medium">Fuelled by coffee &amp; code.</p>
-          </div>
-        </div>
-      </div>
+      <AboutSectionClientView content={contentToDisplay} />
     </SectionWrapper>
   );
 }
