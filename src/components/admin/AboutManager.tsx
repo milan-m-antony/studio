@@ -40,7 +40,7 @@ export default function AboutManager() {
   const [isLoadingAbout, setIsLoadingAbout] = useState(false);
   const [aboutImageFile, setAboutImageFile] = useState<File | null>(null);
   const [aboutImagePreview, setAboutImagePreview] = useState<string | null>(null);
-  const [currentDbAboutImageUrl, setCurrentDbAboutImageUrl] = useState<string | null>(null);
+  const [currentDbAboutImageUrl, setCurrentDbAboutImageUrl] = useState<string | null>(null); // To track the image URL from DB for deletion logic
 
   const aboutForm = useForm<AboutContentFormData>({
     resolver: zodResolver(aboutContentSchema),
@@ -66,10 +66,12 @@ export default function AboutManager() {
         setAboutImagePreview(reader.result as string);
       };
       reader.readAsDataURL(aboutImageFile);
-      return; 
+      return; // Exit early if a new file is being previewed
     } else if (currentAboutImageUrlForForm && currentAboutImageUrlForForm.trim() !== '') {
+      // If there's a URL in the form (e.g., user typed one, or it's from DB)
       newPreviewUrl = currentAboutImageUrlForForm;
     } else if (currentDbAboutImageUrl) {
+      // If form URL is empty, but we had one from DB (before clearing via delete button)
       newPreviewUrl = currentDbAboutImageUrl;
     }
     setAboutImagePreview(newPreviewUrl);
@@ -100,65 +102,51 @@ export default function AboutManager() {
         image_url: data.image_url || '',
         image_tagline: data.image_tagline || '',
       });
-      setCurrentDbAboutImageUrl(data.image_url || null);
-      setAboutImagePreview(data.image_url || null); 
+      setCurrentDbAboutImageUrl(data.image_url || null); // Store the DB image URL
+      setAboutImagePreview(data.image_url || null); // Set initial preview
     } else {
+       // No data found, reset form and previews
        aboutForm.reset({ id: PRIMARY_ABOUT_CONTENT_ID, headline_main: '', headline_code_keyword: '', headline_connector: '', headline_creativity_keyword: '', paragraph1: '', paragraph2: '', paragraph3: '', image_url: '', image_tagline: ''});
        setCurrentDbAboutImageUrl(null);
        setAboutImagePreview(null);
     }
-    setAboutImageFile(null);
+    setAboutImageFile(null); // Reset file input state
     setIsLoadingAbout(false);
   };
 
   const handleAboutImageFileChange = (event: ChangeEvent<HTMLInputElement>) => {
     if (event.target.files?.[0]) {
       setAboutImageFile(event.target.files[0]);
-      aboutForm.setValue('image_url', ''); 
+      aboutForm.setValue('image_url', ''); // Clear URL input if file is chosen
     } else {
       setAboutImageFile(null);
-      // Restore preview from form value or DB value if file is deselected
+      // If file is deselected, restore preview from form's URL field or DB loaded URL
       const formUrl = aboutForm.getValues('image_url');
       setAboutImagePreview(formUrl && formUrl.trim() !== '' ? formUrl : currentDbAboutImageUrl || null);
     }
   };
 
-  const handleDeleteCurrentImage = () => {
-    console.log("[AboutManager] handleDeleteCurrentImage triggered. Current DB URL:", currentDbAboutImageUrl);
-    setAboutImageFile(null); 
-    setAboutImagePreview(null); 
-    aboutForm.setValue('image_url', ''); 
-    // currentDbAboutImageUrl remains, it will be used to delete from storage on save if image_url is empty
-    toast({
-      title: "Image Marked for Removal",
-      description: "The current image will be removed when you save changes.",
-      variant: "default",
-    });
-  };
-
   const onAboutSubmit: SubmitHandler<AboutContentFormData> = async (formData) => {
-    let imageUrlToSave = formData.image_url; 
+    let imageUrlToSave = formData.image_url; // URL from form (could be existing, new manual, or empty)
     let oldImageStoragePathToDelete: string | null = null;
 
-    // Determine if an old image needs to be deleted from storage
+    // Determine if an old image in storage needs to be deleted
     if (currentDbAboutImageUrl) {
         const pathParts = currentDbAboutImageUrl.split('/about-images/');
-        if (pathParts.length > 1 && !pathParts[1].startsWith('http')) { 
+        if (pathParts.length > 1 && !pathParts[1].startsWith('http')) {
             oldImageStoragePathToDelete = pathParts[1];
         }
     }
     
     if (aboutImageFile) { // A new file is being uploaded
-      // If there was an old image and a new one is uploaded, the old one is definitely replaced.
-      // Its path is already in oldImageStoragePathToDelete.
       const fileExt = aboutImageFile.name.split('.').pop();
       const fileName = `about_me_image.${Date.now()}.${fileExt}`; 
-      const filePath = `${fileName}`; 
+      const filePath = `${fileName}`; // File path in the bucket
 
       toast({ title: "Uploading About Me Image", description: "Please wait..." });
       const { data: uploadData, error: uploadError } = await supabase.storage
-        .from('about-images') 
-        .upload(filePath, aboutImageFile, { cacheControl: '3600', upsert: false }); 
+        .from('about-images') // Ensure this bucket name is correct
+        .upload(filePath, aboutImageFile, { cacheControl: '3600', upsert: false }); // upsert: false to avoid overwriting unrelated files with same name by chance
 
       if (uploadError) {
         console.error("Error uploading About Me image:", JSON.stringify(uploadError, null, 2));
@@ -170,27 +158,17 @@ export default function AboutManager() {
         toast({ title: "Error", description: "Failed to get public URL for uploaded About Me image.", variant: "destructive" });
         return;
       }
-      imageUrlToSave = publicUrlData.publicUrl; 
-      // If we uploaded a new image, the old one should be deleted regardless of form URL state.
-    } else if (formData.image_url === '' && currentDbAboutImageUrl) {
-      // No new file, and form URL is empty, meaning user wants to remove the image.
-      // oldImageStoragePathToDelete already holds the path to the DB image.
-      imageUrlToSave = null; // Ensure null is saved to DB if field is empty
-    } else {
-      // No new file, form URL might be the same as DB or a new external URL.
-      // If form URL is different from currentDbAboutImageUrl, oldImageStoragePathToDelete is still relevant.
-      // If form URL is same as currentDbAboutImageUrl, we don't want to delete it from storage.
-      if (formData.image_url === currentDbAboutImageUrl) {
-        oldImageStoragePathToDelete = null; // Don't delete if URL hasn't changed and no new file
-      }
-      imageUrlToSave = formData.image_url || null;
+      imageUrlToSave = publicUrlData.publicUrl; // This is the new URL to save
+      // If we uploaded a new image, the old one (if it existed and is different) should be deleted.
     }
-
+    // No new file uploaded. imageUrlToSave remains what's in formData.image_url.
+    // If formData.image_url is empty, it means the user cleared the URL field.
+    // If formData.image_url is different from currentDbAboutImageUrl, the old one might need deletion.
 
     const dataForUpsert = {
       ...formData,
-      id: PRIMARY_ABOUT_CONTENT_ID, 
-      image_url: imageUrlToSave, 
+      id: PRIMARY_ABOUT_CONTENT_ID, // Ensure the fixed ID is always used
+      image_url: imageUrlToSave || null, // Save the new URL or null if cleared
       updated_at: new Date().toISOString(),
     };
     
@@ -204,21 +182,21 @@ export default function AboutManager() {
     } else {
       toast({ title: "Success", description: "About Me content saved successfully." });
 
-      // Delete old image from storage if necessary
+      // Delete old image from storage if a new one was uploaded OR if the URL was cleared/changed
       if (oldImageStoragePathToDelete && imageUrlToSave !== currentDbAboutImageUrl) {
         console.log("[AboutManager] Attempting to delete old About Me image from storage:", oldImageStoragePathToDelete);
         const { error: storageDeleteError } = await supabase.storage.from('about-images').remove([oldImageStoragePathToDelete]);
         if (storageDeleteError) {
           console.warn("[AboutManager] Error deleting old About Me image from storage:", JSON.stringify(storageDeleteError, null, 2));
-          toast({title: "Storage Warning", description: `Updated content, but failed to delete old image: ${storageDeleteError.message}`, variant: "default"});
+          toast({title: "Storage Warning", description: `Updated content, but failed to delete old image from storage: ${storageDeleteError.message}`, variant: "default"});
         } else {
           console.log("[AboutManager] Old About Me image successfully deleted from storage:", oldImageStoragePathToDelete);
         }
       }
-      fetchAboutContent(); // Re-fetch to update currentDbAboutImageUrl and preview
-      router.refresh(); 
+      fetchAboutContent(); // Re-fetch to update currentDbAboutImageUrl and form state with latest data
+      router.refresh(); // Refresh the current route to reflect changes if it's a server component based page
     }
-    setAboutImageFile(null); 
+    setAboutImageFile(null); // Clear the file input after submission
   };
   
   console.log("[AboutManager] Rendering. currentDbAboutImageUrl:", currentDbAboutImageUrl, "aboutImagePreview:", aboutImagePreview);
@@ -267,31 +245,18 @@ export default function AboutManager() {
                     src={aboutImagePreview} 
                     alt="About Me image preview" 
                     fill 
-                    className="rounded object-contain" // Updated: used className for object-fit
-                    sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw" // Example sizes
+                    className="rounded object-contain"
+                    sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
                   />
-                   {/* Console log for debugging */}
-                  {console.log("[AboutManager] Image preview IS rendering. aboutImagePreview:", aboutImagePreview)}
+                   {/* console.log for debugging preview state */}
+                   {/* {console.log("[AboutManager] Image preview IS rendering. aboutImagePreview:", aboutImagePreview)} */}
                 </div>
               )}
-              {/* New "Remove Current Image" button */}
-              {aboutImagePreview && (
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={handleDeleteCurrentImage}
-                  className="mt-2 flex items-center gap-1.5 text-destructive hover:bg-destructive/10 hover:text-destructive border-destructive/50 hover:border-destructive"
-                  aria-label="Remove current image"
-                >
-                  <Trash2 className="h-4 w-4" />
-                  Remove Current Image
-                </Button>
-              )}
+              {/* The explicit delete button has been removed from here */}
 
               <div>
                 <Label htmlFor="image_url_about" className="text-xs text-muted-foreground">
-                  Or enter Image URL (upload or removing file will override)
+                  Or enter Image URL (upload will override if a file is chosen). Clear this to remove the image.
                 </Label>
                 <Input 
                   id="image_url_about" 
