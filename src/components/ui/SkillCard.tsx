@@ -1,3 +1,4 @@
+
 // src/components/ui/SkillCard.tsx
 import Image from 'next/image';
 import * as LucideIcons from 'lucide-react';
@@ -51,39 +52,8 @@ export default function SkillCard({ skill }: SkillCardProps) {
       </div>
     );
   } else {
-    // Attempt to use Lucide icon if iconName is provided and valid
-    let IconToRender: React.ElementType | null = null;
-    const defaultLucideIconName = 'Cpu'; // Default Lucide icon if specific one fails
-
-    if (skill.iconName && typeof skill.iconName === 'string' && skill.iconName.trim() !== '') {
-      const FoundIcon = LucideIcons[skill.iconName as keyof typeof LucideIcons];
-      if (FoundIcon && typeof FoundIcon === 'function') {
-        IconToRender = FoundIcon;
-      } else {
-        console.warn(
-          `SkillCard: Lucide icon "${skill.iconName}" for skill "${skill.name}" not found or invalid. Attempting default Lucide icon.`
-        );
-      }
-    }
-
-    if (!IconToRender) { // If specific icon wasn't found or no name provided, try default Lucide
-      const DefaultLucide = LucideIcons[defaultLucideIconName as keyof typeof LucideIcons];
-      if (DefaultLucide && typeof DefaultLucide === 'function') {
-        IconToRender = DefaultLucide;
-      } else {
-         console.warn(
-          `SkillCard: Default Lucide icon "${defaultLucideIconName}" for skill "${skill.name}" also not found or invalid. Rendering hardcoded SVG fallback.`
-        );
-      }
-    }
-    
-    if (IconToRender && typeof IconToRender === 'function') {
-        IconContent = <IconToRender className="h-10 w-10 sm:h-12 sm:w-12 text-primary mb-1 transition-transform group-hover:scale-110" />;
-    } else {
-        // Ultimate fallback to inline SVG
-        console.error(`SkillCard: Critical fallback for skill "${skill.name}". Lucide icon resolution failed. Rendering inline SVG.`);
-        IconContent = <DefaultSkillSvgFallback className="h-10 w-10 sm:h-12 sm:w-12 text-muted-foreground mb-1 transition-transform group-hover:scale-110" />;
-    }
+    // Fallback to default SVG if no image URL is provided
+    IconContent = <DefaultSkillSvgFallback className="h-10 w-10 sm:h-12 sm:w-12 text-muted-foreground mb-1 transition-transform group-hover:scale-110" />;
   }
   
   return (

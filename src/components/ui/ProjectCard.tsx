@@ -1,3 +1,4 @@
+
 import Image from 'next/image';
 import Link from 'next/link';
 import { ExternalLink, Github, Rocket, Wrench, FlaskConical, CheckCircle2, Archive, ClipboardList, type LucideIcon } from 'lucide-react';
@@ -73,7 +74,7 @@ export default function ProjectCard({ project }: ProjectCardProps) {
 
   let sourceCodeButton = null;
   if (project.repoUrl) {
-     sourceCodeButton = ( // Always create button, but disable based on actionability
+     sourceCodeButton = ( 
         <Button asChild variant="outline" className="flex-1 group/button hover:border-primary" disabled={!isActionable}>
           <Link href={isActionable ? project.repoUrl : '#'} target={isActionable ? "_blank" : undefined} rel={isActionable ? "noopener noreferrer" : undefined} aria-disabled={!isActionable}>
             <Github className="mr-2 h-4 w-4 group-hover/button:text-primary transition-colors" />
@@ -86,7 +87,6 @@ export default function ProjectCard({ project }: ProjectCardProps) {
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild>
-                {/* Render the disabled button structure here so Tooltip can attach */}
                 <Button variant="outline" className="flex-1" disabled>
                     <Github className="mr-2 h-4 w-4" /> Source Code
                 </Button>
@@ -124,7 +124,7 @@ export default function ProjectCard({ project }: ProjectCardProps) {
           alt={project.title || 'Project image'}
           layout="fill"
           objectFit="cover"
-          className="transition-transform duration-300 group-hover:scale-105"
+          className="transition-transform duration-300 group-hover:scale-105" // Removed dark mode invert
           data-ai-hint={project.imageHint || 'project abstract'}
         />
       </div>

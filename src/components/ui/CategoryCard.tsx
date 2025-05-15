@@ -1,7 +1,7 @@
+
 // src/components/ui/CategoryCard.tsx
 import Image from 'next/image';
-import * as LucideIcons from 'lucide-react';
-import { ArrowRight } from 'lucide-react';
+import { Package as DefaultPackageIconImport, ArrowRight } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import React from 'react';
@@ -9,7 +9,6 @@ import React from 'react';
 interface CategoryCardProps {
   name: string;
   iconImageUrl: string | null | undefined;
-  iconName: string | null | undefined; // Keep for Lucide fallback if image URL is missing
   skillCount: number;
   onClick: () => void;
 }
@@ -34,7 +33,7 @@ const DefaultCategorySvgFallback = (props: React.SVGProps<SVGSVGElement>) => (
   </svg>
 );
 
-export default function CategoryCard({ name, iconImageUrl, iconName, skillCount, onClick }: CategoryCardProps) {
+export default function CategoryCard({ name, iconImageUrl, skillCount, onClick }: CategoryCardProps) {
   let IconContent: React.ReactNode;
 
   if (iconImageUrl) {
@@ -45,45 +44,13 @@ export default function CategoryCard({ name, iconImageUrl, iconName, skillCount,
           alt={`${name} category icon`}
           layout="fill"
           objectFit="contain"
-          className="transition-transform group-hover:scale-110 dark:filter dark:brightness-0 dark:invert"
+          className="transition-transform group-hover:scale-110" // Removed dark mode invert
           data-ai-hint="category icon"
         />
       </div>
     );
   } else {
-    // Fallback to Lucide icon if image URL is missing
-    let IconToRender: React.ElementType | null = null;
-    const defaultLucideIconName = 'Package'; // Default Lucide icon for categories
-
-    if (iconName && typeof iconName === 'string' && iconName.trim() !== '') {
-      const FoundIcon = LucideIcons[iconName as keyof typeof LucideIcons];
-      if (FoundIcon && typeof FoundIcon === 'function') {
-        IconToRender = FoundIcon;
-      } else {
-        console.warn(
-          `CategoryCard: Lucide icon "${iconName}" for category "${name}" not found or invalid. Attempting default Lucide icon.`
-        );
-      }
-    }
-
-    if (!IconToRender) { // If specific icon wasn't found or no name provided, try default Lucide
-      const DefaultLucide = LucideIcons[defaultLucideIconName as keyof typeof LucideIcons];
-      if (DefaultLucide && typeof DefaultLucide === 'function') {
-        IconToRender = DefaultLucide;
-      } else {
-         console.warn(
-          `CategoryCard: Default Lucide icon "${defaultLucideIconName}" for category "${name}" also not found or invalid. Rendering hardcoded SVG fallback.`
-        );
-      }
-    }
-
-    if (IconToRender && typeof IconToRender === 'function') {
-      IconContent = <IconToRender className="h-12 w-12 mx-auto mb-3 transition-transform group-hover:scale-110 text-primary" />;
-    } else {
-      // Ultimate fallback to inline SVG
-      console.error(`CategoryCard: Critical fallback for category "${name}". Lucide icon resolution failed. Rendering inline SVG.`);
-      IconContent = <DefaultCategorySvgFallback className="h-12 w-12 mx-auto mb-3 transition-transform group-hover:scale-110 text-muted-foreground" />;
-    }
+     IconContent = <DefaultCategorySvgFallback className="h-12 w-12 mx-auto mb-3 transition-transform group-hover:scale-110 text-primary" />;
   }
 
   return (

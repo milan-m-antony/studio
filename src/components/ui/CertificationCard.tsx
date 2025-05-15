@@ -32,7 +32,7 @@ export default function CertificationCard({ certification, onClick }: Certificat
             alt={certification.title || 'Certification image'}
             layout="fill"
             objectFit="cover"
-            className="transition-transform duration-300 group-hover/cert-card:scale-105 dark:filter dark:brightness-0 dark:invert"
+            className="transition-transform duration-300 group-hover/cert-card:scale-105" // Removed dark mode invert
             data-ai-hint={certification.imageHint || 'certificate badge'}
           />
         ) : (

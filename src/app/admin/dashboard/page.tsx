@@ -11,7 +11,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { ShieldCheck, LogOut, AlertTriangle, LogIn, PlusCircle, Edit, Trash2, Home, UploadCloud, Package as DefaultCategoryIcon, Cpu as DefaultSkillIcon, UserCircle as AboutMeIcon } from 'lucide-react';
+import { ShieldCheck, LogOut, AlertTriangle, LogIn, PlusCircle, Edit, Trash2, Home, UploadCloud, Package as DefaultCategoryIcon, Cpu as DefaultSkillIcon, UserCircle as AboutMeIcon, Image as ImageIcon } from 'lucide-react';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabaseClient';
 import type { Project, ProjectStatus, SkillCategory, Skill as SkillType, AboutContent } from '@/types/supabase';
@@ -135,7 +135,7 @@ export default function AdminDashboardPage() {
   const [projects, setProjects] = useState<MappedProject[]>([]);
   const [isLoadingProjects, setIsLoadingProjects] = useState(false);
   const [isProjectModalOpen, setIsProjectModalOpen] = useState(false);
-  const [currentProject, setCurrentProject] = useState<MappedProject | null>(null);
+  const [currentProject, setCurrentProject] = useState<(MappedProject & {tags: string}) | null>(null);
   const [showProjectDeleteConfirm, setShowProjectDeleteConfirm] = useState(false);
   const [projectToDelete, setProjectToDelete] = useState<MappedProject | null>(null);
   const [projectImageFile, setProjectImageFile] = useState<File | null>(null);
@@ -220,7 +220,7 @@ export default function AdminDashboardPage() {
       projectForm.reset({
         id: currentProject.id, title: currentProject.title, description: currentProject.description || '',
         image_url: currentProject.imageUrl || '', live_demo_url: currentProject.liveDemoUrl || '', repo_url: currentProject.repoUrl || '',
-        tags: (currentProject.tags || []).join(', '),
+        tags: currentProject.tags, // tags is already a string here
         status: currentProject.status || 'Concept',
         progress: currentProject.progress === null || currentProject.progress === undefined ? null : Number(currentProject.progress),
       });
@@ -285,7 +285,11 @@ export default function AdminDashboardPage() {
     const { data, error: fetchError } = await supabase
       .from('skill_categories')
       .select(`
-        *,
+        id,
+        name,
+        icon_image_url,
+        sort_order,
+        created_at,
         skills (id, name, icon_image_url, description, category_id)
       `)
       .order('sort_order', { ascending: true })
@@ -358,14 +362,15 @@ export default function AdminDashboardPage() {
     const trimmedUsername = username.trim();
     const trimmedPassword = password.trim();
 
-    // Diagnostic logs - these will appear in the browser console
     console.log('[Admin Login] Attempting login...');
-    console.log('[Admin Login] Entered Username:', `"${trimmedUsername}"`); // Log entered username
+    console.log('[Admin Login] Entered Username:', `"${trimmedUsername}"`);
     const expectedUsername = process.env.NEXT_PUBLIC_ADMIN_USERNAME;
-    console.log('[Admin Login] Expected Username from env:', `"${expectedUsername}"`); // Log expected username
-    
+    console.log('[Admin Login] Expected Username from env:', `"${expectedUsername}"`);
+    const expectedPassword = process.env.NEXT_PUBLIC_ADMIN_PASSWORD;
+    // console.log('[Admin Login] Expected Password from env (masked for security):', expectedPassword ? "****" : "MISSING");
+
     const usernameMatch = trimmedUsername === expectedUsername;
-    const passwordMatch = trimmedPassword === process.env.NEXT_PUBLIC_ADMIN_PASSWORD;
+    const passwordMatch = trimmedPassword === expectedPassword;
 
     console.log('[Admin Login] Username match status:', usernameMatch);
     console.log('[Admin Login] Password match status (not logging actual passwords):', passwordMatch);
@@ -680,7 +685,7 @@ export default function AdminDashboardPage() {
 
   // Modal triggers / openers
   const triggerDeleteConfirmation = (project: MappedProject) => { setProjectToDelete(project); setShowProjectDeleteConfirm(true);};
-  const handleOpenProjectModal = (project?: MappedProject) => { setCurrentProject(project || null); setIsProjectModalOpen(true); };
+  const handleOpenProjectModal = (project?: MappedProject) => { setCurrentProject(project ? {...project, tags: (project.tags || []).join(', ')} : null); setIsProjectModalOpen(true); };
   const handleOpenCategoryModal = (category?: MappedSkillCategory) => { setCurrentCategory(category ? { ...category, icon_image_url: category.iconImageUrl || '' } : null); setIsCategoryModalOpen(true); };
   const triggerCategoryDeleteConfirmation = (category: MappedSkillCategory) => { setCategoryToDelete(category); setShowCategoryDeleteConfirm(true); };
   const handleOpenSkillModal = (category_id: string, skill?: SkillType) => { setParentCategoryIdForNewSkill(category_id); setCurrentSkill(skill ? { ...skill, icon_image_url: skill.iconImageUrl || '', category_id: skill.categoryId || category_id } : null); skillForm.setValue('category_id', category_id); setIsSkillModalOpen(true); };
@@ -716,7 +721,7 @@ export default function AdminDashboardPage() {
           </CardContent>
            <CardFooter className="mt-6 flex flex-col items-center space-y-2">
              <Link href="/" className={cn(buttonVariants({ variant: "link" }), "text-muted-foreground hover:text-primary flex items-center")}>
-                <Home className="mr-2 h-4 w-4" />Back to Portfolio
+                 <Home className="mr-2 h-4 w-4" />Back to Portfolio
             </Link>
           </CardFooter>
         </Card>
@@ -752,7 +757,7 @@ export default function AdminDashboardPage() {
                   <div className="space-y-2">
                     <Label htmlFor="project_image_file">Project Image File</Label>
                     <div className="flex items-center gap-3"><Input id="project_image_file" type="file" accept="image/*" onChange={handleProjectImageFileChange} className="flex-grow" /><UploadCloud className="h-6 w-6 text-muted-foreground"/></div>
-                    {(projectImagePreview || currentProjectImageUrlForPreview) && (<div className="mt-2 p-2 border rounded-md bg-muted aspect-video relative w-full max-w-xs mx-auto"><Image src={projectImagePreview || currentProjectImageUrlForPreview || "https://placehold.co/600x400.png"} alt="Image preview" fill objectFit="contain" className="rounded dark:filter dark:brightness-0 dark:invert"/></div>)}
+                    {(projectImagePreview || currentProjectImageUrlForPreview) && (<div className="mt-2 p-2 border rounded-md bg-muted aspect-video relative w-full max-w-xs mx-auto"><Image src={projectImagePreview || currentProjectImageUrlForPreview || "https://placehold.co/600x400.png"} alt="Image preview" fill objectFit="contain" className="rounded"/></div>)}
                     <div><Label htmlFor="image_url_project" className="text-xs text-muted-foreground">Or enter Image URL (upload will override)</Label><Input id="image_url_project" {...projectForm.register("image_url")} placeholder="https://example.com/image.png" />{projectForm.formState.errors.image_url && <p className="text-destructive text-sm mt-1">{projectForm.formState.errors.image_url.message}</p>}</div>
                   </div>
                   <div><Label htmlFor="live_demo_url">Live Demo URL</Label><Input id="live_demo_url" {...projectForm.register("live_demo_url")} placeholder="https://example.com/demo" />{projectForm.formState.errors.live_demo_url && <p className="text-destructive text-sm mt-1">{projectForm.formState.errors.live_demo_url.message}</p>}</div>
@@ -779,11 +784,9 @@ export default function AdminDashboardPage() {
                   </div>
                   <div className="flex space-x-2 self-start sm:self-center shrink-0">
                     <Button variant="outline" size="sm" onClick={() => handleOpenProjectModal(project)}><Edit className="mr-1.5 h-3.5 w-3.5" /> Edit</Button>
-                    
-                       <Button variant="destructive" size="sm" onClick={() => triggerDeleteConfirmation(project)}>
-                          <Trash2 className="mr-1.5 h-3.5 w-3.5" /> Delete
-                       </Button>
-                  
+                     <Button variant="destructive" size="sm" onClick={() => triggerDeleteConfirmation(project)}>
+                        <Trash2 className="mr-1.5 h-3.5 w-3.5" /> Delete
+                     </Button>
                   </div>
                 </Card>
             ))}</div>
@@ -816,7 +819,7 @@ export default function AdminDashboardPage() {
                   <div className="space-y-2">
                     <Label htmlFor="category_icon_file">Category Icon File</Label>
                     <div className="flex items-center gap-3"><Input id="category_icon_file" type="file" accept="image/*" onChange={handleCategoryIconFileChange} className="flex-grow" /><UploadCloud className="h-6 w-6 text-muted-foreground"/></div>
-                    {(categoryIconPreview || currentCategoryIconUrlForPreview) && (<div className="mt-2 p-2 border rounded-md bg-muted aspect-square relative w-24 h-24 mx-auto"><Image src={categoryIconPreview || currentCategoryIconUrlForPreview || "https://placehold.co/100x100.png"} alt="Icon preview" fill objectFit="contain" className="rounded dark:filter dark:brightness-0 dark:invert"/></div>)}
+                    {(categoryIconPreview || currentCategoryIconUrlForPreview) && (<div className="mt-2 p-2 border rounded-md bg-muted aspect-square relative w-24 h-24 mx-auto"><Image src={categoryIconPreview || currentCategoryIconUrlForPreview || "https://placehold.co/100x100.png"} alt="Icon preview" fill objectFit="contain" className="rounded"/></div>)}
                      <div>
                         <Label htmlFor="icon_image_url_category" className="text-xs text-muted-foreground">
                           Or enter Icon Image URL (upload will override).
@@ -839,7 +842,7 @@ export default function AdminDashboardPage() {
                 <AccordionItem value={category.id} key={category.id}>
                   <AccordionTrigger className="hover:no-underline">
                     <div className="flex items-center gap-3 flex-grow">
-                      {category.iconImageUrl ? <Image src={category.iconImageUrl} alt={category.name} width={20} height={20} className="rounded-sm dark:filter dark:brightness-0 dark:invert" /> : <DefaultCategoryIcon className="h-5 w-5 text-primary"/>}
+                      {category.iconImageUrl ? <Image src={category.iconImageUrl} alt={category.name} width={20} height={20} className="rounded-sm" /> : <DefaultCategoryIcon className="h-5 w-5 text-primary"/>}
                       <span className="font-medium text-lg">{category.name}</span>
                       <Badge variant="outline">{category.skills?.length || 0} skills</Badge>
                     </div>
@@ -856,7 +859,7 @@ export default function AdminDashboardPage() {
                           <Card key={skill.id} className="p-3">
                             <div className="flex items-center justify-between">
                               <div className="flex items-center gap-2">
-                                {skill.iconImageUrl ? <Image src={skill.iconImageUrl} alt={skill.name} width={16} height={16} className="rounded-sm dark:filter dark:brightness-0 dark:invert" /> : <DefaultSkillIcon className="h-4 w-4 text-muted-foreground"/>}
+                                {skill.iconImageUrl ? <Image src={skill.iconImageUrl} alt={skill.name} width={16} height={16} className="rounded-sm" /> : <DefaultSkillIcon className="h-4 w-4 text-muted-foreground"/>}
                                 <span className="text-sm font-medium">{skill.name}</span>
                               </div>
                               <div className="flex space-x-1.5">
@@ -910,7 +913,7 @@ export default function AdminDashboardPage() {
                 </div>
                 {(aboutImagePreview || currentAboutImageUrlForPreview) && (
                   <div className="mt-2 p-2 border rounded-md bg-muted aspect-video relative w-full max-w-sm mx-auto">
-                    <Image src={aboutImagePreview || currentAboutImageUrlForPreview || "https://placehold.co/600x400.png"} alt="About Me image preview" fill objectFit="contain" className="rounded dark:filter dark:brightness-0 dark:invert"/>
+                    <Image src={aboutImagePreview || currentAboutImageUrlForPreview || "https://placehold.co/600x400.png"} alt="About Me image preview" fill objectFit="contain" className="rounded"/>
                   </div>
                 )}
                 <div>
@@ -938,7 +941,7 @@ export default function AdminDashboardPage() {
             <div className="space-y-2">
               <Label htmlFor="skill_icon_file">Skill Icon File</Label>
               <div className="flex items-center gap-3"><Input id="skill_icon_file" type="file" accept="image/*" onChange={handleSkillIconFileChange} className="flex-grow" /><UploadCloud className="h-6 w-6 text-muted-foreground"/></div>
-              {(skillIconPreview || currentSkillIconUrlForPreview) && (<div className="mt-2 p-2 border rounded-md bg-muted aspect-square relative w-24 h-24 mx-auto"><Image src={skillIconPreview || currentSkillIconUrlForPreview || "https://placehold.co/100x100.png"} alt="Icon preview" fill objectFit="contain" className="rounded dark:filter dark:brightness-0 dark:invert"/></div>)}
+              {(skillIconPreview || currentSkillIconUrlForPreview) && (<div className="mt-2 p-2 border rounded-md bg-muted aspect-square relative w-24 h-24 mx-auto"><Image src={skillIconPreview || currentSkillIconUrlForPreview || "https://placehold.co/100x100.png"} alt="Icon preview" fill objectFit="contain" className="rounded"/></div>)}
                <div>
                   <Label htmlFor="icon_image_url_skill" className="text-xs text-muted-foreground">
                     Or enter Icon Image URL (upload will override).
@@ -976,5 +979,3 @@ export default function AdminDashboardPage() {
     </SectionWrapper>
   );
 }
-
-  
