@@ -44,33 +44,32 @@ async function getAboutContent(): Promise<AboutContent | null> {
 export default async function AboutSection() {
   const aboutContent = await getAboutContent();
 
-  // Provide default/fallback content if nothing is fetched
-  const defaults: AboutContent = {
-    id: PRIMARY_ABOUT_CONTENT_ID,
-    headline_main: "Milan: Weaving ",
-    headline_code_keyword: "Code",
-    headline_connector: " with ",
-    headline_creativity_keyword: "Creativity",
-    paragraph1: "Hello! I'm Milan, a passionate Creative Developer...",
-    paragraph2: "With a foundation in Computer Science...",
-    paragraph3: "Beyond the screen, I enjoy exploring...",
-    imageUrl: "https://picsum.photos/seed/aboutmilan/600/800",
-    image_tagline: "Fuelled by coffee & code.",
-  };
-
-  const contentToDisplay = aboutContent ? {
-    headline_main: aboutContent.headline_main || defaults.headline_main,
-    headline_code_keyword: aboutContent.headline_code_keyword || defaults.headline_code_keyword,
-    headline_connector: aboutContent.headline_connector || defaults.headline_connector,
-    headline_creativity_keyword: aboutContent.headline_creativity_keyword || defaults.headline_creativity_keyword,
-    paragraph1: aboutContent.paragraph1 || defaults.paragraph1,
-    paragraph2: aboutContent.paragraph2 || defaults.paragraph2,
-    paragraph3: aboutContent.paragraph3 || defaults.paragraph3,
-    imageUrl: aboutContent.imageUrl || defaults.imageUrl,
-    image_tagline: aboutContent.image_tagline || defaults.image_tagline,
-  } : { // Spread defaults if aboutContent is entirely null
-    ...defaults
-  };
+  // If aboutContent is null (no data from DB), pass an object with empty strings for headlines
+  // and null for other fields.
+  // Otherwise, use the fetched content, providing empty strings as fallbacks for individual null headline fields.
+  const contentToDisplay: Omit<AboutContent, 'id' | 'updated_at'> = aboutContent
+    ? {
+        headline_main: aboutContent.headline_main || "",
+        headline_code_keyword: aboutContent.headline_code_keyword || "",
+        headline_connector: aboutContent.headline_connector || "",
+        headline_creativity_keyword: aboutContent.headline_creativity_keyword || "",
+        paragraph1: aboutContent.paragraph1 || null,
+        paragraph2: aboutContent.paragraph2 || null,
+        paragraph3: aboutContent.paragraph3 || null,
+        imageUrl: aboutContent.imageUrl || null,
+        image_tagline: aboutContent.image_tagline || null,
+      }
+    : { // This is the case when the database is empty or content not found
+        headline_main: "",
+        headline_code_keyword: "",
+        headline_connector: "",
+        headline_creativity_keyword: "",
+        paragraph1: null,
+        paragraph2: null,
+        paragraph3: null,
+        imageUrl: null,
+        image_tagline: null,
+      };
 
 
   return (
