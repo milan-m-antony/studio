@@ -151,7 +151,6 @@ export default function SkillsManager() {
         name: cat.name,
         iconImageUrl: cat.icon_image_url,
         sort_order: cat.sort_order,
-        // created_at: cat.created_at, // not used in UI
         skills: (cat.skills || []).map((s: any) => ({
           id: s.id,
           name: s.name,
@@ -210,7 +209,7 @@ export default function SkillsManager() {
     setIsCategoryModalOpen(false);
     setCategoryIconFile(null);
     categoryForm.reset();
-    router.refresh();
+    router.refresh(); // Refresh current route (admin dashboard)
   };
 
   const onSkillSubmit: SubmitHandler<SkillFormData> = async (formData) => {
@@ -245,11 +244,11 @@ export default function SkillsManager() {
       if (insertError) { toast({ title: "Error adding skill", description: insertError.message, variant: "destructive" }); }
       else { toast({ title: "Success", description: "Skill added." }); }
     }
-    fetchSkillCategories(); // Refetch all categories to update the nested skills
+    fetchSkillCategories(); 
     setIsSkillModalOpen(false);
     setSkillIconFile(null);
     skillForm.reset();
-    router.refresh();
+    router.refresh(); // Refresh current route (admin dashboard)
   };
 
   const performDeleteCategory = async (categoryId: string) => {
@@ -271,6 +270,7 @@ export default function SkillsManager() {
     else { toast({ title: "Success", description: "Category deleted." }); fetchSkillCategories(); router.refresh(); }
     setShowCategoryDeleteConfirm(false);
     setCategoryToDelete(null);
+    router.refresh(); // Refresh current route (admin dashboard)
   };
 
   const performDeleteSkill = async (skillId: string) => {
@@ -285,9 +285,10 @@ export default function SkillsManager() {
 
     const { error } = await supabase.from('skills').delete().eq('id', skillId);
     if (error) { console.error("[SkillsManager] Error deleting skill from DB:", JSON.stringify(error, null, 2)); toast({ title: "Error deleting skill", description: error.message, variant: "destructive" }); }
-    else { toast({ title: "Success", description: "Skill deleted." }); fetchSkillCategories(); router.refresh(); } // Refetch all categories
+    else { toast({ title: "Success", description: "Skill deleted." }); fetchSkillCategories(); router.refresh(); } 
     setShowSkillDeleteConfirm(false);
     setSkillToDelete(null);
+    router.refresh(); // Refresh current route (admin dashboard)
   };
 
   const handleOpenCategoryModal = (category?: MappedSkillCategory) => { setCurrentCategory(category || null); setIsCategoryModalOpen(true); };
@@ -308,7 +309,7 @@ export default function SkillsManager() {
                 <div className="space-y-2">
                   <Label htmlFor="category_icon_file">Category Icon File</Label>
                   <div className="flex items-center gap-3"><Input id="category_icon_file" type="file" accept="image/*" onChange={handleCategoryIconFileChange} className="flex-grow" /><UploadCloud className="h-6 w-6 text-muted-foreground" /></div>
-                  {(categoryIconPreview) && (<div className="mt-2 p-2 border rounded-md bg-muted aspect-square relative w-24 h-24 mx-auto"><Image src={categoryIconPreview} alt="Icon preview" fill objectFit="contain" className="rounded" /></div>)}
+                  {(categoryIconPreview || currentCategoryIconUrlForPreview) && (<div className="mt-2 p-2 border rounded-md bg-muted aspect-square relative w-24 h-24 mx-auto"><Image src={categoryIconPreview || currentCategoryIconUrlForPreview || "https://placehold.co/100x100.png"} alt="Icon preview" fill objectFit="contain" className="rounded"/></div>)}
                   <div><Label htmlFor="icon_image_url_category" className="text-xs text-muted-foreground">Or enter Icon Image URL (upload will override).</Label><Input id="icon_image_url_category" {...categoryForm.register("icon_image_url")} placeholder="https://example.com/icon.png" />{categoryForm.formState.errors.icon_image_url && <p className="text-destructive text-sm mt-1">{categoryForm.formState.errors.icon_image_url.message}</p>}</div>
                 </div>
                 <div><Label htmlFor="sortOrder">Sort Order</Label><Input id="sortOrder" type="number" {...categoryForm.register("sort_order")} /></div>
@@ -377,8 +378,15 @@ export default function SkillsManager() {
             <div className="space-y-2">
               <Label htmlFor="skill_icon_file">Skill Icon File</Label>
               <div className="flex items-center gap-3"><Input id="skill_icon_file" type="file" accept="image/*" onChange={handleSkillIconFileChange} className="flex-grow" /><UploadCloud className="h-6 w-6 text-muted-foreground"/></div>
-              {(skillIconPreview) && (<div className="mt-2 p-2 border rounded-md bg-muted aspect-square relative w-24 h-24 mx-auto"><Image src={skillIconPreview} alt="Icon preview" fill objectFit="contain" className="rounded"/></div>)}
-               <div><Label htmlFor="icon_image_url_skill" className="text-xs text-muted-foreground">Or enter Icon Image URL (upload will override).</Label><Input id="icon_image_url_skill" {...skillForm.register("icon_image_url")} placeholder="https://example.com/icon.png"/>{skillForm.formState.errors.icon_image_url && <p className="text-destructive text-sm mt-1">{skillForm.formState.errors.icon_image_url.message}</p>}</div>
+              {(skillIconPreview || currentSkillIconUrlForPreview) && (<div className="mt-2 p-2 border rounded-md bg-muted aspect-square relative w-24 h-24 mx-auto"><Image src={skillIconPreview || currentSkillIconUrlForPreview || "https://placehold.co/100x100.png"} alt="Icon preview" fill objectFit="contain" className="rounded"/></div>)}
+               <div>
+                  <Label htmlFor="icon_image_url_skill" className="text-xs text-muted-foreground">
+                    Or enter Icon Image URL (upload will override). You can find icon names on 
+                    <Link href="https://lucide.dev/icons/" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline"> Lucide Icons</Link>.
+                  </Label>
+                  <Input id="icon_image_url_skill" {...skillForm.register("icon_image_url")} placeholder="https://example.com/icon.png"/>
+                  {skillForm.formState.errors.icon_image_url && <p className="text-destructive text-sm mt-1">{skillForm.formState.errors.icon_image_url.message}</p>}
+              </div>
             </div>
             <div><Label htmlFor="skillDescription">Description (Optional)</Label><Textarea id="skillDescription" {...skillForm.register("description")} /></div>
             <DialogFooter><DialogClose asChild><Button type="button" variant="outline" onClick={() => { setSkillIconFile(null); skillForm.reset();}}>Cancel</Button></DialogClose><Button type="submit">{currentSkill?.id ? 'Save Changes' : 'Add Skill'}</Button></DialogFooter>
@@ -406,5 +414,3 @@ export default function SkillsManager() {
     </Card>
   );
 }
-
-    

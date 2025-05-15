@@ -118,11 +118,11 @@ export default function AboutManager() {
     if (aboutImageFile) {
       const fileExt = aboutImageFile.name.split('.').pop();
       const fileName = `about_me_image.${Date.now()}.${fileExt}`;
-      const filePath = `${fileName}`; // Store directly in bucket root for simplicity, or a subfolder
+      const filePath = `${fileName}`; 
       toast({ title: "Uploading About Me Image", description: "Please wait..." });
       const { error: uploadError } = await supabase.storage
-        .from('about-images') // Ensure this bucket exists in Supabase Storage
-        .upload(filePath, aboutImageFile, { cacheControl: '3600', upsert: false }); // Use upsert: true if you want to overwrite with the same name
+        .from('about-images') 
+        .upload(filePath, aboutImageFile, { cacheControl: '3600', upsert: false }); 
 
       if (uploadError) {
         console.error("Error uploading About Me image:", JSON.stringify(uploadError, null, 2));
@@ -139,7 +139,7 @@ export default function AboutManager() {
 
     const dataForUpsert = {
       ...formData,
-      id: PRIMARY_ABOUT_CONTENT_ID, // Ensure ID is always the primary one
+      id: PRIMARY_ABOUT_CONTENT_ID, 
       image_url: imageUrlToSave || null,
       updated_at: new Date().toISOString(),
     };
@@ -153,8 +153,8 @@ export default function AboutManager() {
       toast({ title: "Error", description: `Failed to save About Me content: ${upsertError.message}`, variant: "destructive" });
     } else {
       toast({ title: "Success", description: "About Me content saved successfully." });
-      fetchAboutContent(); // Refetch to update the form with potentially new image URL from storage
-      router.refresh(); // Revalidate public page if it's fetching this data
+      fetchAboutContent(); 
+      router.refresh(); // Refresh current route (admin dashboard)
     }
   };
 
@@ -193,5 +193,3 @@ export default function AboutManager() {
     </Card>
   );
 }
-
-    
