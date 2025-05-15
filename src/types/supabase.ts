@@ -56,21 +56,21 @@ export interface Database {
         Row: {
           id: string
           name: string
-          icon_image_url: string | null
+          icon_image_url: string | null // Changed from icon_name
           sort_order: number | null
           created_at: string
         }
         Insert: {
           id?: string
           name: string
-          icon_image_url?: string | null
+          icon_image_url?: string | null // Changed
           sort_order?: number | null
           created_at?: string
         }
         Update: {
           id?: string
           name?: string
-          icon_image_url?: string | null
+          icon_image_url?: string | null // Changed
           sort_order?: number | null
           created_at?: string
         }
@@ -80,7 +80,7 @@ export interface Database {
         Row: {
           id: string
           name: string
-          icon_image_url: string | null
+          icon_image_url: string | null // Changed from icon_name
           description: string | null
           category_id: string | null
           created_at: string
@@ -88,7 +88,7 @@ export interface Database {
         Insert: {
           id?: string
           name: string
-          icon_image_url?: string | null
+          icon_image_url?: string | null // Changed
           description?: string | null
           category_id?: string | null
           created_at?: string
@@ -96,7 +96,7 @@ export interface Database {
         Update: {
           id?: string
           name?: string
-          icon_image_url?: string | null
+          icon_image_url?: string | null // Changed
           description?: string | null
           category_id?: string | null
           created_at?: string
@@ -110,7 +110,7 @@ export interface Database {
           }
         ]
       }
-      certifications: {
+      certifications: { // Ensure this matches your DB table
         Row: {
           id: string
           title: string
@@ -159,7 +159,7 @@ export interface Database {
           date: string
           title: string
           description: string
-          icon_image_url?: string | null // Changed from icon_name
+          icon_image_url?: string | null // Changed
           type: string
           sort_order?: number | null
           created_at?: string
@@ -169,7 +169,7 @@ export interface Database {
           date?: string
           title?: string
           description?: string
-          icon_image_url?: string | null // Changed from icon_name
+          icon_image_url?: string | null // Changed
           type?: string
           sort_order?: number | null
           created_at?: string
@@ -263,7 +263,7 @@ export interface SkillCategory {
   name: string;
   iconImageUrl?: string | null; // Mapped from icon_image_url
   skills?: Skill[];
-  skillCount?: number;
+  skillCount?: number; // Optional, can be derived client-side
   sort_order?: number | null;
   created_at?: string;
 }
@@ -286,9 +286,9 @@ export interface Certification {
   title: string;
   issuer: string;
   date: string;
-  imageUrl: string | null; // Mapped from image_url
-  imageHint: string | null;
-  verifyUrl?: string | null; // Mapped from verify_url
+  imageUrl: string | null; // Mapped from image_url in DB
+  imageHint: string | null; // Mapped from image_hint in DB
+  verifyUrl?: string | null; // Mapped from verify_url in DB
   created_at: string;
 }
 

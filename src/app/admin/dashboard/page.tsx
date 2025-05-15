@@ -14,16 +14,17 @@ import Link from 'next/link';
 import ProjectsManager from '@/components/admin/ProjectsManager';
 import SkillsManager from '@/components/admin/SkillsManager';
 import AboutManager from '@/components/admin/AboutManager';
-import TimelineManager from '@/components/admin/TimelineManager'; // Import the new component
+import TimelineManager from '@/components/admin/TimelineManager';
+import CertificationsManager from '@/components/admin/CertificationsManager'; // Import the new manager
 import SectionWrapper from '@/components/ui/SectionWrapper';
 
 export default function AdminDashboardPage() {
   const router = useRouter();
-  const [isMounted, setIsMounted] = React.useState(false);
-  const [isAuthenticatedForRender, setIsAuthenticatedForRender] = React.useState(false);
-  const [username, setUsername] = React.useState('');
-  const [password, setPassword] = React.useState('');
-  const [error, setError] = React.useState('');
+  const [isMounted, setIsMounted] = useState(false);
+  const [isAuthenticatedForRender, setIsAuthenticatedForRender] = useState(false);
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
 
   useEffect(() => {
     setIsMounted(true);
@@ -45,16 +46,11 @@ export default function AdminDashboardPage() {
     console.log('[Admin Login] Attempting login...');
     console.log('[Admin Login] Entered Username:', `"${trimmedUsername}"`);
     console.log('[Admin Login] Expected Username from env:', `"${expectedUsername}"`);
+    console.log('[Admin Login] Username match status:', trimmedUsername === expectedUsername);
     console.log('[Admin Login] Password match status (not logging actual passwords):', trimmedPassword === expectedPassword);
 
 
-    const usernameMatch = trimmedUsername === expectedUsername;
-    const passwordMatch = trimmedPassword === expectedPassword;
-
-    console.log('[Admin Login] Username match status:', usernameMatch);
-    console.log('[Admin Login] Password match status (not logging actual passwords):', passwordMatch);
-
-    if (usernameMatch && passwordMatch) {
+    if (trimmedUsername === expectedUsername && trimmedPassword === expectedPassword) {
       if (typeof window !== 'undefined') {
         localStorage.setItem('isAdminAuthenticated', 'true');
         window.dispatchEvent(new CustomEvent('authChange'));
@@ -140,7 +136,8 @@ export default function AdminDashboardPage() {
         <ProjectsManager />
         <SkillsManager />
         <AboutManager />
-        <TimelineManager /> {/* Add the new TimelineManager component */}
+        <TimelineManager />
+        <CertificationsManager /> {/* Add the new manager here */}
       </div>
     </SectionWrapper>
   );
