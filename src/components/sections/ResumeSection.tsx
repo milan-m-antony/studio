@@ -10,10 +10,9 @@ import type {
   ResumeEducation,
   ResumeKeySkillCategory,
   ResumeLanguage,
-  ResumeMeta // Import ResumeMeta type
+  ResumeMeta
 } from '@/types/supabase';
 
-// Fixed ID for the single resume_meta record
 const PRIMARY_RESUME_META_ID = '00000000-0000-0000-0000-000000000003';
 
 async function getResumeMeta(): Promise<ResumeMeta | null> {
@@ -45,7 +44,7 @@ async function getResumeExperience(): Promise<ResumeExperience[]> {
 
   if (error) {
     let errorMessage = 'Error fetching resume experience. ';
-    if (typeof error === 'object' && error !== null) {
+     if (typeof error === 'object' && error !== null) {
       const supabaseError = error as { message?: string; details?: string; hint?: string; code?: string };
       errorMessage += `Message: ${supabaseError.message || 'N/A'}, Details: ${supabaseError.details || 'N/A'}, Hint: ${supabaseError.hint || 'N/A'}, Code: ${supabaseError.code || 'N/A'}. `;
     }
@@ -128,13 +127,13 @@ async function getResumeLanguages(): Promise<ResumeLanguage[]> {
 
 export default async function ResumeSection() {
   const [
-    resumeMetaData, // Fetch resume meta data
+    resumeMetaData,
     experienceData,
     educationData,
     keySkillsData,
     languagesData
   ] = await Promise.all([
-    getResumeMeta(), // Call the new fetch function
+    getResumeMeta(),
     getResumeExperience(),
     getResumeEducation(),
     getResumeKeySkills(),
@@ -143,11 +142,11 @@ export default async function ResumeSection() {
 
   return (
     <SectionWrapper id="resume" className="section-fade-in" style={{ animationDelay: '1.2s' }}>
-      <SectionTitle subtitle={resumeMetaData?.description || "Access my comprehensive resume for a detailed overview of my qualifications and experience."}>
+      <SectionTitle subtitle="A comprehensive overview of my qualifications, experience, and skills.">
         My Resume / CV
       </SectionTitle>
       <ResumeSectionClientView
-        resumeMetaData={resumeMetaData} // Pass resume meta data
+        resumeMetaData={resumeMetaData}
         experienceData={experienceData}
         educationData={educationData}
         keySkillsData={keySkillsData}

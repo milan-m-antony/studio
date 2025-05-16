@@ -2,19 +2,21 @@
 "use client";
 
 import { Button } from '@/components/ui/button';
-import { Download, Printer, Briefcase, GraduationCap, ListChecks, Languages as LanguagesIcon, Building, HelpCircle, ExternalLink, Type as DefaultCategoryIcon } from 'lucide-react';
-import NextImage from 'next/image'; // Renamed to NextImage to avoid conflict if 'Image' from lucide-react is used
+import { Download, Printer, Briefcase, GraduationCap, ListChecks, Languages as LanguagesIcon, Building, HelpCircle, ExternalLink, Type as DefaultCategoryIcon, Eye } from 'lucide-react';
+import NextImage from 'next/image';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'; // Removed CardDescription as it's not used
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import React from 'react';
+import React, { useState } from 'react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogClose } from '@/components/ui/dialog';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 import type { 
   ResumeExperience, 
   ResumeEducation, 
   ResumeKeySkillCategory, 
   ResumeLanguage,
-  ResumeMeta // Import ResumeMeta type
+  ResumeMeta
 } from '@/types/supabase';
 
 interface ResumeDetailItemProps {
@@ -29,7 +31,7 @@ interface ResumeDetailItemProps {
 const ResumeDetailItem: React.FC<ResumeDetailItemProps> = ({ title, subtitle, date, description, iconImageUrl, DefaultIconComponent = Building }) => {
   return (
     <div className="mb-6 last:mb-0">
-      <div className="flex items-start mb-1"> {/* Changed to items-start for better alignment with multi-line titles */}
+      <div className="flex items-start mb-1">
         <div className="flex-shrink-0 mr-3 mt-1">
           {iconImageUrl ? (
             <div className="relative h-6 w-6 rounded-sm overflow-hidden border bg-muted">
@@ -61,7 +63,7 @@ const ResumeDetailItem: React.FC<ResumeDetailItemProps> = ({ title, subtitle, da
 };
 
 interface ResumeSectionClientViewProps {
-  resumeMetaData: ResumeMeta | null; // Add resumeMetaData prop
+  resumeMetaData: ResumeMeta | null;
   experienceData: ResumeExperience[];
   educationData: ResumeEducation[];
   keySkillsData: ResumeKeySkillCategory[];
@@ -69,12 +71,14 @@ interface ResumeSectionClientViewProps {
 }
 
 export default function ResumeSectionClientView({
-  resumeMetaData, // Destructure new prop
+  resumeMetaData,
   experienceData,
   educationData,
   keySkillsData,
   languagesData
 }: ResumeSectionClientViewProps) {
+  const [isPdfPreviewOpen, setIsPdfPreviewOpen] = useState(false);
+
   const handlePrint = () => {
     if (typeof window !== 'undefined') {
       window.print();
@@ -86,28 +90,56 @@ export default function ResumeSectionClientView({
 
   return (
     <>
-      <div className="text-center space-y-6 max-w-2xl mx-auto mb-12"> {/* Increased max-width for description */}
+      <div className="text-center space-y-6 max-w-3xl mx-auto mb-12">
         {resumeDescription && (
-          <p className="text-muted-foreground">
+          <p className="text-muted-foreground text-lg leading-relaxed">
             {resumeDescription}
           </p>
         )}
-        <div className="flex flex-col sm:flex-row justify-center gap-4">
+        <div className="flex flex-col sm:flex-row justify-center items-center gap-4">
+          {resumePdfUrl && (
+            <Button onClick={() => setIsPdfPreviewOpen(true)} size="lg" className="w-full sm:w-auto">
+              <Eye className="mr-2 h-5 w-5" /> Preview PDF
+            </Button>
+          )}
           <Button asChild size="lg" className="w-full sm:w-auto" disabled={!resumePdfUrl}>
-            <a href={resumePdfUrl || "#"} download="Milan_Resume.pdf" aria-disabled={!resumePdfUrl}>
+            <a href={resumePdfUrl || "#"} download="Milan_Resume.pdf" target="_blank" rel="noopener noreferrer" aria-disabled={!resumePdfUrl}>
               <Download className="mr-2 h-5 w-5" /> Download PDF
             </a>
           </Button>
           <Button variant="outline" size="lg" onClick={handlePrint} className="w-full sm:w-auto">
-            <Printer className="mr-2 h-5 w-5" /> Print Resume
+            <Printer className="mr-2 h-5 w-5" /> Print Page
           </Button>
         </div>
         {!resumePdfUrl && (
            <p className="text-xs text-muted-foreground">
-            (Resume PDF not available for download currently. Print functionality uses browser print.)
+            (Resume PDF not available for download or preview currently. Print functionality prints the current web page view.)
           </p>
         )}
       </div>
+
+      {resumePdfUrl && (
+        <Dialog open={isPdfPreviewOpen} onOpenChange={setIsPdfPreviewOpen}>
+          <DialogContent className="max-w-4xl w-[90vw] h-[90vh] p-0 flex flex-col">
+            <DialogHeader className="p-4 border-b">
+              <DialogTitle>Resume Preview</DialogTitle>
+              <DialogDescription>
+                Viewing PDF. You can also download it or print from your browser's PDF viewer.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="flex-grow p-0 m-0">
+              <iframe
+                src={resumePdfUrl}
+                title="Resume PDF Preview"
+                className="w-full h-full border-0"
+              />
+            </div>
+            <DialogClose asChild>
+                <Button type="button" variant="outline" className="m-4 mt-0 self-end">Close</Button>
+            </DialogClose>
+          </DialogContent>
+        </Dialog>
+      )}
 
       <Tabs defaultValue="experience" className="w-full max-w-4xl mx-auto">
         <TabsList className="grid w-full grid-cols-2 md:grid-cols-4 mb-8">
@@ -218,7 +250,7 @@ export default function ResumeSectionClientView({
                     title={lang.language_name}
                     description={lang.proficiency || undefined}
                     iconImageUrl={lang.icon_image_url}
-                    DefaultIconComponent={ExternalLink}
+                    DefaultIconComponent={ExternalLink} 
                   />
                 ))
               ) : (
