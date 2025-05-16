@@ -8,8 +8,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
-import { PlusCircle, Edit, Trash2, Briefcase, GraduationCap, ListChecks, Languages as LanguagesIcon, FileText as ResumeIcon, UploadCloud, Link as LinkIcon, ImageIcon, Building } from 'lucide-react';
-import NextImage from 'next/image'; // Renamed to avoid conflict if 'Image' is used from lucide
+import { PlusCircle, Edit, Trash2, Briefcase, GraduationCap, ListChecks, Languages as LanguagesIcon, FileText as ResumeIcon, UploadCloud, Link as LinkIcon, ImageIcon, Building, HelpCircle } from 'lucide-react';
+import NextImage from 'next/image';
 import { supabase } from '@/lib/supabaseClient';
 import type { ResumeExperience, ResumeEducation, ResumeKeySkillCategory, ResumeKeySkill, ResumeLanguage, ResumeMeta } from '@/types/supabase';
 import {
@@ -110,6 +110,7 @@ export default function ResumeManager() {
     defaultValues: { degree_or_certification: '', institution_name: '', date_range: '', description: '', icon_image_url: '', sort_order: 0 }
   });
 
+  // Fetch Resume Meta
   const fetchResumeMeta = async () => {
     setIsLoadingResumeMeta(true);
     const { data, error } = await supabase.from('resume_meta').select('*').eq('id', RESUME_META_ID).maybeSingle();
@@ -132,10 +133,9 @@ export default function ResumeManager() {
     setIsLoadingResumeMeta(false);
   };
 
-  // DEBUG: Temporarily comment out this useEffect to isolate parsing error
-  // React.useEffect(() => {
-  //   fetchResumeMeta();
-  // }, []);
+  React.useEffect(() => {
+    fetchResumeMeta();
+  }, []);
 
   const handleResumePdfFileChange = (event: ChangeEvent<HTMLInputElement>) => {
     if (event.target.files?.[0]) {
@@ -149,31 +149,81 @@ export default function ResumeManager() {
     }
   };
 
-  // DEBUG: Temporarily simplify onResumeMetaSubmit
   const onResumeMetaSubmit: SubmitHandler<ResumeMetaFormData> = async (formData) => {
-    console.log("Resume Meta form submitted (DEBUG MODE - NO DB ACTION):", formData);
-    toast({
-      title: "Debug Submit",
-      description: "Resume Meta form submitted. No database operation performed in this debug state.",
-    });
-    // The original complex logic for file upload and Supabase upsert is temporarily removed
-    // to help isolate the parsing error.
-    // You would re-introduce the full logic here once the parsing error is fixed.
-    // For example, a minimal placeholder for the original logic's structure:
-    // setIsLoadingResumeMeta(true);
-    // await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate async work
-    // setIsLoadingResumeMeta(false);
-    // fetchResumeMeta();
-    // router.refresh();
-  };
+    setIsLoadingResumeMeta(true);
+    let pdfUrlToSave = formData.resume_pdf_url;
+    let oldPdfStoragePathToDelete: string | null = null;
 
+    if (currentDbResumePdfUrl) {
+      try {
+        const url = new URL(currentDbResumePdfUrl);
+        const pathParts = url.pathname.split('/resume-pdfs/');
+        if (pathParts.length > 1 && !pathParts[1].startsWith('http')) {
+          oldPdfStoragePathToDelete = pathParts[1];
+        }
+      } catch (e) {
+        console.warn("[ResumeManager] Could not parse currentDbResumePdfUrl as URL:", currentDbResumePdfUrl);
+      }
+    }
+    
+    if (resumePdfFile) {
+      const fileExt = resumePdfFile.name.split('.').pop();
+      const fileName = `resume_${Date.now()}.${fileExt}`;
+      const filePath = `${fileName}`; // File path in the bucket
+
+      toast({ title: "Uploading Resume PDF", description: "Please wait..." });
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('resume-pdfs')
+        .upload(filePath, resumePdfFile, { cacheControl: '3600', upsert: false });
+
+      if (uploadError) {
+        toast({ title: "Upload Error", description: `Failed to upload PDF: ${uploadError.message}`, variant: "destructive" });
+        setIsLoadingResumeMeta(false);
+        return;
+      }
+      const { data: publicUrlData } = supabase.storage.from('resume-pdfs').getPublicUrl(filePath);
+      if (!publicUrlData?.publicUrl) {
+        toast({ title: "Error", description: "Failed to get public URL for uploaded PDF.", variant: "destructive" });
+        setIsLoadingResumeMeta(false);
+        return;
+      }
+      pdfUrlToSave = publicUrlData.publicUrl;
+    }
+    
+    const dataForUpsert = {
+      id: RESUME_META_ID,
+      description: formData.description || null,
+      resume_pdf_url: pdfUrlToSave || null,
+      updated_at: new Date().toISOString(),
+    };
+
+    const { error: upsertError } = await supabase
+      .from('resume_meta')
+      .upsert(dataForUpsert, { onConflict: 'id' });
+
+    if (upsertError) {
+      toast({ title: "Error", description: `Failed to save resume info: ${upsertError.message}`, variant: "destructive" });
+    } else {
+      toast({ title: "Success", description: "Resume info saved." });
+      if (oldPdfStoragePathToDelete && pdfUrlToSave !== currentDbResumePdfUrl) {
+        const { error: storageDeleteError } = await supabase.storage.from('resume-pdfs').remove([oldPdfStoragePathToDelete]);
+        if (storageDeleteError) {
+          toast({title: "Storage Warning", description: `Updated content, but failed to delete old PDF: ${storageDeleteError.message}`, variant: "default"});
+        }
+      }
+      fetchResumeMeta(); // Re-fetch to update currentDbResumePdfUrl and form state
+      router.refresh();
+    }
+    setResumePdfFile(null);
+    setIsLoadingResumeMeta(false);
+  };
 
   // Fetch Experiences
   const fetchExperiences = async () => {
     setIsLoadingExperiences(true);
     const { data, error } = await supabase.from('resume_experience').select('*').order('sort_order', { ascending: true });
     if (error) { toast({ title: "Error fetching experiences", description: error.message, variant: "destructive" }); setExperiences([]); }
-    else { setExperiences((data || []).map(item => ({ ...item, description_points: item.description_points || [] }))); }
+    else { setExperiences((data || []).map(item => ({ ...item, description_points: item.description_points || [], icon_image_url: item.icon_image_url || null }))); }
     setIsLoadingExperiences(false);
   };
 
@@ -211,7 +261,7 @@ export default function ResumeManager() {
     setIsLoadingEducation(true);
     const { data, error } = await supabase.from('resume_education').select('*').order('sort_order', { ascending: true });
     if (error) { toast({ title: "Error fetching education items", description: error.message, variant: "destructive" }); setEducationItems([]); }
-    else { setEducationItems(data || []); }
+    else { setEducationItems((data || []).map(item => ({ ...item, icon_image_url: item.icon_image_url || null }))); }
     setIsLoadingEducation(false);
   };
 
@@ -240,11 +290,11 @@ export default function ResumeManager() {
   
   // Fetch all data on mount
   React.useEffect(() => {
-    // fetchResumeMeta(); // Still commented out for debugging parsing error
+    fetchResumeMeta();
     fetchExperiences();
     fetchEducationItems();
     // TODO: Fetch data for Key Skills and Languages when implemented
-  }, []); // Dependency array is empty, runs once on mount
+  }, []);
 
   return (
     <>
@@ -282,7 +332,9 @@ export default function ResumeManager() {
                   {resumeMetaForm.formState.errors.resume_pdf_url && <p className="text-destructive text-sm mt-1">{resumeMetaForm.formState.errors.resume_pdf_url.message}</p>}
                 </div>
               </div>
-              <Button type="submit" className="w-full sm:w-auto justify-self-start">Save Resume Info</Button>
+              <Button type="submit" className="w-full sm:w-auto justify-self-start" disabled={isLoadingResumeMeta}>
+                {isLoadingResumeMeta ? 'Saving...' : 'Save Resume Info'}
+              </Button>
             </form>
           )}
         </CardContent>
@@ -432,7 +484,7 @@ export default function ResumeManager() {
               </form>
             </DialogContent>
           </Dialog>
-        </TabsContent> {/* This closes the Education TabContent */}
+        </TabsContent> {/* This closes the Education TabContent, it should be inside the main CardContent for Tabs */}
       </Card> {/* This closes the "Manage Resume Sections" Card */}
     </>
   );
