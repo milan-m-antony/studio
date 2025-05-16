@@ -2,14 +2,16 @@
 "use client";
 
 import { Button } from '@/components/ui/button';
-import { Download, Printer, Briefcase, GraduationCap, ListChecks, Languages as LanguagesIcon, Building, HelpCircle, ExternalLink, Type as DefaultCategoryIcon, Eye } from 'lucide-react';
+import { Download, Eye, Briefcase, GraduationCap, ListChecks, Languages as LanguagesIcon, Building, HelpCircle, ExternalLink, Type as DefaultCategoryIcon } from 'lucide-react';
 import NextImage from 'next/image';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogClose } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { format, parseISO } from 'date-fns';
+import { useToast } from '@/hooks/use-toast';
 
 import type { 
   ResumeExperience, 
@@ -78,11 +80,29 @@ export default function ResumeSectionClientView({
   languagesData
 }: ResumeSectionClientViewProps) {
   const [isPdfPreviewOpen, setIsPdfPreviewOpen] = useState(false);
+  const [formattedLastUpdated, setFormattedLastUpdated] = useState<string | null>(null);
+  const { toast } = useToast();
 
-  const handlePrint = () => {
-    if (typeof window !== 'undefined') {
-      window.print();
+  useEffect(() => {
+    if (resumeMetaData?.updated_at) {
+      try {
+        const date = parseISO(resumeMetaData.updated_at);
+        setFormattedLastUpdated(format(date, "MMMM d, yyyy 'at' h:mm a"));
+      } catch (error) {
+        console.error("Error formatting resume updated_at date:", error);
+        setFormattedLastUpdated("Date unavailable");
+      }
+    } else {
+      setFormattedLastUpdated(null);
     }
+  }, [resumeMetaData?.updated_at]);
+
+  const handleDownloadClick = () => {
+    toast({
+      title: "Download Initiated",
+      description: "Your resume PDF download has started.",
+    });
+    // The actual download is handled by the <a> tag's href and download attributes
   };
 
   const resumePdfUrl = resumeMetaData?.resume_pdf_url;
@@ -98,36 +118,40 @@ export default function ResumeSectionClientView({
         )}
         <div className="flex flex-col sm:flex-row justify-center items-center gap-4">
           {resumePdfUrl && (
-            <Button onClick={() => setIsPdfPreviewOpen(true)} size="lg" className="w-full sm:w-auto">
-              <Eye className="mr-2 h-5 w-5" /> Preview PDF
-            </Button>
+            <>
+              <Button onClick={() => setIsPdfPreviewOpen(true)} size="lg" className="w-full sm:w-auto">
+                <Eye className="mr-2 h-5 w-5" /> Preview PDF
+              </Button>
+              <Button asChild size="lg" className="w-full sm:w-auto" onClick={handleDownloadClick}>
+                <a href={resumePdfUrl} download="Milan_Resume.pdf" target="_blank" rel="noopener noreferrer">
+                  <Download className="mr-2 h-5 w-5" /> Download PDF
+                </a>
+              </Button>
+            </>
           )}
-          <Button asChild size="lg" className="w-full sm:w-auto" disabled={!resumePdfUrl}>
-            <a href={resumePdfUrl || "#"} download="Milan_Resume.pdf" target="_blank" rel="noopener noreferrer" aria-disabled={!resumePdfUrl}>
-              <Download className="mr-2 h-5 w-5" /> Download PDF
-            </a>
-          </Button>
-          <Button variant="outline" size="lg" onClick={handlePrint} className="w-full sm:w-auto">
-            <Printer className="mr-2 h-5 w-5" /> Print Page
-          </Button>
         </div>
         {!resumePdfUrl && (
-           <p className="text-xs text-muted-foreground">
-            (Resume PDF not available for download or preview currently. Print functionality prints the current web page view.)
+           <p className="text-xs text-muted-foreground mt-2">
+            (Resume PDF not available for download or preview currently.)
+          </p>
+        )}
+         {formattedLastUpdated && (
+          <p className="text-xs text-muted-foreground mt-4">
+            Last Updated: {formattedLastUpdated}
           </p>
         )}
       </div>
 
       {resumePdfUrl && (
         <Dialog open={isPdfPreviewOpen} onOpenChange={setIsPdfPreviewOpen}>
-          <DialogContent className="max-w-4xl w-[90vw] h-[90vh] p-0 flex flex-col">
-            <DialogHeader className="p-4 border-b">
+          <DialogContent className="max-w-4xl w-[95vw] md:w-[90vw] h-[90vh] p-0 flex flex-col overflow-hidden">
+            <DialogHeader className="p-4 border-b shrink-0">
               <DialogTitle>Resume Preview</DialogTitle>
               <DialogDescription>
                 Viewing PDF. You can also download it or print from your browser's PDF viewer.
               </DialogDescription>
             </DialogHeader>
-            <div className="flex-grow p-0 m-0">
+            <div className="flex-grow p-0 m-0 overflow-hidden">
               <iframe
                 src={resumePdfUrl}
                 title="Resume PDF Preview"
@@ -135,7 +159,7 @@ export default function ResumeSectionClientView({
               />
             </div>
             <DialogClose asChild>
-                <Button type="button" variant="outline" className="m-4 mt-0 self-end">Close</Button>
+                <Button type="button" variant="outline" className="m-4 mt-0 self-end shrink-0">Close</Button>
             </DialogClose>
           </DialogContent>
         </Dialog>

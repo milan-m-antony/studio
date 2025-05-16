@@ -13,12 +13,13 @@ import type {
   ResumeMeta
 } from '@/types/supabase';
 
+// Fixed ID for the resume_meta table, ensure this matches the ID used in ResumeManager.tsx
 const PRIMARY_RESUME_META_ID = '00000000-0000-0000-0000-000000000003';
 
 async function getResumeMeta(): Promise<ResumeMeta | null> {
   const { data, error, status, statusText } = await supabase
     .from('resume_meta')
-    .select('id, description, resume_pdf_url, updated_at')
+    .select('id, description, resume_pdf_url, updated_at') // Ensure updated_at is selected
     .eq('id', PRIMARY_RESUME_META_ID)
     .maybeSingle();
 
