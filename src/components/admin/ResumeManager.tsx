@@ -59,10 +59,14 @@ const resumeEducationSchema = z.object({
 });
 type ResumeEducationFormData = z.infer<typeof resumeEducationSchema>;
 
-// Placeholder: Zod schemas for Key Skills and Languages will be added when those sections are implemented
+// Placeholder Zod schemas for Key Skills and Languages (to be implemented)
 // const resumeKeySkillCategorySchema = z.object({ /* ... */ });
+// type ResumeKeySkillCategoryFormData = z.infer<typeof resumeKeySkillCategorySchema>;
 // const resumeKeySkillSchema = z.object({ /* ... */ });
+// type ResumeKeySkillFormData = z.infer<typeof resumeKeySkillSchema>;
 // const resumeLanguageSchema = z.object({ /* ... */ });
+// type ResumeLanguageFormData = z.infer<typeof resumeLanguageSchema>;
+
 
 const IconPreview = ({ url, alt = "Icon Preview" }: { url?: string | null; alt?: string }) => {
   if (!url || typeof url !== 'string' || url.trim() === '') {
@@ -88,6 +92,8 @@ export default function ResumeManager() {
   const [isExperienceModalOpen, setIsExperienceModalOpen] = React.useState(false);
   const [currentExperience, setCurrentExperience] = React.useState<ResumeExperience | null>(null);
   const [experienceToDelete, setExperienceToDelete] = React.useState<ResumeExperience | null>(null);
+  const [showExperienceDeleteConfirm, setShowExperienceDeleteConfirm] = React.useState(false);
+
 
   // Education State
   const [educationItems, setEducationItems] = React.useState<ResumeEducation[]>([]);
@@ -95,6 +101,8 @@ export default function ResumeManager() {
   const [isEducationModalOpen, setIsEducationModalOpen] = React.useState(false);
   const [currentEducation, setCurrentEducation] = React.useState<ResumeEducation | null>(null);
   const [educationToDelete, setEducationToDelete] = React.useState<ResumeEducation | null>(null);
+  const [showEducationDeleteConfirm, setShowEducationDeleteConfirm] = React.useState(false);
+
 
   // Forms
   const resumeMetaForm = useForm<ResumeMetaFormData>({
@@ -156,8 +164,8 @@ export default function ResumeManager() {
 
     if (currentDbResumePdfUrl) {
       try {
-        const url = new URL(currentDbResumePdfUrl);
-        const pathParts = url.pathname.split('/resume-pdfs/');
+        const url = new URL(currentDbResumePdfUrl); // Ensure currentDbResumePdfUrl is a valid URL
+        const pathParts = url.pathname.split('/resume-pdfs/'); // Path for storage bucket
         if (pathParts.length > 1 && !pathParts[1].startsWith('http')) {
           oldPdfStoragePathToDelete = pathParts[1];
         }
@@ -169,11 +177,11 @@ export default function ResumeManager() {
     if (resumePdfFile) {
       const fileExt = resumePdfFile.name.split('.').pop();
       const fileName = `resume_${Date.now()}.${fileExt}`;
-      const filePath = `${fileName}`; // File path in the bucket
+      const filePath = `${fileName}`; 
 
       toast({ title: "Uploading Resume PDF", description: "Please wait..." });
       const { data: uploadData, error: uploadError } = await supabase.storage
-        .from('resume-pdfs')
+        .from('resume-pdfs') // Bucket name
         .upload(filePath, resumePdfFile, { cacheControl: '3600', upsert: false });
 
       if (uploadError) {
@@ -211,7 +219,7 @@ export default function ResumeManager() {
           toast({title: "Storage Warning", description: `Updated content, but failed to delete old PDF: ${storageDeleteError.message}`, variant: "default"});
         }
       }
-      fetchResumeMeta(); // Re-fetch to update currentDbResumePdfUrl and form state
+      fetchResumeMeta(); 
       router.refresh();
     }
     setResumePdfFile(null);
@@ -243,8 +251,14 @@ export default function ResumeManager() {
     if (error) { toast({ title: "Error deleting experience", description: error.message, variant: "destructive" }); }
     else { toast({ title: "Success", description: "Experience deleted." }); fetchExperiences(); router.refresh(); }
     setExperienceToDelete(null);
+    setShowExperienceDeleteConfirm(false);
   };
   
+  const triggerExperienceDeleteConfirmation = (experience: ResumeExperience) => {
+    setExperienceToDelete(experience);
+    setShowExperienceDeleteConfirm(true);
+  };
+
   const handleOpenExperienceModal = (experience?: ResumeExperience) => {
     setCurrentExperience(experience || null);
     experienceForm.reset(experience ? { 
@@ -280,6 +294,12 @@ export default function ResumeManager() {
     if (error) { toast({ title: "Error deleting education item", description: error.message, variant: "destructive" }); }
     else { toast({ title: "Success", description: "Education item deleted." }); fetchEducationItems(); router.refresh(); }
     setEducationToDelete(null);
+    setShowEducationDeleteConfirm(false);
+  };
+
+  const triggerEducationDeleteConfirmation = (education: ResumeEducation) => {
+    setEducationToDelete(education);
+    setShowEducationDeleteConfirm(true);
   };
 
   const handleOpenEducationModal = (education?: ResumeEducation) => {
@@ -376,18 +396,7 @@ export default function ResumeManager() {
                         </div>
                         <div className="flex space-x-2 flex-shrink-0">
                           <Button variant="outline" size="sm" onClick={() => handleOpenExperienceModal(exp)}><Edit className="mr-1 h-3 w-3" />Edit</Button>
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                                <Button variant="destructive" size="sm"><Trash2 className="mr-1 h-3 w-3" />Delete</Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent className="bg-destructive border-destructive text-destructive-foreground">
-                                <AlertDialogHeader><AlertDialogTitle className="text-destructive-foreground">Delete Experience: {exp.job_title}?</AlertDialogTitle><AlertDialogDescription className="text-destructive-foreground/90">This action cannot be undone.</AlertDialogDescription></AlertDialogHeader>
-                                <AlertDialogFooter>
-                                    <AlertDialogCancel onClick={() => setExperienceToDelete(null)} className={cn(buttonVariants({ variant: "outline" }), "border-destructive-foreground/40 text-destructive-foreground hover:bg-destructive-foreground/10 hover:text-destructive-foreground hover:border-destructive-foreground/60")}>Cancel</AlertDialogCancel>
-                                    <AlertDialogAction onClick={() => { setExperienceToDelete(exp); handleDeleteExperience(); }} className={cn(buttonVariants({ variant: "default" }), "bg-destructive-foreground text-destructive hover:bg-destructive-foreground/90")}>Delete</AlertDialogAction>
-                                </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
+                          <Button variant="destructive" size="sm" onClick={() => triggerExperienceDeleteConfirmation(exp)}><Trash2 className="mr-1 h-3 w-3" />Delete</Button>
                         </div>
                       </div>
                     </Card>
@@ -415,18 +424,7 @@ export default function ResumeManager() {
                         </div>
                         <div className="flex space-x-2 flex-shrink-0">
                           <Button variant="outline" size="sm" onClick={() => handleOpenEducationModal(edu)}><Edit className="mr-1 h-3 w-3" />Edit</Button>
-                           <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                                <Button variant="destructive" size="sm"><Trash2 className="mr-1 h-3 w-3" />Delete</Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent className="bg-destructive border-destructive text-destructive-foreground">
-                                <AlertDialogHeader><AlertDialogTitle className="text-destructive-foreground">Delete Education: {edu.degree_or_certification}?</AlertDialogTitle><AlertDialogDescription className="text-destructive-foreground/90">This action cannot be undone.</AlertDialogDescription></AlertDialogHeader>
-                                <AlertDialogFooter>
-                                    <AlertDialogCancel onClick={() => setEducationToDelete(null)} className={cn(buttonVariants({ variant: "outline" }), "border-destructive-foreground/40 text-destructive-foreground hover:bg-destructive-foreground/10 hover:text-destructive-foreground hover:border-destructive-foreground/60")}>Cancel</AlertDialogCancel>
-                                    <AlertDialogAction onClick={() => { setEducationToDelete(edu); handleDeleteEducation();}} className={cn(buttonVariants({ variant: "default" }), "bg-destructive-foreground text-destructive hover:bg-destructive-foreground/90")}>Delete</AlertDialogAction>
-                                </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
+                          <Button variant="destructive" size="sm" onClick={() => triggerEducationDeleteConfirmation(edu)}><Trash2 className="mr-1 h-3 w-3" />Delete</Button>
                         </div>
                       </div>
                     </Card>
@@ -438,54 +436,84 @@ export default function ResumeManager() {
             <TabsContent value="skills"><p className="text-center text-muted-foreground py-8">Key Skills management coming soon.</p></TabsContent>
             <TabsContent value="languages"><p className="text-center text-muted-foreground py-8">Languages management coming soon.</p></TabsContent>
           </Tabs>
-
-          {/* Experience Modal */}
-          <Dialog open={isExperienceModalOpen} onOpenChange={(isOpen) => { setIsExperienceModalOpen(isOpen); if (!isOpen) setCurrentExperience(null); }}>
-            <DialogContent className="sm:max-w-[525px]">
-              <DialogHeader><DialogTitle>{currentExperience ? 'Edit Experience' : 'Add New Experience'}</DialogTitle></DialogHeader>
-              <form onSubmit={experienceForm.handleSubmit(onExperienceSubmit)} className="grid gap-4 py-4">
-                <ScrollArea className="max-h-[70vh] p-1"><div className="grid gap-4 p-3">
-                  <div><Label htmlFor="job_title">Job Title</Label><Input id="job_title" {...experienceForm.register("job_title")} />{experienceForm.formState.errors.job_title && <p className="text-destructive text-sm mt-1">{experienceForm.formState.errors.job_title.message}</p>}</div>
-                  <div><Label htmlFor="company_name">Company Name</Label><Input id="company_name" {...experienceForm.register("company_name")} />{experienceForm.formState.errors.company_name && <p className="text-destructive text-sm mt-1">{experienceForm.formState.errors.company_name.message}</p>}</div>
-                  <div><Label htmlFor="exp_date_range">Date Range (e.g., Jan 2023 - Present)</Label><Input id="exp_date_range" {...experienceForm.register("date_range")} /></div>
-                  <div><Label htmlFor="description_points">Description (one point per line)</Label><Textarea id="description_points" {...experienceForm.register("description_points")} rows={5} /></div>
-                  <div>
-                    <Label htmlFor="exp_icon_image_url">Icon Image URL (Optional)</Label>
-                    <Input id="exp_icon_image_url" {...experienceForm.register("icon_image_url")} placeholder="https://example.com/icon.png" />
-                    {experienceForm.formState.errors.icon_image_url && <p className="text-destructive text-sm mt-1">{experienceForm.formState.errors.icon_image_url.message}</p>}
-                    {experienceForm.watch("icon_image_url") && (<div className="mt-2 flex items-center gap-2"><span className="text-xs">Preview:</span><IconPreview url={experienceForm.watch("icon_image_url")} /></div>)}
-                  </div>
-                  <div><Label htmlFor="exp_sort_order">Sort Order</Label><Input id="exp_sort_order" type="number" {...experienceForm.register("sort_order")} /></div>
-                </div></ScrollArea>
-                <DialogFooter><DialogClose asChild><Button type="button" variant="outline">Cancel</Button></DialogClose><Button type="submit">{currentExperience ? 'Save Changes' : 'Add Experience'}</Button></DialogFooter>
-              </form>
-            </DialogContent>
-          </Dialog>
-          
-          {/* Education Modal */}
-          <Dialog open={isEducationModalOpen} onOpenChange={(isOpen) => { setIsEducationModalOpen(isOpen); if (!isOpen) setCurrentEducation(null); }}>
-            <DialogContent className="sm:max-w-[525px]">
-              <DialogHeader><DialogTitle>{currentEducation ? 'Edit Education' : 'Add New Education'}</DialogTitle></DialogHeader>
-              <form onSubmit={educationForm.handleSubmit(onEducationSubmit)} className="grid gap-4 py-4">
-                <ScrollArea className="max-h-[70vh] p-1"><div className="grid gap-4 p-3">
-                  <div><Label htmlFor="degree_or_certification">Degree or Certification</Label><Input id="degree_or_certification" {...educationForm.register("degree_or_certification")} />{educationForm.formState.errors.degree_or_certification && <p className="text-destructive text-sm mt-1">{educationForm.formState.errors.degree_or_certification.message}</p>}</div>
-                  <div><Label htmlFor="institution_name">Institution Name</Label><Input id="institution_name" {...educationForm.register("institution_name")} />{educationForm.formState.errors.institution_name && <p className="text-destructive text-sm mt-1">{educationForm.formState.errors.institution_name.message}</p>}</div>
-                  <div><Label htmlFor="edu_date_range">Date Range (e.g., 2020 - 2024)</Label><Input id="edu_date_range" {...educationForm.register("date_range")} /></div>
-                  <div><Label htmlFor="edu_description">Description (Optional)</Label><Textarea id="edu_description" {...educationForm.register("description")} rows={3} /></div>
-                  <div>
-                    <Label htmlFor="edu_icon_image_url">Icon Image URL (Optional)</Label>
-                    <Input id="edu_icon_image_url" {...educationForm.register("icon_image_url")} placeholder="https://example.com/school-logo.png" />
-                    {educationForm.formState.errors.icon_image_url && <p className="text-destructive text-sm mt-1">{educationForm.formState.errors.icon_image_url.message}</p>}
-                     {educationForm.watch("icon_image_url") && (<div className="mt-2 flex items-center gap-2"><span className="text-xs">Preview:</span><IconPreview url={educationForm.watch("icon_image_url")} /></div>)}
-                  </div>
-                  <div><Label htmlFor="edu_sort_order">Sort Order</Label><Input id="edu_sort_order" type="number" {...educationForm.register("sort_order")} /></div>
-                </div></ScrollArea>
-                <DialogFooter><DialogClose asChild><Button type="button" variant="outline">Cancel</Button></DialogClose><Button type="submit">{currentEducation ? 'Save Changes' : 'Add Education'}</Button></DialogFooter>
-              </form>
-            </DialogContent>
-          </Dialog>
-        </TabsContent> {/* This closes the Education TabContent, it should be inside the main CardContent for Tabs */}
+        </CardContent>
       </Card> {/* This closes the "Manage Resume Sections" Card */}
+
+      {/* Experience Delete Confirmation Dialog */}
+      <AlertDialog open={showExperienceDeleteConfirm} onOpenChange={setShowExperienceDeleteConfirm}>
+        <AlertDialogContent className="bg-destructive border-destructive text-destructive-foreground">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-destructive-foreground">Delete Experience: {experienceToDelete?.job_title}?</AlertDialogTitle>
+            <AlertDialogDescription className="text-destructive-foreground/90">This action cannot be undone.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => { setExperienceToDelete(null); setShowExperienceDeleteConfirm(false); }} className={cn(buttonVariants({ variant: "outline" }), "border-destructive-foreground/40 text-destructive-foreground hover:bg-destructive-foreground/10 hover:text-destructive-foreground hover:border-destructive-foreground/60")}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteExperience} className={cn(buttonVariants({ variant: "default" }), "bg-destructive-foreground text-destructive hover:bg-destructive-foreground/90")}>Delete</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Education Delete Confirmation Dialog */}
+      <AlertDialog open={showEducationDeleteConfirm} onOpenChange={setShowEducationDeleteConfirm}>
+        <AlertDialogContent className="bg-destructive border-destructive text-destructive-foreground">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-destructive-foreground">Delete Education: {educationToDelete?.degree_or_certification}?</AlertDialogTitle>
+            <AlertDialogDescription className="text-destructive-foreground/90">This action cannot be undone.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => { setEducationToDelete(null); setShowEducationDeleteConfirm(false);}} className={cn(buttonVariants({ variant: "outline" }), "border-destructive-foreground/40 text-destructive-foreground hover:bg-destructive-foreground/10 hover:text-destructive-foreground hover:border-destructive-foreground/60")}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteEducation} className={cn(buttonVariants({ variant: "default" }), "bg-destructive-foreground text-destructive hover:bg-destructive-foreground/90")}>Delete</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      
+      {/* Experience Modal */}
+      <Dialog open={isExperienceModalOpen} onOpenChange={(isOpen) => { setIsExperienceModalOpen(isOpen); if (!isOpen) setCurrentExperience(null); }}>
+        <DialogContent className="sm:max-w-[525px]">
+          <DialogHeader><DialogTitle>{currentExperience ? 'Edit Experience' : 'Add New Experience'}</DialogTitle></DialogHeader>
+          <form onSubmit={experienceForm.handleSubmit(onExperienceSubmit)} className="grid gap-4 py-4">
+            <ScrollArea className="max-h-[70vh] p-1"><div className="grid gap-4 p-3">
+              <div><Label htmlFor="job_title">Job Title</Label><Input id="job_title" {...experienceForm.register("job_title")} />{experienceForm.formState.errors.job_title && <p className="text-destructive text-sm mt-1">{experienceForm.formState.errors.job_title.message}</p>}</div>
+              <div><Label htmlFor="company_name">Company Name</Label><Input id="company_name" {...experienceForm.register("company_name")} />{experienceForm.formState.errors.company_name && <p className="text-destructive text-sm mt-1">{experienceForm.formState.errors.company_name.message}</p>}</div>
+              <div><Label htmlFor="exp_date_range">Date Range (e.g., Jan 2023 - Present)</Label><Input id="exp_date_range" {...experienceForm.register("date_range")} /></div>
+              <div><Label htmlFor="description_points">Description (one point per line)</Label><Textarea id="description_points" {...experienceForm.register("description_points")} rows={5} /></div>
+              <div>
+                <Label htmlFor="exp_icon_image_url">Icon Image URL (Optional)</Label>
+                <Input id="exp_icon_image_url" {...experienceForm.register("icon_image_url")} placeholder="https://example.com/icon.png" />
+                {experienceForm.formState.errors.icon_image_url && <p className="text-destructive text-sm mt-1">{experienceForm.formState.errors.icon_image_url.message}</p>}
+                {experienceForm.watch("icon_image_url") && (<div className="mt-2 flex items-center gap-2"><span className="text-xs">Preview:</span><IconPreview url={experienceForm.watch("icon_image_url")} /></div>)}
+              </div>
+              <div><Label htmlFor="exp_sort_order">Sort Order</Label><Input id="exp_sort_order" type="number" {...experienceForm.register("sort_order")} /></div>
+            </div></ScrollArea>
+            <DialogFooter><DialogClose asChild><Button type="button" variant="outline">Cancel</Button></DialogClose><Button type="submit">{currentExperience ? 'Save Changes' : 'Add Experience'}</Button></DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+      
+      {/* Education Modal */}
+      <Dialog open={isEducationModalOpen} onOpenChange={(isOpen) => { setIsEducationModalOpen(isOpen); if (!isOpen) setCurrentEducation(null); }}>
+        <DialogContent className="sm:max-w-[525px]">
+          <DialogHeader><DialogTitle>{currentEducation ? 'Edit Education' : 'Add New Education'}</DialogTitle></DialogHeader>
+          <form onSubmit={educationForm.handleSubmit(onEducationSubmit)} className="grid gap-4 py-4">
+            <ScrollArea className="max-h-[70vh] p-1"><div className="grid gap-4 p-3">
+              <div><Label htmlFor="degree_or_certification">Degree or Certification</Label><Input id="degree_or_certification" {...educationForm.register("degree_or_certification")} />{educationForm.formState.errors.degree_or_certification && <p className="text-destructive text-sm mt-1">{educationForm.formState.errors.degree_or_certification.message}</p>}</div>
+              <div><Label htmlFor="institution_name">Institution Name</Label><Input id="institution_name" {...educationForm.register("institution_name")} />{educationForm.formState.errors.institution_name && <p className="text-destructive text-sm mt-1">{educationForm.formState.errors.institution_name.message}</p>}</div>
+              <div><Label htmlFor="edu_date_range">Date Range (e.g., 2020 - 2024)</Label><Input id="edu_date_range" {...educationForm.register("date_range")} /></div>
+              <div><Label htmlFor="edu_description">Description (Optional)</Label><Textarea id="edu_description" {...educationForm.register("description")} rows={3} /></div>
+              <div>
+                <Label htmlFor="edu_icon_image_url">Icon Image URL (Optional)</Label>
+                <Input id="edu_icon_image_url" {...educationForm.register("icon_image_url")} placeholder="https://example.com/school-logo.png" />
+                {educationForm.formState.errors.icon_image_url && <p className="text-destructive text-sm mt-1">{educationForm.formState.errors.icon_image_url.message}</p>}
+                 {educationForm.watch("icon_image_url") && (<div className="mt-2 flex items-center gap-2"><span className="text-xs">Preview:</span><IconPreview url={educationForm.watch("icon_image_url")} /></div>)}
+              </div>
+              <div><Label htmlFor="edu_sort_order">Sort Order</Label><Input id="edu_sort_order" type="number" {...educationForm.register("sort_order")} /></div>
+            </div></ScrollArea>
+            <DialogFooter><DialogClose asChild><Button type="button" variant="outline">Cancel</Button></DialogClose><Button type="submit">{currentEducation ? 'Save Changes' : 'Add Education'}</Button></DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }
+
+    
