@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useEffect, useState, type ChangeEvent } from 'react';
+import React, { useEffect, useState, type ChangeEvent, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -171,7 +171,7 @@ export default function ResumeManager() {
       const fileName = `resume_${Date.now()}.${resumePdfFile.name.split('.').pop()}`;
       toast({ title: "Uploading Resume PDF", description: "Please wait..." });
       const { data: uploadData, error: uploadError } = await supabase.storage
-        .from('resume-pdfs')
+        .from('resume-pdfs') // Ensure this bucket name is correct in your Supabase setup
         .upload(fileName, resumePdfFile, { cacheControl: '3600', upsert: false });
 
       if (uploadError) {
@@ -319,7 +319,6 @@ export default function ResumeManager() {
     setIsEducationModalOpen(true);
   };
   
-
   return (
     <>
       <Card className="shadow-lg mb-8">
@@ -502,3 +501,5 @@ export default function ResumeManager() {
     </>
   );
 }
+
+    
