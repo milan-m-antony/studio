@@ -2,8 +2,8 @@
 "use client";
 
 import { Button } from '@/components/ui/button';
-import { Download, Eye, Briefcase, GraduationCap, ListChecks, Languages as LanguagesIcon, Building, ExternalLink, Type as DefaultCategoryIcon } from 'lucide-react';
-import NextImage from 'next/image'; // Changed from Image to NextImage
+import { Download, Eye } from 'lucide-react';
+import NextImage from 'next/image';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -31,27 +31,27 @@ interface ResumeDetailItemProps {
   DefaultIconComponent?: React.ElementType;
 }
 
-const ResumeDetailItem: React.FC<ResumeDetailItemProps> = ({ title, subtitle, date, description, iconImageUrl, DefaultIconComponent = Building }) => {
-  let ActualIconComponent: React.ElementType = DefaultIconComponent;
-  if (iconImageUrl && typeof iconImageUrl === 'string' && iconImageUrl.startsWith('http')) {
-    // If an image URL is provided, we render an Image component
-  } else if (DefaultIconComponent) {
-    ActualIconComponent = DefaultIconComponent;
-  } else {
-    ActualIconComponent = ExternalLink; // Ultimate fallback
-  }
+const ResumeDetailItem: React.FC<ResumeDetailItemProps> = ({ title, subtitle, date, description, iconImageUrl, DefaultIconComponent }) => {
+  let ActualIconComponent: React.ElementType | null = DefaultIconComponent || null;
+  
+  // Prioritize image URL if available
+  const iconContent = iconImageUrl ? (
+    <div className="relative h-6 w-6 rounded-sm overflow-hidden border bg-muted flex-shrink-0">
+      <NextImage src={iconImageUrl} alt={`${title} icon`} fill className="object-contain" sizes="24px" />
+    </div>
+  ) : ActualIconComponent ? (
+    <ActualIconComponent className="h-6 w-6 text-primary flex-shrink-0" />
+  ) : (
+    <div className="h-6 w-6 text-primary flex-shrink-0"> {/* Fallback empty div or simple shape */}
+      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle></svg>
+    </div>
+  );
 
   return (
     <div className="mb-6 last:mb-0">
       <div className="flex items-start mb-1">
-        <div className="flex-shrink-0 mr-3 mt-1">
-          {iconImageUrl && typeof iconImageUrl === 'string' && iconImageUrl.startsWith('http') ? (
-            <div className="relative h-6 w-6 rounded-sm overflow-hidden border bg-muted">
-              <NextImage src={iconImageUrl} alt={`${title} icon`} fill className="object-contain" sizes="24px" />
-            </div>
-          ) : (
-            <ActualIconComponent className="h-6 w-6 text-primary" />
-          )}
+        <div className="mr-3 mt-1">
+          {iconContent}
         </div>
         <div className="flex-grow">
           <h4 className="text-xl font-semibold text-foreground">{title}</h4>
@@ -103,7 +103,8 @@ export default function ResumeSectionClientView({
         if (isValid(date)) {
           setFormattedLastUpdated(format(date, "MMMM d, yyyy 'at' h:mm a"));
         } else {
-          setFormattedLastUpdated("Invalid date");
+          console.warn("ResumeSectionClientView: Received invalid date for updated_at:", resumeMetaData.updated_at);
+          setFormattedLastUpdated("Date unavailable");
         }
       } catch (error) {
         console.error("Error formatting resume updated_at date:", error);
@@ -125,8 +126,9 @@ export default function ResumeSectionClientView({
     }
 
     toast({
-      title: "Download Initiated",
-      description: "Your resume PDF download has started.",
+      title: "Resume Download",
+      description: "Your resume PDF is being prepared for download.",
+      variant: "default",
     });
 
     try {
@@ -137,26 +139,27 @@ export default function ResumeSectionClientView({
       const blob = await response.blob();
       const link = document.createElement('a');
       link.href = URL.createObjectURL(blob);
-      link.download = "Milan_Resume.pdf"; // Or a dynamic name from resumeMetaData if available
+      link.download = "Milan_Resume.pdf"; 
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-      URL.revokeObjectURL(link.href); // Clean up
+      URL.revokeObjectURL(link.href); 
     } catch (error) {
       console.error("Error during PDF download:", error);
       toast({
         title: "Download Failed",
-        description: "Could not download the PDF. Please try again later.",
+        description: "Could not download the PDF. Please try again later or check the URL.",
         variant: "destructive",
       });
     }
   };
 
+
   return (
     <>
       <div className="text-center space-y-6 max-w-3xl mx-auto mb-12">
         {resumeDescription && (
-          <p className="text-muted-foreground text-lg leading-relaxed">
+          <p className="text-muted-foreground text-lg leading-relaxed max-w-3xl mx-auto">
             {resumeDescription}
           </p>
         )}
@@ -178,7 +181,7 @@ export default function ResumeSectionClientView({
         </div>
         {!resumePdfUrl && (
            <p className="text-xs text-muted-foreground mt-2">
-            (Resume PDF not available for download or preview currently.)
+            (Resume PDF not available. Please upload one via the admin panel.)
           </p>
         )}
          {formattedLastUpdated && (
@@ -234,7 +237,7 @@ export default function ResumeSectionClientView({
                     date={exp.date_range}
                     description={exp.description_points || []}
                     iconImageUrl={exp.icon_image_url}
-                    DefaultIconComponent={Building}
+                    DefaultIconComponent={Briefcase}
                   />
                 ))
               ) : (
@@ -284,7 +287,7 @@ export default function ResumeSectionClientView({
                                 <NextImage src={skillCategory.icon_image_url} alt={skillCategory.category_name} fill className="object-contain" sizes="20px" />
                             </div>
                         ) : (
-                            <DefaultCategoryIcon className="h-5 w-5 mr-2 text-primary flex-shrink-0" />
+                            <ListChecks className="h-5 w-5 mr-2 text-primary flex-shrink-0" /> // Default category icon
                         )}
                         <h4 className="text-lg font-semibold text-foreground">{skillCategory.category_name}</h4>
                       </div>
@@ -320,7 +323,7 @@ export default function ResumeSectionClientView({
                     title={lang.language_name}
                     description={lang.proficiency || undefined}
                     iconImageUrl={lang.icon_image_url}
-                    DefaultIconComponent={ExternalLink} 
+                    DefaultIconComponent={LanguagesIcon} 
                   />
                 ))
               ) : (
@@ -334,4 +337,3 @@ export default function ResumeSectionClientView({
   );
 }
 
-    
