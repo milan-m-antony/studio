@@ -8,8 +8,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
-import { PlusCircle, Edit, Trash2, Briefcase, GraduationCap, ListChecks, Languages as LanguagesIcon, FileText as ResumeIcon, UploadCloud, Download, Link as LinkIcon, Image as ImageIcon, Building } from 'lucide-react';
-import NextImage from 'next/image'; // Renamed to avoid conflict with local Image component if any
+import { PlusCircle, Edit, Trash2, Briefcase, GraduationCap, ListChecks, Languages as LanguagesIcon, FileText as ResumeIcon, UploadCloud, Link as LinkIcon, Image as ImageIcon } from 'lucide-react';
+import NextImage from 'next/image';
 import { supabase } from '@/lib/supabaseClient';
 import type { ResumeExperience, ResumeEducation, ResumeKeySkillCategory, ResumeKeySkill, ResumeLanguage, ResumeMeta } from '@/types/supabase';
 import {
@@ -106,7 +106,6 @@ export default function ResumeManager() {
     defaultValues: { degree_or_certification: '', institution_name: '', date_range: '', description: '', icon_image_url: '', sort_order: 0 }
   });
 
-
   useEffect(() => {
     fetchResumeMeta();
     fetchExperiences();
@@ -123,7 +122,6 @@ export default function ResumeManager() {
       });
       setCurrentDbResumePdfUrl(resumeMeta.resume_pdf_url || null);
     } else {
-      // Ensure form is reset to defaults if no data found
       resumeMetaForm.reset({ id: RESUME_META_ID, description: '', resume_pdf_url: '' });
       setCurrentDbResumePdfUrl(null);
     }
@@ -136,13 +134,25 @@ export default function ResumeManager() {
     const { data, error } = await supabase.from('resume_meta').select('*').eq('id', RESUME_META_ID).maybeSingle();
     if (error) {
       toast({ title: "Error fetching resume meta", description: error.message, variant: "destructive" });
-      setResumeMeta(null); // Explicitly set to null on error
+      setResumeMeta(null);
     } else if (data) {
       setResumeMeta(data);
     } else {
-       setResumeMeta(null); // No data found
+       setResumeMeta(null);
     }
     setIsLoadingResumeMeta(false);
+  };
+
+  const handleResumePdfFileChange = (event: ChangeEvent<HTMLInputElement>) => {
+    if (event.target.files?.[0]) {
+      setResumePdfFile(event.target.files[0]);
+      resumeMetaForm.setValue('resume_pdf_url', '');
+    } else {
+      setResumePdfFile(null);
+      if (currentDbResumePdfUrl) {
+        resumeMetaForm.setValue('resume_pdf_url', currentDbResumePdfUrl);
+      }
+    }
   };
 
   // Resume Meta Submit
@@ -152,7 +162,7 @@ export default function ResumeManager() {
 
     if (currentDbResumePdfUrl) {
         const pathParts = currentDbResumePdfUrl.split('/resume-pdfs/');
-        if (pathParts.length > 1 && !pathParts[1].startsWith('http')) { // Basic check to see if it's a Supabase storage path
+        if (pathParts.length > 1 && !pathParts[1].startsWith('http')) {
             oldPdfStoragePathToDelete = pathParts[1];
         }
     }
@@ -161,11 +171,10 @@ export default function ResumeManager() {
       const fileName = `resume_${Date.now()}.${resumePdfFile.name.split('.').pop()}`;
       toast({ title: "Uploading Resume PDF", description: "Please wait..." });
       const { data: uploadData, error: uploadError } = await supabase.storage
-        .from('resume-pdfs') // Ensure this bucket name is correct
+        .from('resume-pdfs')
         .upload(fileName, resumePdfFile, { cacheControl: '3600', upsert: false });
 
       if (uploadError) {
-        console.error("Error uploading Resume PDF:", JSON.stringify(uploadError, null, 2));
         toast({ title: "Upload Error", description: `Failed to upload PDF: ${uploadError.message}`, variant: "destructive" });
         return;
       }
@@ -178,50 +187,30 @@ export default function ResumeManager() {
     }
     
     const dataForUpsert = {
-      ...formData, // Contains id, description, resume_pdf_url from form
-      id: RESUME_META_ID, // Ensure the fixed ID is always used
-      resume_pdf_url: pdfUrlToSave || null, // Use new URL or null if cleared
+      ...formData,
+      id: RESUME_META_ID,
+      resume_pdf_url: pdfUrlToSave || null,
       updated_at: new Date().toISOString(),
     };
 
     const { error: upsertError } = await supabase.from('resume_meta').upsert(dataForUpsert, { onConflict: 'id' });
 
     if (upsertError) {
-      console.error("Error saving resume info:", JSON.stringify(upsertError, null, 2));
       toast({ title: "Error", description: `Failed to save resume info: ${upsertError.message}`, variant: "destructive" });
     } else {
       toast({ title: "Success", description: "Resume info saved." });
-      // Delete old PDF from storage if a new one was uploaded OR if the URL was cleared/changed
       if (oldPdfStoragePathToDelete && pdfUrlToSave !== currentDbResumePdfUrl) {
-        console.log("[ResumeManager] Attempting to delete old resume PDF from storage:", oldPdfStoragePathToDelete);
         const { error: storageDeleteError } = await supabase.storage.from('resume-pdfs').remove([oldPdfStoragePathToDelete]);
         if (storageDeleteError) {
-          console.warn("[ResumeManager] Error deleting old resume PDF:", JSON.stringify(storageDeleteError, null, 2));
           toast({title: "Storage Warning", description: `Updated resume info, but failed to delete old PDF: ${storageDeleteError.message}`, variant: "default"});
-        } else {
-          console.log("[ResumeManager] Old resume PDF successfully deleted:", oldPdfStoragePathToDelete);
         }
       }
-      fetchResumeMeta(); // Re-fetch to update currentDbResumePdfUrl and form state
-      setResumePdfFile(null); // Clear the file input after submission
-      router.refresh(); // Refresh to reflect changes on public pages if they fetch this data
+      fetchResumeMeta();
+      setResumePdfFile(null);
+      router.refresh();
     }
   };
   
-  const handleResumePdfFileChange = (event: ChangeEvent<HTMLInputElement>) => {
-    if (event.target.files?.[0]) {
-      setResumePdfFile(event.target.files[0]);
-      resumeMetaForm.setValue('resume_pdf_url', ''); // Clear URL input if file is chosen
-    } else {
-      setResumePdfFile(null);
-      // If file is deselected, restore URL from initial DB load if it existed
-      if (currentDbResumePdfUrl) {
-        resumeMetaForm.setValue('resume_pdf_url', currentDbResumePdfUrl);
-      }
-    }
-  };
-
-
   // Fetch Experiences
   const fetchExperiences = async () => {
     setIsLoadingExperiences(true);
@@ -259,7 +248,7 @@ export default function ResumeManager() {
       fetchExperiences(); 
       router.refresh(); 
     }
-    setExperienceToDelete(null); // Close confirmation dialog
+    setExperienceToDelete(null);
   };
   
   // Experience Modal Open
@@ -267,7 +256,8 @@ export default function ResumeManager() {
     setCurrentExperience(experience || null);
     experienceForm.reset(experience ? { 
       ...experience, 
-      description_points: experience.description_points?.join('\n') || '' 
+      description_points: experience.description_points?.join('\n') || '',
+      icon_image_url: experience.icon_image_url || '',
     } : { job_title: '', company_name: '', date_range: '', description_points: [], icon_image_url: '', sort_order: 0 });
     setIsExperienceModalOpen(true);
   };
@@ -316,39 +306,19 @@ export default function ResumeManager() {
       fetchEducationItems(); 
       router.refresh(); 
     }
-    setEducationToDelete(null); // Close confirmation dialog
+    setEducationToDelete(null);
   };
 
   // Education Modal Open
   const handleOpenEducationModal = (education?: ResumeEducation) => {
     setCurrentEducation(education || null);
-    educationForm.reset(education || { degree_or_certification: '', institution_name: '', date_range: '', description: '', icon_image_url: '', sort_order: 0 });
+    educationForm.reset(education ? {
+        ...education,
+        icon_image_url: education.icon_image_url || ''
+    } : { degree_or_certification: '', institution_name: '', date_range: '', description: '', icon_image_url: '', sort_order: 0 });
     setIsEducationModalOpen(true);
   };
-
-  useEffect(() => {
-    if (currentExperience) {
-      experienceForm.reset({
-        ...currentExperience,
-        description_points: currentExperience.description_points?.join('\n') || '',
-        icon_image_url: currentExperience.icon_image_url || '', // Ensure this is part of reset
-      });
-    } else {
-      experienceForm.reset({ job_title: '', company_name: '', date_range: '', description_points: [], icon_image_url: '', sort_order: 0 });
-    }
-  }, [currentExperience, experienceForm]);
-
-  useEffect(() => {
-    if (currentEducation) {
-      educationForm.reset({
-        ...currentEducation,
-        icon_image_url: currentEducation.icon_image_url || '', // Ensure this is part of reset
-      });
-    } else {
-      educationForm.reset({ degree_or_certification: '', institution_name: '', date_range: '', description: '', icon_image_url: '', sort_order: 0 });
-    }
-  }, [currentEducation, educationForm]);
-
+  
 
   return (
     <>
@@ -477,7 +447,10 @@ export default function ResumeManager() {
                   <div><Label htmlFor="company_name">Company Name</Label><Input id="company_name" {...experienceForm.register("company_name")} />{experienceForm.formState.errors.company_name && <p className="text-destructive text-sm mt-1">{experienceForm.formState.errors.company_name.message}</p>}</div>
                   <div><Label htmlFor="exp_date_range">Date Range (e.g., Jan 2023 - Present)</Label><Input id="exp_date_range" {...experienceForm.register("date_range")} /></div>
                   <div><Label htmlFor="description_points">Description (one point per line)</Label><Textarea id="description_points" {...experienceForm.register("description_points")} rows={5} /></div>
-                  <div><Label htmlFor="exp_icon_image_url">Icon Image URL (Optional)</Label><Input id="exp_icon_image_url" {...experienceForm.register("icon_image_url")} placeholder="https://example.com/icon.png" />{experienceForm.formState.errors.icon_image_url && <p className="text-destructive text-sm mt-1">{experienceForm.formState.errors.icon_image_url.message}</p>}
+                  <div>
+                    <Label htmlFor="exp_icon_image_url">Icon Image URL (Optional)</Label>
+                    <Input id="exp_icon_image_url" {...experienceForm.register("icon_image_url")} placeholder="https://example.com/icon.png" />
+                    {experienceForm.formState.errors.icon_image_url && <p className="text-destructive text-sm mt-1">{experienceForm.formState.errors.icon_image_url.message}</p>}
                     {experienceForm.watch("icon_image_url") && (<div className="mt-2 flex items-center gap-2"><span className="text-xs">Preview:</span><IconPreview url={experienceForm.watch("icon_image_url")} /></div>)}
                   </div>
                   <div><Label htmlFor="exp_sort_order">Sort Order</Label><Input id="exp_sort_order" type="number" {...experienceForm.register("sort_order")} /></div>
@@ -504,7 +477,10 @@ export default function ResumeManager() {
                   <div><Label htmlFor="institution_name">Institution Name</Label><Input id="institution_name" {...educationForm.register("institution_name")} />{educationForm.formState.errors.institution_name && <p className="text-destructive text-sm mt-1">{educationForm.formState.errors.institution_name.message}</p>}</div>
                   <div><Label htmlFor="edu_date_range">Date Range (e.g., 2020 - 2024)</Label><Input id="edu_date_range" {...educationForm.register("date_range")} /></div>
                   <div><Label htmlFor="edu_description">Description (Optional)</Label><Textarea id="edu_description" {...educationForm.register("description")} rows={3} /></div>
-                  <div><Label htmlFor="edu_icon_image_url">Icon Image URL (Optional)</Label><Input id="edu_icon_image_url" {...educationForm.register("icon_image_url")} placeholder="https://example.com/school-logo.png" />{educationForm.formState.errors.icon_image_url && <p className="text-destructive text-sm mt-1">{educationForm.formState.errors.icon_image_url.message}</p>}
+                  <div>
+                    <Label htmlFor="edu_icon_image_url">Icon Image URL (Optional)</Label>
+                    <Input id="edu_icon_image_url" {...educationForm.register("icon_image_url")} placeholder="https://example.com/school-logo.png" />
+                    {educationForm.formState.errors.icon_image_url && <p className="text-destructive text-sm mt-1">{educationForm.formState.errors.icon_image_url.message}</p>}
                      {educationForm.watch("icon_image_url") && (<div className="mt-2 flex items-center gap-2"><span className="text-xs">Preview:</span><IconPreview url={educationForm.watch("icon_image_url")} /></div>)}
                   </div>
                   <div><Label htmlFor="edu_sort_order">Sort Order</Label><Input id="edu_sort_order" type="number" {...educationForm.register("sort_order")} /></div>
@@ -526,5 +502,3 @@ export default function ResumeManager() {
     </>
   );
 }
-
-    
