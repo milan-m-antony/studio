@@ -2,7 +2,7 @@
 "use client";
 
 import { Button } from '@/components/ui/button';
-import { Download, Eye } from 'lucide-react';
+import { Download, Eye, Briefcase, GraduationCap, ListChecks, Languages as LanguagesIcon } from 'lucide-react'; // Added Briefcase, GraduationCap, ListChecks, LanguagesIcon
 import NextImage from 'next/image';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -34,15 +34,14 @@ interface ResumeDetailItemProps {
 const ResumeDetailItem: React.FC<ResumeDetailItemProps> = ({ title, subtitle, date, description, iconImageUrl, DefaultIconComponent }) => {
   let ActualIconComponent: React.ElementType | null = DefaultIconComponent || null;
   
-  // Prioritize image URL if available
   const iconContent = iconImageUrl ? (
     <div className="relative h-6 w-6 rounded-sm overflow-hidden border bg-muted flex-shrink-0">
-      <NextImage src={iconImageUrl} alt={`${title} icon`} fill className="object-contain" sizes="24px" />
+      <NextImage src={iconImageUrl} alt={`${title} icon`} fill className="object-contain dark:filter dark:brightness-0 dark:invert" sizes="24px" />
     </div>
   ) : ActualIconComponent ? (
     <ActualIconComponent className="h-6 w-6 text-primary flex-shrink-0" />
   ) : (
-    <div className="h-6 w-6 text-primary flex-shrink-0"> {/* Fallback empty div or simple shape */}
+    <div className="h-6 w-6 text-primary flex-shrink-0"> 
       <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle></svg>
     </div>
   );
@@ -159,7 +158,7 @@ export default function ResumeSectionClientView({
     <>
       <div className="text-center space-y-6 max-w-3xl mx-auto mb-12">
         {resumeDescription && (
-          <p className="text-muted-foreground text-lg leading-relaxed max-w-3xl mx-auto">
+          <p className="text-muted-foreground text-lg leading-relaxed">
             {resumeDescription}
           </p>
         )}
@@ -284,10 +283,10 @@ export default function ResumeSectionClientView({
                       <div className="flex items-center mb-3">
                         {skillCategory.icon_image_url ? (
                             <div className="relative h-5 w-5 mr-2 rounded-sm overflow-hidden border bg-muted flex-shrink-0">
-                                <NextImage src={skillCategory.icon_image_url} alt={skillCategory.category_name} fill className="object-contain" sizes="20px" />
+                                <NextImage src={skillCategory.icon_image_url} alt={skillCategory.category_name} fill className="object-contain dark:filter dark:brightness-0 dark:invert" sizes="20px" />
                             </div>
                         ) : (
-                            <ListChecks className="h-5 w-5 mr-2 text-primary flex-shrink-0" /> // Default category icon
+                            <ListChecks className="h-5 w-5 mr-2 text-primary flex-shrink-0" /> 
                         )}
                         <h4 className="text-lg font-semibold text-foreground">{skillCategory.category_name}</h4>
                       </div>
@@ -336,4 +335,3 @@ export default function ResumeSectionClientView({
     </>
   );
 }
-
