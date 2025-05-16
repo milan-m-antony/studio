@@ -119,9 +119,14 @@ export default function ResumeManager() {
       toast({ title: "Error fetching resume meta", description: error.message, variant: "destructive" });
     } else if (data) {
       setResumeMeta(data);
-      resumeMetaForm.reset(data);
+      resumeMetaForm.reset({
+        id: data.id,
+        description: data.description || '',
+        resume_pdf_url: data.resume_pdf_url || ''
+      });
       setCurrentDbResumePdfUrl(data.resume_pdf_url || null);
     } else {
+      // No data found, ensure form is reset to defaults
       resumeMetaForm.reset({ id: RESUME_META_ID, description: '', resume_pdf_url: '' });
       setCurrentDbResumePdfUrl(null);
     }
@@ -148,11 +153,16 @@ export default function ResumeManager() {
         .upload(fileName, resumePdfFile, { cacheControl: '3600', upsert: false });
 
       if (uploadError) {
+        console.error("Error uploading Resume PDF:", JSON.stringify(uploadError, null, 2));
         toast({ title: "Upload Error", description: `Failed to upload PDF: ${uploadError.message}`, variant: "destructive" });
         return;
       }
       const { data: publicUrlData } = supabase.storage.from('resume-pdfs').getPublicUrl(fileName);
-      pdfUrlToSave = publicUrlData?.publicUrl || null;
+      if (!publicUrlData?.publicUrl) {
+        toast({ title: "Error", description: "Failed to get public URL for uploaded PDF.", variant: "destructive" });
+        return;
+      }
+      pdfUrlToSave = publicUrlData.publicUrl;
     }
     
     const dataForUpsert = {
@@ -165,11 +175,19 @@ export default function ResumeManager() {
     const { error: upsertError } = await supabase.from('resume_meta').upsert(dataForUpsert, { onConflict: 'id' });
 
     if (upsertError) {
-      toast({ title: "Error saving resume info", description: upsertError.message, variant: "destructive" });
+      console.error("Error saving resume info:", JSON.stringify(upsertError, null, 2));
+      toast({ title: "Error", description: `Failed to save resume info: ${upsertError.message}`, variant: "destructive" });
     } else {
       toast({ title: "Success", description: "Resume info saved." });
       if (oldPdfStoragePathToDelete && pdfUrlToSave !== currentDbResumePdfUrl) {
-        await supabase.storage.from('resume-pdfs').remove([oldPdfStoragePathToDelete]);
+        console.log("[ResumeManager] Attempting to delete old resume PDF from storage:", oldPdfStoragePathToDelete);
+        const { error: storageDeleteError } = await supabase.storage.from('resume-pdfs').remove([oldPdfStoragePathToDelete]);
+        if (storageDeleteError) {
+          console.warn("[ResumeManager] Error deleting old resume PDF:", JSON.stringify(storageDeleteError, null, 2));
+          toast({title: "Storage Warning", description: `Updated resume info, but failed to delete old PDF: ${storageDeleteError.message}`, variant: "default"});
+        } else {
+          console.log("[ResumeManager] Old resume PDF successfully deleted:", oldPdfStoragePathToDelete);
+        }
       }
       fetchResumeMeta();
       setResumePdfFile(null);
@@ -202,23 +220,38 @@ export default function ResumeManager() {
     let response;
     if (formData.id) response = await supabase.from('resume_experience').update(dataToSave).eq('id', formData.id).select();
     else { const { id, ...insertData } = dataToSave; response = await supabase.from('resume_experience').insert(insertData).select(); }
-    if (response.error) toast({ title: "Error saving experience", description: response.error.message, variant: "destructive" });
-    else { toast({ title: "Success", description: "Experience saved." }); fetchExperiences(); setIsExperienceModalOpen(false); router.refresh(); }
+    
+    if (response.error) {
+      toast({ title: "Error saving experience", description: response.error.message, variant: "destructive" });
+    } else { 
+      toast({ title: "Success", description: "Experience saved." }); 
+      fetchExperiences(); 
+      setIsExperienceModalOpen(false); 
+      router.refresh(); 
+    }
   };
   
   // Experience Delete
   const handleDeleteExperience = async () => {
     if (!experienceToDelete) return;
     const { error } = await supabase.from('resume_experience').delete().eq('id', experienceToDelete.id);
-    if (error) toast({ title: "Error deleting experience", description: error.message, variant: "destructive" });
-    else { toast({ title: "Success", description: "Experience deleted." }); fetchExperiences(); router.refresh(); }
-    setExperienceToDelete(null);
+    if (error) {
+      toast({ title: "Error deleting experience", description: error.message, variant: "destructive" });
+    } else { 
+      toast({ title: "Success", description: "Experience deleted." }); 
+      fetchExperiences(); 
+      router.refresh(); 
+    }
+    setExperienceToDelete(null); // Close confirmation dialog
   };
   
   // Experience Modal Open
   const handleOpenExperienceModal = (experience?: ResumeExperience) => {
     setCurrentExperience(experience || null);
-    experienceForm.reset(experience ? { ...experience, description_points: experience.description_points?.join('\n') || '' } : { job_title: '', company_name: '', date_range: '', description_points: [], icon_image_url: '', sort_order: 0 });
+    experienceForm.reset(experience ? { 
+      ...experience, 
+      description_points: experience.description_points?.join('\n') || '' 
+    } : { job_title: '', company_name: '', date_range: '', description_points: [], icon_image_url: '', sort_order: 0 });
     setIsExperienceModalOpen(true);
   };
 
@@ -226,8 +259,11 @@ export default function ResumeManager() {
   const fetchEducationItems = async () => {
     setIsLoadingEducation(true);
     const { data, error } = await supabase.from('resume_education').select('*').order('sort_order', { ascending: true });
-    if (error) toast({ title: "Error fetching education items", description: error.message, variant: "destructive" });
-    else setEducationItems(data || []);
+    if (error) {
+      toast({ title: "Error fetching education items", description: error.message, variant: "destructive" });
+    } else {
+      setEducationItems(data || []);
+    }
     setIsLoadingEducation(false);
   };
 
@@ -235,19 +271,35 @@ export default function ResumeManager() {
   const onEducationSubmit: SubmitHandler<ResumeEducationFormData> = async (formData) => {
     const dataToSave = { ...formData, icon_image_url: formData.icon_image_url?.trim() === '' ? null : formData.icon_image_url, };
     let response;
-    if (formData.id) response = await supabase.from('resume_education').update(dataToSave).eq('id', formData.id).select();
-    else { const { id, ...insertData } = dataToSave; response = await supabase.from('resume_education').insert(insertData).select(); }
-    if (response.error) toast({ title: "Error saving education item", description: response.error.message, variant: "destructive" });
-    else { toast({ title: "Success", description: "Education item saved." }); fetchEducationItems(); setIsEducationModalOpen(false); router.refresh(); }
+    if (formData.id) {
+      response = await supabase.from('resume_education').update(dataToSave).eq('id', formData.id).select();
+    } else { 
+      const { id, ...insertData } = dataToSave; 
+      response = await supabase.from('resume_education').insert(insertData).select(); 
+    }
+    
+    if (response.error) {
+      toast({ title: "Error saving education item", description: response.error.message, variant: "destructive" });
+    } else { 
+      toast({ title: "Success", description: "Education item saved." }); 
+      fetchEducationItems(); 
+      setIsEducationModalOpen(false); 
+      router.refresh(); 
+    }
   };
   
   // Education Delete
   const handleDeleteEducation = async () => {
     if (!educationToDelete) return;
     const { error } = await supabase.from('resume_education').delete().eq('id', educationToDelete.id);
-    if (error) toast({ title: "Error deleting education item", description: error.message, variant: "destructive" });
-    else { toast({ title: "Success", description: "Education item deleted." }); fetchEducationItems(); router.refresh(); }
-    setEducationToDelete(null);
+    if (error) {
+      toast({ title: "Error deleting education item", description: error.message, variant: "destructive" });
+    } else { 
+      toast({ title: "Success", description: "Education item deleted." }); 
+      fetchEducationItems(); 
+      router.refresh(); 
+    }
+    setEducationToDelete(null); // Close confirmation dialog
   };
 
   // Education Modal Open
@@ -269,7 +321,7 @@ export default function ResumeManager() {
           <CardDescription>Update the overall resume description and downloadable PDF file.</CardDescription>
         </CardHeader>
         <CardContent>
-          {isLoadingResumeMeta ? <p>Loading resume info...</p> : (
+          {isLoadingResumeMeta ? <p className="text-center text-muted-foreground">Loading resume info...</p> : (
             <form onSubmit={resumeMetaForm.handleSubmit(onResumeMetaSubmit)} className="grid gap-6 py-4">
               <div>
                 <Label htmlFor="resumeDescription">Overall Resume Description</Label>
@@ -321,7 +373,7 @@ export default function ResumeManager() {
               <div className="text-right mb-4">
                 <Button onClick={() => handleOpenExperienceModal()}><PlusCircle className="mr-2 h-4 w-4" /> Add Experience</Button>
               </div>
-              {isLoadingExperiences ? <p>Loading experiences...</p> : experiences.length === 0 ? <p className="text-muted-foreground text-center py-4">No experience entries yet.</p> : (
+              {isLoadingExperiences ? <p className="text-center text-muted-foreground">Loading experiences...</p> : experiences.length === 0 ? <p className="text-muted-foreground text-center py-4">No experience entries yet.</p> : (
                 <div className="space-y-4">
                   {experiences.map((exp) => (
                     <Card key={exp.id} className="p-4">
@@ -348,7 +400,7 @@ export default function ResumeManager() {
               <div className="text-right mb-4">
                 <Button onClick={() => handleOpenEducationModal()}><PlusCircle className="mr-2 h-4 w-4" /> Add Education</Button>
               </div>
-              {isLoadingEducation ? <p>Loading education items...</p> : educationItems.length === 0 ? <p className="text-muted-foreground text-center py-4">No education entries yet.</p> : (
+              {isLoadingEducation ? <p className="text-center text-muted-foreground">Loading education items...</p> : educationItems.length === 0 ? <p className="text-muted-foreground text-center py-4">No education entries yet.</p> : (
                 <div className="space-y-4">
                   {educationItems.map((edu) => (
                     <Card key={edu.id} className="p-4">
@@ -394,6 +446,7 @@ export default function ResumeManager() {
               </form>
             </DialogContent>
           </Dialog>
+          {/* Experience Delete Confirmation */}
           <AlertDialog open={!!experienceToDelete} onOpenChange={() => setExperienceToDelete(null)}>
             <AlertDialogContent className="bg-destructive border-destructive text-destructive-foreground">
               <AlertDialogHeader><AlertDialogTitle className="text-destructive-foreground">Delete Experience: {experienceToDelete?.job_title}?</AlertDialogTitle><AlertDialogDescription className="text-destructive-foreground/90">This action cannot be undone.</AlertDialogDescription></AlertDialogHeader>
@@ -420,6 +473,7 @@ export default function ResumeManager() {
               </form>
             </DialogContent>
           </Dialog>
+          {/* Education Delete Confirmation */}
           <AlertDialog open={!!educationToDelete} onOpenChange={() => setEducationToDelete(null)}>
             <AlertDialogContent className="bg-destructive border-destructive text-destructive-foreground">
               <AlertDialogHeader><AlertDialogTitle className="text-destructive-foreground">Delete Education: {educationToDelete?.degree_or_certification}?</AlertDialogTitle><AlertDialogDescription className="text-destructive-foreground/90">This action cannot be undone.</AlertDialogDescription></AlertDialogHeader>
