@@ -2,10 +2,10 @@
 "use client";
 
 import { Button } from '@/components/ui/button';
-import { Download, Printer, Briefcase, GraduationCap, ListChecks, Languages as LanguagesIcon, Building, HelpCircle, ExternalLink, Type } from 'lucide-react'; // Added Type for generic skill category
-import NextImage from 'next/image';
+import { Download, Printer, Briefcase, GraduationCap, ListChecks, Languages as LanguagesIcon, Building, HelpCircle, ExternalLink, Type as DefaultCategoryIcon } from 'lucide-react';
+import NextImage from 'next/image'; // Renamed to NextImage to avoid conflict if 'Image' from lucide-react is used
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'; // Removed CardDescription as it's not used
 import { Badge } from '@/components/ui/badge';
 import React from 'react';
 
@@ -13,7 +13,8 @@ import type {
   ResumeExperience, 
   ResumeEducation, 
   ResumeKeySkillCategory, 
-  ResumeLanguage 
+  ResumeLanguage,
+  ResumeMeta // Import ResumeMeta type
 } from '@/types/supabase';
 
 interface ResumeDetailItemProps {
@@ -21,20 +22,24 @@ interface ResumeDetailItemProps {
   subtitle?: string;
   date?: string;
   description?: string | string[];
-  iconImageUrl?: string | null; // Changed from iconName
-  DefaultIconComponent?: React.ElementType; // For fallback if URL is missing
+  iconImageUrl?: string | null;
+  DefaultIconComponent?: React.ElementType;
 }
 
 const ResumeDetailItem: React.FC<ResumeDetailItemProps> = ({ title, subtitle, date, description, iconImageUrl, DefaultIconComponent = Building }) => {
   return (
-    <div className="mb-6">
-      <div className="flex items-center mb-2">
-        {iconImageUrl ? (
-          <NextImage src={iconImageUrl} alt={title} width={24} height={24} className="h-6 w-6 mr-3 rounded-sm object-contain border" />
-        ) : (
-          <DefaultIconComponent className="h-6 w-6 mr-3 text-primary" />
-        )}
-        <div>
+    <div className="mb-6 last:mb-0">
+      <div className="flex items-start mb-1"> {/* Changed to items-start for better alignment with multi-line titles */}
+        <div className="flex-shrink-0 mr-3 mt-1">
+          {iconImageUrl ? (
+            <div className="relative h-6 w-6 rounded-sm overflow-hidden border bg-muted">
+              <NextImage src={iconImageUrl} alt={`${title} icon`} fill className="object-contain" sizes="24px" />
+            </div>
+          ) : (
+            <DefaultIconComponent className="h-6 w-6 text-primary" />
+          )}
+        </div>
+        <div className="flex-grow">
           <h4 className="text-xl font-semibold text-foreground">{title}</h4>
           {subtitle && <p className="text-sm text-muted-foreground">{subtitle}</p>}
         </div>
@@ -56,6 +61,7 @@ const ResumeDetailItem: React.FC<ResumeDetailItemProps> = ({ title, subtitle, da
 };
 
 interface ResumeSectionClientViewProps {
+  resumeMetaData: ResumeMeta | null; // Add resumeMetaData prop
   experienceData: ResumeExperience[];
   educationData: ResumeEducation[];
   keySkillsData: ResumeKeySkillCategory[];
@@ -63,6 +69,7 @@ interface ResumeSectionClientViewProps {
 }
 
 export default function ResumeSectionClientView({
+  resumeMetaData, // Destructure new prop
   experienceData,
   educationData,
   keySkillsData,
@@ -74,16 +81,20 @@ export default function ResumeSectionClientView({
     }
   };
 
+  const resumePdfUrl = resumeMetaData?.resume_pdf_url;
+  const resumeDescription = resumeMetaData?.description;
+
   return (
     <>
-      <div className="text-center space-y-6 max-w-md mx-auto mb-12">
-        <p className="text-muted-foreground">
-          Download the latest version of my resume to learn more about my skills, experience, and accomplishments.
-          You can also print a copy directly.
-        </p>
+      <div className="text-center space-y-6 max-w-2xl mx-auto mb-12"> {/* Increased max-width for description */}
+        {resumeDescription && (
+          <p className="text-muted-foreground">
+            {resumeDescription}
+          </p>
+        )}
         <div className="flex flex-col sm:flex-row justify-center gap-4">
-          <Button asChild size="lg" className="w-full sm:w-auto">
-            <a href="/resume-milan.pdf" download="Milan_Resume.pdf">
+          <Button asChild size="lg" className="w-full sm:w-auto" disabled={!resumePdfUrl}>
+            <a href={resumePdfUrl || "#"} download="Milan_Resume.pdf" aria-disabled={!resumePdfUrl}>
               <Download className="mr-2 h-5 w-5" /> Download PDF
             </a>
           </Button>
@@ -91,9 +102,11 @@ export default function ResumeSectionClientView({
             <Printer className="mr-2 h-5 w-5" /> Print Resume
           </Button>
         </div>
-        <p className="text-xs text-muted-foreground">
-          (Note: PDF download is static. Print uses browser functionality.)
-        </p>
+        {!resumePdfUrl && (
+           <p className="text-xs text-muted-foreground">
+            (Resume PDF not available for download currently. Print functionality uses browser print.)
+          </p>
+        )}
       </div>
 
       <Tabs defaultValue="experience" className="w-full max-w-4xl mx-auto">
@@ -123,7 +136,7 @@ export default function ResumeSectionClientView({
                   />
                 ))
               ) : (
-                <p className="text-muted-foreground text-center">No experience entries yet.</p>
+                <p className="text-muted-foreground text-center py-4">No professional experience entries yet.</p>
               )}
             </CardContent>
           </Card>
@@ -148,7 +161,7 @@ export default function ResumeSectionClientView({
                   />
                 ))
               ) : (
-                <p className="text-muted-foreground text-center">No education entries yet.</p>
+                <p className="text-muted-foreground text-center py-4">No education entries yet.</p>
               )}
             </CardContent>
           </Card>
@@ -162,29 +175,31 @@ export default function ResumeSectionClientView({
             <CardContent>
               {keySkillsData && keySkillsData.length > 0 ? (
                 keySkillsData.map((skillCategory) => (
-                    <div key={skillCategory.id} className="mb-8">
+                    <div key={skillCategory.id} className="mb-6 last:mb-0">
                       <div className="flex items-center mb-3">
                         {skillCategory.icon_image_url ? (
-                            <NextImage src={skillCategory.icon_image_url} alt={skillCategory.category_name} width={20} height={20} className="h-5 w-5 mr-2 rounded-sm object-contain border" />
+                            <div className="relative h-5 w-5 mr-2 rounded-sm overflow-hidden border bg-muted flex-shrink-0">
+                                <NextImage src={skillCategory.icon_image_url} alt={skillCategory.category_name} fill className="object-contain" sizes="20px" />
+                            </div>
                         ) : (
-                            <Type className="h-5 w-5 mr-2 text-primary" /> // Generic icon for category
+                            <DefaultCategoryIcon className="h-5 w-5 mr-2 text-primary flex-shrink-0" />
                         )}
                         <h4 className="text-lg font-semibold text-foreground">{skillCategory.category_name}</h4>
                       </div>
-                      <div className="pl-7 flex flex-wrap gap-3">
+                      <div className="pl-7 flex flex-wrap gap-2">
                         {skillCategory.skills && skillCategory.skills.length > 0 ? (
                           skillCategory.skills.map((skill) => (
                             <Badge key={skill.id} variant="secondary">{skill.skill_name}</Badge>
                           ))
                         ) : (
-                          <p className="text-xs text-muted-foreground">No skills in this category.</p>
+                          <p className="text-xs text-muted-foreground">No skills listed in this category.</p>
                         )}
                       </div>
                     </div>
                   )
                 )
               ) : (
-                <p className="text-muted-foreground text-center">No key skill categories yet.</p>
+                <p className="text-muted-foreground text-center py-4">No key skill categories yet.</p>
               )}
             </CardContent>
           </Card>
@@ -203,11 +218,11 @@ export default function ResumeSectionClientView({
                     title={lang.language_name}
                     description={lang.proficiency || undefined}
                     iconImageUrl={lang.icon_image_url}
-                    DefaultIconComponent={ExternalLink} // Using ExternalLink as a generic fallback, can be changed
+                    DefaultIconComponent={ExternalLink}
                   />
                 ))
               ) : (
-                <p className="text-muted-foreground text-center">No language entries yet.</p>
+                <p className="text-muted-foreground text-center py-4">No language entries yet.</p>
               )}
             </CardContent>
           </Card>

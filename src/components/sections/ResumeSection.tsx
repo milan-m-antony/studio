@@ -9,9 +9,33 @@ import type {
   ResumeExperience,
   ResumeEducation,
   ResumeKeySkillCategory,
-  ResumeKeySkill, // Will be used by ResumeKeySkillCategory
-  ResumeLanguage
+  ResumeLanguage,
+  ResumeMeta // Import ResumeMeta type
 } from '@/types/supabase';
+
+// Fixed ID for the single resume_meta record
+const PRIMARY_RESUME_META_ID = '00000000-0000-0000-0000-000000000003';
+
+async function getResumeMeta(): Promise<ResumeMeta | null> {
+  const { data, error, status, statusText } = await supabase
+    .from('resume_meta')
+    .select('id, description, resume_pdf_url, updated_at')
+    .eq('id', PRIMARY_RESUME_META_ID)
+    .maybeSingle();
+
+  if (error) {
+    let errorMessage = 'Error fetching resume meta. ';
+    if (typeof error === 'object' && error !== null) {
+      const supabaseError = error as { message?: string; details?: string; hint?: string; code?: string };
+      errorMessage += `Message: ${supabaseError.message || 'N/A'}, Details: ${supabaseError.details || 'N/A'}, Hint: ${supabaseError.hint || 'N/A'}, Code: ${supabaseError.code || 'N/A'}. `;
+    }
+    errorMessage += `Status: ${status || 'N/A'} ${statusText || 'N/A'}.`;
+    console.error(errorMessage);
+    return null;
+  }
+  return data;
+}
+
 
 async function getResumeExperience(): Promise<ResumeExperience[]> {
   const { data, error, status, statusText } = await supabase
@@ -39,8 +63,8 @@ async function getResumeEducation(): Promise<ResumeEducation[]> {
     .order('sort_order', { ascending: true });
 
   if (error) {
-    let errorMessage = 'Error fetching resume education. ';
-     if (typeof error === 'object' && error !== null) {
+     let errorMessage = 'Error fetching resume education. ';
+    if (typeof error === 'object' && error !== null) {
       const supabaseError = error as { message?: string; details?: string; hint?: string; code?: string };
       errorMessage += `Message: ${supabaseError.message || 'N/A'}, Details: ${supabaseError.details || 'N/A'}, Hint: ${supabaseError.hint || 'N/A'}, Code: ${supabaseError.code || 'N/A'}. `;
     }
@@ -61,11 +85,8 @@ async function getResumeKeySkills(): Promise<ResumeKeySkillCategory[]> {
       sort_order,
       created_at,
       resume_key_skills (id, skill_name, category_id)
-    `) // Removed created_at from resume_key_skills sub-query
-    .order('sort_order', { ascending: true })
-    // Cannot order by created_at on resume_key_skills if it doesn't exist
-    // .order('created_at', { foreignTable: 'resume_key_skills', ascending: true });
-    ;
+    `)
+    .order('sort_order', { ascending: true });
 
 
   if (error) {
@@ -81,7 +102,7 @@ async function getResumeKeySkills(): Promise<ResumeKeySkillCategory[]> {
   return (data || []).map(category => ({
     ...category,
     icon_image_url: category.icon_image_url || null,
-    skills: (category.resume_key_skills || []).map(skill => ({ ...skill })) // skills will not have created_at
+    skills: (category.resume_key_skills || []).map(skill => ({ ...skill }))
   }));
 }
 
@@ -107,11 +128,13 @@ async function getResumeLanguages(): Promise<ResumeLanguage[]> {
 
 export default async function ResumeSection() {
   const [
+    resumeMetaData, // Fetch resume meta data
     experienceData,
     educationData,
     keySkillsData,
     languagesData
   ] = await Promise.all([
+    getResumeMeta(), // Call the new fetch function
     getResumeExperience(),
     getResumeEducation(),
     getResumeKeySkills(),
@@ -120,10 +143,11 @@ export default async function ResumeSection() {
 
   return (
     <SectionWrapper id="resume" className="section-fade-in" style={{ animationDelay: '1.2s' }}>
-      <SectionTitle subtitle="Access my comprehensive resume for a detailed overview of my qualifications and experience.">
+      <SectionTitle subtitle={resumeMetaData?.description || "Access my comprehensive resume for a detailed overview of my qualifications and experience."}>
         My Resume / CV
       </SectionTitle>
       <ResumeSectionClientView
+        resumeMetaData={resumeMetaData} // Pass resume meta data
         experienceData={experienceData}
         educationData={educationData}
         keySkillsData={keySkillsData}
