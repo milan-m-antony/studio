@@ -2,12 +2,12 @@
 "use client";
 
 import { Button } from '@/components/ui/button';
-import { Download, Printer, Briefcase, GraduationCap, ListChecks, Languages as LanguagesIcon, Building, Cloud, Laptop, ServerIcon, Shield, Globe, type LucideIcon } from 'lucide-react';
+import { Download, Printer, Briefcase, GraduationCap, ListChecks, Languages as LanguagesIcon, Building, HelpCircle, ExternalLink, Type } from 'lucide-react'; // Added Type for generic skill category
+import NextImage from 'next/image';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import React from 'react';
-import * as LucideIcons from 'lucide-react';
 
 import type { 
   ResumeExperience, 
@@ -16,33 +16,24 @@ import type {
   ResumeLanguage 
 } from '@/types/supabase';
 
-// Helper to get Lucide icon component by name
-const getLucideIcon = (iconName: string | null | undefined, DefaultIcon: LucideIcon): LucideIcon => {
-  if (iconName && LucideIcons[iconName as keyof typeof LucideIcons]) {
-    const IconComponent = LucideIcons[iconName as keyof typeof LucideIcons] as LucideIcon;
-    if (typeof IconComponent === 'function' || (typeof IconComponent === 'object' && IconComponent !== null && 'render' in IconComponent)) {
-      return IconComponent;
-    }
-  }
-  return DefaultIcon;
-};
-
-
 interface ResumeDetailItemProps {
   title: string;
   subtitle?: string;
   date?: string;
   description?: string | string[];
-  iconName?: string | null; // Changed from icon to iconName string
-  defaultIcon: LucideIcon; // Provide a default Lucide icon component
+  iconImageUrl?: string | null; // Changed from iconName
+  DefaultIconComponent?: React.ElementType; // For fallback if URL is missing
 }
 
-const ResumeDetailItem: React.FC<ResumeDetailItemProps> = ({ title, subtitle, date, description, iconName, defaultIcon }) => {
-  const Icon = getLucideIcon(iconName, defaultIcon);
+const ResumeDetailItem: React.FC<ResumeDetailItemProps> = ({ title, subtitle, date, description, iconImageUrl, DefaultIconComponent = Building }) => {
   return (
     <div className="mb-6">
       <div className="flex items-center mb-2">
-        {Icon && <Icon className="h-6 w-6 mr-3 text-primary" />}
+        {iconImageUrl ? (
+          <NextImage src={iconImageUrl} alt={title} width={24} height={24} className="h-6 w-6 mr-3 rounded-sm object-contain border" />
+        ) : (
+          <DefaultIconComponent className="h-6 w-6 mr-3 text-primary" />
+        )}
         <div>
           <h4 className="text-xl font-semibold text-foreground">{title}</h4>
           {subtitle && <p className="text-sm text-muted-foreground">{subtitle}</p>}
@@ -67,7 +58,7 @@ const ResumeDetailItem: React.FC<ResumeDetailItemProps> = ({ title, subtitle, da
 interface ResumeSectionClientViewProps {
   experienceData: ResumeExperience[];
   educationData: ResumeEducation[];
-  keySkillsData: ResumeKeySkillCategory[]; // This will include nested skills
+  keySkillsData: ResumeKeySkillCategory[];
   languagesData: ResumeLanguage[];
 }
 
@@ -101,7 +92,7 @@ export default function ResumeSectionClientView({
           </Button>
         </div>
         <p className="text-xs text-muted-foreground">
-          (Note: PDF download link is static. Print functionality uses browser print.)
+          (Note: PDF download is static. Print uses browser functionality.)
         </p>
       </div>
 
@@ -127,8 +118,8 @@ export default function ResumeSectionClientView({
                     subtitle={exp.company_name}
                     date={exp.date_range}
                     description={exp.description_points || []}
-                    iconName={exp.icon_name}
-                    defaultIcon={Building}
+                    iconImageUrl={exp.icon_image_url}
+                    DefaultIconComponent={Building}
                   />
                 ))
               ) : (
@@ -152,8 +143,8 @@ export default function ResumeSectionClientView({
                     subtitle={edu.institution_name}
                     date={edu.date_range}
                     description={edu.description || undefined}
-                    iconName={edu.icon_name}
-                    defaultIcon={GraduationCap}
+                    iconImageUrl={edu.icon_image_url}
+                    DefaultIconComponent={GraduationCap}
                   />
                 ))
               ) : (
@@ -170,12 +161,14 @@ export default function ResumeSectionClientView({
             </CardHeader>
             <CardContent>
               {keySkillsData && keySkillsData.length > 0 ? (
-                keySkillsData.map((skillCategory) => {
-                  const CategoryIcon = getLucideIcon(skillCategory.icon_name, ListChecks);
-                  return (
+                keySkillsData.map((skillCategory) => (
                     <div key={skillCategory.id} className="mb-8">
                       <div className="flex items-center mb-3">
-                        <CategoryIcon className="h-5 w-5 mr-2 text-primary" />
+                        {skillCategory.icon_image_url ? (
+                            <NextImage src={skillCategory.icon_image_url} alt={skillCategory.category_name} width={20} height={20} className="h-5 w-5 mr-2 rounded-sm object-contain border" />
+                        ) : (
+                            <Type className="h-5 w-5 mr-2 text-primary" /> // Generic icon for category
+                        )}
                         <h4 className="text-lg font-semibold text-foreground">{skillCategory.category_name}</h4>
                       </div>
                       <div className="pl-7 flex flex-wrap gap-3">
@@ -188,8 +181,8 @@ export default function ResumeSectionClientView({
                         )}
                       </div>
                     </div>
-                  );
-                })
+                  )
+                )
               ) : (
                 <p className="text-muted-foreground text-center">No key skill categories yet.</p>
               )}
@@ -209,8 +202,8 @@ export default function ResumeSectionClientView({
                     key={lang.id}
                     title={lang.language_name}
                     description={lang.proficiency || undefined}
-                    iconName={lang.icon_name}
-                    defaultIcon={Globe}
+                    iconImageUrl={lang.icon_image_url}
+                    DefaultIconComponent={ExternalLink} // Using ExternalLink as a generic fallback, can be changed
                   />
                 ))
               ) : (

@@ -56,7 +56,7 @@ export interface Database {
         Row: {
           id: string
           name: string
-          icon_image_url: string | null
+          icon_image_url: string | null // Changed from icon_name
           sort_order: number | null
           created_at: string
         }
@@ -80,7 +80,7 @@ export interface Database {
         Row: {
           id: string
           name: string
-          icon_image_url: string | null
+          icon_image_url: string | null // Changed from icon_name
           description: string | null
           category_id: string | null
           created_at: string
@@ -119,6 +119,7 @@ export interface Database {
           image_url: string | null
           verify_url: string | null
           created_at: string
+          // image_hint was removed
         }
         Insert: {
           id?: string
@@ -222,7 +223,7 @@ export interface Database {
           company_name: string
           date_range: string | null
           description_points: string[] | null
-          icon_name: string | null
+          icon_image_url: string | null // Changed from icon_name
           sort_order: number | null
           created_at: string
         }
@@ -232,7 +233,7 @@ export interface Database {
           company_name: string
           date_range?: string | null
           description_points?: string[] | null
-          icon_name?: string | null
+          icon_image_url?: string | null
           sort_order?: number | null
           created_at?: string
         }
@@ -242,7 +243,7 @@ export interface Database {
           company_name?: string
           date_range?: string | null
           description_points?: string[] | null
-          icon_name?: string | null
+          icon_image_url?: string | null
           sort_order?: number | null
           created_at?: string
         }
@@ -255,7 +256,7 @@ export interface Database {
           institution_name: string
           date_range: string | null
           description: string | null
-          icon_name: string | null
+          icon_image_url: string | null // Changed from icon_name
           sort_order: number | null
           created_at: string
         }
@@ -265,7 +266,7 @@ export interface Database {
           institution_name: string
           date_range?: string | null
           description?: string | null
-          icon_name?: string | null
+          icon_image_url?: string | null
           sort_order?: number | null
           created_at?: string
         }
@@ -275,7 +276,7 @@ export interface Database {
           institution_name?: string
           date_range?: string | null
           description?: string | null
-          icon_name?: string | null
+          icon_image_url?: string | null
           sort_order?: number | null
           created_at?: string
         }
@@ -285,27 +286,27 @@ export interface Database {
         Row: {
           id: string
           category_name: string
-          icon_name: string | null
+          icon_image_url: string | null // Changed from icon_name
           sort_order: number | null
           created_at: string
         }
         Insert: {
           id?: string
           category_name: string
-          icon_name?: string | null
+          icon_image_url?: string | null
           sort_order?: number | null
           created_at?: string
         }
         Update: {
           id?: string
           category_name?: string
-          icon_name?: string | null
+          icon_image_url?: string | null
           sort_order?: number | null
           created_at?: string
         }
         Relationships: []
       }
-      resume_key_skills: {
+      resume_key_skills: { // Key skills themselves typically don't have individual icons, they belong to a category
         Row: {
           id: string
           skill_name: string
@@ -338,7 +339,7 @@ export interface Database {
           id: string
           language_name: string
           proficiency: string | null
-          icon_name: string | null
+          icon_image_url: string | null // Changed from icon_name
           sort_order: number | null
           created_at: string
         }
@@ -346,7 +347,7 @@ export interface Database {
           id?: string
           language_name: string
           proficiency?: string | null
-          icon_name?: string | null
+          icon_image_url?: string | null
           sort_order?: number | null
           created_at?: string
         }
@@ -354,7 +355,7 @@ export interface Database {
           id?: string
           language_name?: string
           proficiency?: string | null
-          icon_name?: string | null
+          icon_image_url?: string | null
           sort_order?: number | null
           created_at?: string
         }
@@ -405,7 +406,7 @@ export interface SkillCategory {
   name: string;
   iconImageUrl?: string | null; // Changed from iconName
   skills?: Skill[];
-  skillCount?: number;
+  skillCount?: number; // This is usually a derived/calculated value, not in DB
   sort_order?: number | null;
   created_at?: string;
 }
@@ -455,7 +456,7 @@ export interface ResumeExperience {
   company_name: string;
   date_range: string | null;
   description_points: string[] | null;
-  icon_name: string | null; // Optional Lucide icon name
+  icon_image_url: string | null; // Changed from icon_name
   sort_order?: number | null;
   created_at: string;
 }
@@ -466,23 +467,23 @@ export interface ResumeEducation {
   institution_name: string;
   date_range: string | null;
   description: string | null;
-  icon_name: string | null; // Optional Lucide icon name
+  icon_image_url: string | null; // Changed from icon_name
   sort_order?: number | null;
   created_at: string;
 }
 
-export interface ResumeKeySkill {
+export interface ResumeKeySkill { // Individual key skills usually don't have their own icons
   id: string;
   skill_name: string;
-  category_id?: string | null; // Foreign key to resume_key_skill_categories
+  category_id?: string | null; 
   created_at?: string;
 }
 
 export interface ResumeKeySkillCategory {
   id: string;
   category_name: string;
-  icon_name: string | null; // Optional Lucide icon name
-  skills?: ResumeKeySkill[]; // For joining data
+  icon_image_url: string | null; // Changed from icon_name, for the category itself
+  skills?: ResumeKeySkill[]; 
   sort_order?: number | null;
   created_at?: string;
 }
@@ -491,7 +492,7 @@ export interface ResumeLanguage {
   id: string;
   language_name: string;
   proficiency: string | null;
-  icon_name: string | null; // Optional Lucide icon name
+  icon_image_url: string | null; // Changed from icon_name
   sort_order?: number | null;
   created_at: string;
 }

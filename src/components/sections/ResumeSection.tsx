@@ -9,31 +9,32 @@ import type {
   ResumeExperience, 
   ResumeEducation, 
   ResumeKeySkillCategory, 
+  ResumeKeySkill,
   ResumeLanguage 
 } from '@/types/supabase';
 
 async function getResumeExperience(): Promise<ResumeExperience[]> {
   const { data, error } = await supabase
     .from('resume_experience')
-    .select('*')
+    .select('id, job_title, company_name, date_range, description_points, icon_image_url, sort_order, created_at') // Ensure icon_image_url is selected
     .order('sort_order', { ascending: true });
   if (error) {
     console.error("Error fetching resume experience:", error);
     return [];
   }
-  return data || [];
+  return (data || []).map(item => ({ ...item, icon_image_url: item.icon_image_url || null }));
 }
 
 async function getResumeEducation(): Promise<ResumeEducation[]> {
   const { data, error } = await supabase
     .from('resume_education')
-    .select('*')
+    .select('id, degree_or_certification, institution_name, date_range, description, icon_image_url, sort_order, created_at') // Ensure icon_image_url is selected
     .order('sort_order', { ascending: true });
   if (error) {
     console.error("Error fetching resume education:", error);
     return [];
   }
-  return data || [];
+  return (data || []).map(item => ({ ...item, icon_image_url: item.icon_image_url || null }));
 }
 
 async function getResumeKeySkills(): Promise<ResumeKeySkillCategory[]> {
@@ -42,12 +43,12 @@ async function getResumeKeySkills(): Promise<ResumeKeySkillCategory[]> {
     .select(`
       id,
       category_name,
-      icon_name,
+      icon_image_url, 
       sort_order,
-      resume_key_skills (id, skill_name)
-    `)
+      created_at,
+      resume_key_skills (id, skill_name, category_id, created_at)
+    `) // Ensure icon_image_url is selected
     .order('sort_order', { ascending: true });
-    // Note: Ordering for nested resume_key_skills would need to be handled client-side or with a more complex query/RPC.
 
   if (error) {
     console.error("Error fetching resume key skills:", error);
@@ -55,20 +56,21 @@ async function getResumeKeySkills(): Promise<ResumeKeySkillCategory[]> {
   }
   return (data || []).map(category => ({
     ...category,
-    skills: category.resume_key_skills || [] // Ensure skills array is present
+    icon_image_url: category.icon_image_url || null,
+    skills: (category.resume_key_skills || []).map(skill => ({...skill})) // map inner skills if needed
   }));
 }
 
 async function getResumeLanguages(): Promise<ResumeLanguage[]> {
   const { data, error } = await supabase
     .from('resume_languages')
-    .select('*')
+    .select('id, language_name, proficiency, icon_image_url, sort_order, created_at') // Ensure icon_image_url is selected
     .order('sort_order', { ascending: true });
   if (error) {
     console.error("Error fetching resume languages:", error);
     return [];
   }
-  return data || [];
+  return (data || []).map(item => ({ ...item, icon_image_url: item.icon_image_url || null }));
 }
 
 
