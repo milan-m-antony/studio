@@ -9,7 +9,7 @@ import type {
   ResumeExperience,
   ResumeEducation,
   ResumeKeySkillCategory,
-  ResumeKeySkill,
+  ResumeKeySkill, // Will be used by ResumeKeySkillCategory
   ResumeLanguage
 } from '@/types/supabase';
 
@@ -40,12 +40,12 @@ async function getResumeEducation(): Promise<ResumeEducation[]> {
 
   if (error) {
     let errorMessage = 'Error fetching resume education. ';
-    if (typeof error === 'object' && error !== null) {
+     if (typeof error === 'object' && error !== null) {
       const supabaseError = error as { message?: string; details?: string; hint?: string; code?: string };
       errorMessage += `Message: ${supabaseError.message || 'N/A'}, Details: ${supabaseError.details || 'N/A'}, Hint: ${supabaseError.hint || 'N/A'}, Code: ${supabaseError.code || 'N/A'}. `;
     }
     errorMessage += `Status: ${status || 'N/A'} ${statusText || 'N/A'}.`;
-    console.error(errorMessage); // Enhanced logging
+    console.error(errorMessage);
     return [];
   }
   return (data || []).map(item => ({ ...item, icon_image_url: item.icon_image_url || null }));
@@ -60,10 +60,13 @@ async function getResumeKeySkills(): Promise<ResumeKeySkillCategory[]> {
       icon_image_url,
       sort_order,
       created_at,
-      resume_key_skills (id, skill_name, category_id, created_at)
-    `)
+      resume_key_skills (id, skill_name, category_id)
+    `) // Removed created_at from resume_key_skills sub-query
     .order('sort_order', { ascending: true })
-    .order('created_at', { foreignTable: 'resume_key_skills', ascending: true });
+    // Cannot order by created_at on resume_key_skills if it doesn't exist
+    // .order('created_at', { foreignTable: 'resume_key_skills', ascending: true });
+    ;
+
 
   if (error) {
     let errorMessage = 'Error fetching resume key skills. ';
@@ -78,7 +81,7 @@ async function getResumeKeySkills(): Promise<ResumeKeySkillCategory[]> {
   return (data || []).map(category => ({
     ...category,
     icon_image_url: category.icon_image_url || null,
-    skills: (category.resume_key_skills || []).map(skill => ({ ...skill }))
+    skills: (category.resume_key_skills || []).map(skill => ({ ...skill })) // skills will not have created_at
   }));
 }
 
