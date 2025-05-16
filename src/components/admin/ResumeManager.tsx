@@ -1,15 +1,15 @@
 
 "use client";
 
-import React, { useEffect, useState, type ChangeEvent, type FormEvent } from 'react';
+import React, { useEffect, useState, type ChangeEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
-import { PlusCircle, Edit, Trash2, Briefcase, GraduationCap, ListChecks, Languages as LanguagesIcon, FileText as ResumeIcon, UploadCloud, Link as LinkIcon, Image as ImageIcon, Building } from 'lucide-react';
-import NextImage from 'next/image';
+import { PlusCircle, Edit, Trash2, Briefcase, GraduationCap, ListChecks, Languages as LanguagesIcon, FileText as ResumeIcon, UploadCloud, Link as LinkIcon, ImageIcon, Building } from 'lucide-react';
+import NextImage from 'next/image'; // Renamed to avoid conflict if 'Image' is used from lucide
 import { supabase } from '@/lib/supabaseClient';
 import type { ResumeExperience, ResumeEducation, ResumeKeySkillCategory, ResumeKeySkill, ResumeLanguage, ResumeMeta } from '@/types/supabase';
 import {
@@ -60,10 +60,12 @@ const resumeEducationSchema = z.object({
 type ResumeEducationFormData = z.infer<typeof resumeEducationSchema>;
 
 // Placeholder: Zod schemas for Key Skills and Languages will be added when those sections are implemented
+// const resumeKeySkillCategorySchema = z.object({ /* ... */ });
+// const resumeKeySkillSchema = z.object({ /* ... */ });
+// const resumeLanguageSchema = z.object({ /* ... */ });
 
 const IconPreview = ({ url, alt = "Icon Preview" }: { url?: string | null; alt?: string }) => {
   if (!url || typeof url !== 'string' || url.trim() === '') {
-    // Fallback to a generic icon if URL is not valid
     return <ImageIcon className="h-8 w-8 text-muted-foreground border rounded p-1" />;
   }
   return <NextImage src={url} alt={alt} width={32} height={32} className="rounded object-contain border" sizes="32px" />;
@@ -75,24 +77,24 @@ export default function ResumeManager() {
   const { toast } = useToast();
 
   // Resume Meta State
-  const [resumeMeta, setResumeMeta] = useState<ResumeMeta | null>(null);
-  const [isLoadingResumeMeta, setIsLoadingResumeMeta] = useState(false);
-  const [resumePdfFile, setResumePdfFile] = useState<File | null>(null);
-  const [currentDbResumePdfUrl, setCurrentDbResumePdfUrl] = useState<string | null>(null);
+  const [resumeMeta, setResumeMeta] = React.useState<ResumeMeta | null>(null);
+  const [isLoadingResumeMeta, setIsLoadingResumeMeta] = React.useState(false);
+  const [resumePdfFile, setResumePdfFile] = React.useState<File | null>(null);
+  const [currentDbResumePdfUrl, setCurrentDbResumePdfUrl] = React.useState<string | null>(null);
 
   // Experience State
-  const [experiences, setExperiences] = useState<ResumeExperience[]>([]);
-  const [isLoadingExperiences, setIsLoadingExperiences] = useState(false);
-  const [isExperienceModalOpen, setIsExperienceModalOpen] = useState(false);
-  const [currentExperience, setCurrentExperience] = useState<ResumeExperience | null>(null);
-  const [experienceToDelete, setExperienceToDelete] = useState<ResumeExperience | null>(null);
+  const [experiences, setExperiences] = React.useState<ResumeExperience[]>([]);
+  const [isLoadingExperiences, setIsLoadingExperiences] = React.useState(false);
+  const [isExperienceModalOpen, setIsExperienceModalOpen] = React.useState(false);
+  const [currentExperience, setCurrentExperience] = React.useState<ResumeExperience | null>(null);
+  const [experienceToDelete, setExperienceToDelete] = React.useState<ResumeExperience | null>(null);
 
   // Education State
-  const [educationItems, setEducationItems] = useState<ResumeEducation[]>([]);
-  const [isLoadingEducation, setIsLoadingEducation] = useState(false);
-  const [isEducationModalOpen, setIsEducationModalOpen] = useState(false);
-  const [currentEducation, setCurrentEducation] = useState<ResumeEducation | null>(null);
-  const [educationToDelete, setEducationToDelete] = useState<ResumeEducation | null>(null);
+  const [educationItems, setEducationItems] = React.useState<ResumeEducation[]>([]);
+  const [isLoadingEducation, setIsLoadingEducation] = React.useState(false);
+  const [isEducationModalOpen, setIsEducationModalOpen] = React.useState(false);
+  const [currentEducation, setCurrentEducation] = React.useState<ResumeEducation | null>(null);
+  const [educationToDelete, setEducationToDelete] = React.useState<ResumeEducation | null>(null);
 
   // Forms
   const resumeMetaForm = useForm<ResumeMetaFormData>({
@@ -108,31 +110,6 @@ export default function ResumeManager() {
     defaultValues: { degree_or_certification: '', institution_name: '', date_range: '', description: '', icon_image_url: '', sort_order: 0 }
   });
 
-  // Fetch data on mount
-  useEffect(() => {
-    fetchResumeMeta();
-    fetchExperiences();
-    fetchEducationItems();
-    // TODO: Fetch data for Key Skills and Languages when implemented
-  }, []);
-
-  // Effect to populate Resume Meta form when data is loaded
-  useEffect(() => {
-    if (resumeMeta) {
-      resumeMetaForm.reset({
-        id: resumeMeta.id,
-        description: resumeMeta.description || '',
-        resume_pdf_url: resumeMeta.resume_pdf_url || ''
-      });
-      setCurrentDbResumePdfUrl(resumeMeta.resume_pdf_url || null);
-    } else {
-      resumeMetaForm.reset({ id: RESUME_META_ID, description: '', resume_pdf_url: '' });
-      setCurrentDbResumePdfUrl(null);
-    }
-  }, [resumeMeta, resumeMetaForm]); // Added resumeMetaForm to dependency array
-
-
-  // Fetch Resume Meta
   const fetchResumeMeta = async () => {
     setIsLoadingResumeMeta(true);
     const { data, error } = await supabase.from('resume_meta').select('*').eq('id', RESUME_META_ID).maybeSingle();
@@ -141,102 +118,62 @@ export default function ResumeManager() {
       setResumeMeta(null);
     } else if (data) {
       setResumeMeta(data);
+      resumeMetaForm.reset({
+        id: data.id,
+        description: data.description || '',
+        resume_pdf_url: data.resume_pdf_url || ''
+      });
+      setCurrentDbResumePdfUrl(data.resume_pdf_url || null);
     } else {
-       setResumeMeta(null); // No data found for the fixed ID, set to null
+       setResumeMeta(null);
+       resumeMetaForm.reset({ id: RESUME_META_ID, description: '', resume_pdf_url: '' });
+       setCurrentDbResumePdfUrl(null);
     }
     setIsLoadingResumeMeta(false);
   };
 
+  // DEBUG: Temporarily comment out this useEffect to isolate parsing error
+  // React.useEffect(() => {
+  //   fetchResumeMeta();
+  // }, []);
+
   const handleResumePdfFileChange = (event: ChangeEvent<HTMLInputElement>) => {
     if (event.target.files?.[0]) {
       setResumePdfFile(event.target.files[0]);
-      resumeMetaForm.setValue('resume_pdf_url', ''); // Clear URL if file is chosen
+      resumeMetaForm.setValue('resume_pdf_url', ''); 
     } else {
       setResumePdfFile(null);
-      // If file is deselected, restore URL from DB loaded URL if it exists
       if (currentDbResumePdfUrl) {
         resumeMetaForm.setValue('resume_pdf_url', currentDbResumePdfUrl);
       }
     }
   };
 
-  // Resume Meta Submit
+  // DEBUG: Temporarily simplify onResumeMetaSubmit
   const onResumeMetaSubmit: SubmitHandler<ResumeMetaFormData> = async (formData) => {
-    let pdfUrlToSave = formData.resume_pdf_url;
-    let oldPdfStoragePathToDelete: string | null = null;
-
-    if (currentDbResumePdfUrl) {
-        const pathParts = currentDbResumePdfUrl.split('/resume-pdfs/');
-        if (pathParts.length > 1 && !pathParts[1].startsWith('http')) {
-            oldPdfStoragePathToDelete = pathParts[1];
-        }
-    }
-    
-    if (resumePdfFile) {
-      const fileExt = resumePdfFile.name.split('.').pop();
-      const fileName = `resume_${Date.now()}.${fileExt}`; 
-      const filePath = `${fileName}`;
-
-      toast({ title: "Uploading Resume PDF", description: "Please wait..." });
-      const { data: uploadData, error: uploadError } = await supabase.storage
-        .from('resume-pdfs')
-        .upload(filePath, resumePdfFile, { cacheControl: '3600', upsert: false });
-
-      if (uploadError) {
-        console.error("Error uploading Resume PDF:", JSON.stringify(uploadError, null, 2));
-        toast({ title: "Upload Error", description: `Failed to upload PDF: ${uploadError.message}`, variant: "destructive" });
-        return;
-      }
-      const { data: publicUrlData } = supabase.storage.from('resume-pdfs').getPublicUrl(filePath);
-      if (!publicUrlData?.publicUrl) {
-        toast({ title: "Error", description: "Failed to get public URL for uploaded PDF.", variant: "destructive" });
-        return;
-      }
-      pdfUrlToSave = publicUrlData.publicUrl;
-    }
-    
-    const dataForUpsert = {
-      ...formData,
-      id: RESUME_META_ID,
-      resume_pdf_url: pdfUrlToSave || null,
-      updated_at: new Date().toISOString(),
-    };
-    
-    const { error: upsertError } = await supabase
-      .from('resume_meta')
-      .upsert(dataForUpsert, { onConflict: 'id' });
-
-    if (upsertError) {
-      console.error("Error saving Resume info:", JSON.stringify(upsertError, null, 2));
-      toast({ title: "Error", description: `Failed to save resume info: ${upsertError.message}`, variant: "destructive" });
-    } else {
-      toast({ title: "Success", description: "Resume info saved successfully." });
-      if (oldPdfStoragePathToDelete && pdfUrlToSave !== currentDbResumePdfUrl) {
-        console.log("[ResumeManager] Attempting to delete old Resume PDF from storage:", oldPdfStoragePathToDelete);
-        const { error: storageDeleteError } = await supabase.storage.from('resume-pdfs').remove([oldPdfStoragePathToDelete]);
-        if (storageDeleteError) {
-          console.warn("[ResumeManager] Error deleting old Resume PDF from storage:", JSON.stringify(storageDeleteError, null, 2));
-          toast({title: "Storage Warning", description: `Updated resume info, but failed to delete old PDF from storage: ${storageDeleteError.message}`, variant: "default"});
-        } else {
-          console.log("[ResumeManager] Old Resume PDF successfully deleted from storage:", oldPdfStoragePathToDelete);
-        }
-      }
-      fetchResumeMeta();
-      setResumePdfFile(null);
-      router.refresh(); 
-    }
+    console.log("Resume Meta form submitted (DEBUG MODE - NO DB ACTION):", formData);
+    toast({
+      title: "Debug Submit",
+      description: "Resume Meta form submitted. No database operation performed in this debug state.",
+    });
+    // The original complex logic for file upload and Supabase upsert is temporarily removed
+    // to help isolate the parsing error.
+    // You would re-introduce the full logic here once the parsing error is fixed.
+    // For example, a minimal placeholder for the original logic's structure:
+    // setIsLoadingResumeMeta(true);
+    // await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate async work
+    // setIsLoadingResumeMeta(false);
+    // fetchResumeMeta();
+    // router.refresh();
   };
-  
+
+
   // Fetch Experiences
   const fetchExperiences = async () => {
     setIsLoadingExperiences(true);
     const { data, error } = await supabase.from('resume_experience').select('*').order('sort_order', { ascending: true });
-    if (error) {
-      toast({ title: "Error fetching experiences", description: error.message, variant: "destructive" });
-      setExperiences([]);
-    } else {
-      setExperiences(data || []);
-    }
+    if (error) { toast({ title: "Error fetching experiences", description: error.message, variant: "destructive" }); setExperiences([]); }
+    else { setExperiences((data || []).map(item => ({ ...item, description_points: item.description_points || [] }))); }
     setIsLoadingExperiences(false);
   };
 
@@ -244,45 +181,27 @@ export default function ResumeManager() {
   const onExperienceSubmit: SubmitHandler<ResumeExperienceFormData> = async (formData) => {
     const dataToSave = { ...formData, description_points: formData.description_points || [], icon_image_url: formData.icon_image_url?.trim() === '' ? null : formData.icon_image_url, sort_order: Number(formData.sort_order) || 0 };
     let response;
-    if (formData.id) {
-      response = await supabase.from('resume_experience').update(dataToSave).eq('id', formData.id).select();
-    } else { 
-      const { id, ...insertData } = dataToSave; 
-      response = await supabase.from('resume_experience').insert(insertData).select(); 
-    }
-    
-    if (response.error) {
-      toast({ title: "Error saving experience", description: response.error.message, variant: "destructive" });
-    } else { 
-      toast({ title: "Success", description: "Experience saved." }); 
-      fetchExperiences(); 
-      setIsExperienceModalOpen(false); 
-      router.refresh(); 
-    }
+    if (formData.id) { response = await supabase.from('resume_experience').update(dataToSave).eq('id', formData.id).select(); }
+    else { const { id, ...insertData } = dataToSave; response = await supabase.from('resume_experience').insert(insertData).select(); }
+    if (response.error) { toast({ title: "Error saving experience", description: response.error.message, variant: "destructive" }); }
+    else { toast({ title: "Success", description: "Experience saved." }); fetchExperiences(); setIsExperienceModalOpen(false); router.refresh(); }
   };
   
-  // Experience Delete
   const handleDeleteExperience = async () => {
     if (!experienceToDelete) return;
     const { error } = await supabase.from('resume_experience').delete().eq('id', experienceToDelete.id);
-    if (error) {
-      toast({ title: "Error deleting experience", description: error.message, variant: "destructive" });
-    } else { 
-      toast({ title: "Success", description: "Experience deleted." }); 
-      fetchExperiences(); 
-      router.refresh(); 
-    }
+    if (error) { toast({ title: "Error deleting experience", description: error.message, variant: "destructive" }); }
+    else { toast({ title: "Success", description: "Experience deleted." }); fetchExperiences(); router.refresh(); }
     setExperienceToDelete(null);
   };
   
-  // Experience Modal Open
   const handleOpenExperienceModal = (experience?: ResumeExperience) => {
     setCurrentExperience(experience || null);
     experienceForm.reset(experience ? { 
       ...experience, 
       description_points: experience.description_points?.join('\n') || '',
       icon_image_url: experience.icon_image_url || '',
-      sort_order: experience.sort_order === null || experience.sort_order === undefined ? 0 : Number(experience.sort_order),
+      sort_order: Number(experience.sort_order ?? 0),
     } : { job_title: '', company_name: '', date_range: '', description_points: [], icon_image_url: '', sort_order: 0 });
     setIsExperienceModalOpen(true);
   };
@@ -291,61 +210,42 @@ export default function ResumeManager() {
   const fetchEducationItems = async () => {
     setIsLoadingEducation(true);
     const { data, error } = await supabase.from('resume_education').select('*').order('sort_order', { ascending: true });
-    if (error) {
-      toast({ title: "Error fetching education items", description: error.message, variant: "destructive" });
-      setEducationItems([]);
-    } else {
-      setEducationItems(data || []);
-    }
+    if (error) { toast({ title: "Error fetching education items", description: error.message, variant: "destructive" }); setEducationItems([]); }
+    else { setEducationItems(data || []); }
     setIsLoadingEducation(false);
   };
 
-  // Education Submit
   const onEducationSubmit: SubmitHandler<ResumeEducationFormData> = async (formData) => {
     const dataToSave = { ...formData, icon_image_url: formData.icon_image_url?.trim() === '' ? null : formData.icon_image_url, sort_order: Number(formData.sort_order) || 0 };
     let response;
-    if (formData.id) {
-      response = await supabase.from('resume_education').update(dataToSave).eq('id', formData.id).select();
-    } else { 
-      const { id, ...insertData } = dataToSave; 
-      response = await supabase.from('resume_education').insert(insertData).select(); 
-    }
-    
-    if (response.error) {
-      toast({ title: "Error saving education item", description: response.error.message, variant: "destructive" });
-    } else { 
-      toast({ title: "Success", description: "Education item saved." }); 
-      fetchEducationItems(); 
-      setIsEducationModalOpen(false); 
-      router.refresh(); 
-    }
+    if (formData.id) { response = await supabase.from('resume_education').update(dataToSave).eq('id', formData.id).select(); }
+    else { const { id, ...insertData } = dataToSave; response = await supabase.from('resume_education').insert(insertData).select(); }
+    if (response.error) { toast({ title: "Error saving education item", description: response.error.message, variant: "destructive" }); }
+    else { toast({ title: "Success", description: "Education item saved." }); fetchEducationItems(); setIsEducationModalOpen(false); router.refresh(); }
   };
   
-  // Education Delete
   const handleDeleteEducation = async () => {
     if (!educationToDelete) return;
     const { error } = await supabase.from('resume_education').delete().eq('id', educationToDelete.id);
-    if (error) {
-      toast({ title: "Error deleting education item", description: error.message, variant: "destructive" });
-    } else { 
-      toast({ title: "Success", description: "Education item deleted." }); 
-      fetchEducationItems(); 
-      router.refresh(); 
-    }
+    if (error) { toast({ title: "Error deleting education item", description: error.message, variant: "destructive" }); }
+    else { toast({ title: "Success", description: "Education item deleted." }); fetchEducationItems(); router.refresh(); }
     setEducationToDelete(null);
   };
 
-  // Education Modal Open
   const handleOpenEducationModal = (education?: ResumeEducation) => {
     setCurrentEducation(education || null);
-    educationForm.reset(education ? {
-        ...education,
-        icon_image_url: education.icon_image_url || '',
-        sort_order: education.sort_order === null || education.sort_order === undefined ? 0 : Number(education.sort_order),
-    } : { degree_or_certification: '', institution_name: '', date_range: '', description: '', icon_image_url: '', sort_order: 0 });
+    educationForm.reset(education ? {...education, icon_image_url: education.icon_image_url || '', sort_order: Number(education.sort_order ?? 0)} : { degree_or_certification: '', institution_name: '', date_range: '', description: '', icon_image_url: '', sort_order: 0 });
     setIsEducationModalOpen(true);
   };
   
+  // Fetch all data on mount
+  React.useEffect(() => {
+    // fetchResumeMeta(); // Still commented out for debugging parsing error
+    fetchExperiences();
+    fetchEducationItems();
+    // TODO: Fetch data for Key Skills and Languages when implemented
+  }, []); // Dependency array is empty, runs once on mount
+
   return (
     <>
       <Card className="shadow-lg mb-8">
@@ -377,7 +277,7 @@ export default function ResumeManager() {
                   </div>
                 )}
                  <div>
-                  <Label htmlFor="resume_pdf_url_manual" className="text-xs text-muted-foreground">Or enter direct PDF URL (upload will override if a file is chosen or if this field is cleared)</Label>
+                  <Label htmlFor="resume_pdf_url_manual" className="text-xs text-muted-foreground">Or enter direct PDF URL (upload will override)</Label>
                   <Input id="resume_pdf_url_manual" {...resumeMetaForm.register("resume_pdf_url")} placeholder="https://example.com/your-resume.pdf" />
                   {resumeMetaForm.formState.errors.resume_pdf_url && <p className="text-destructive text-sm mt-1">{resumeMetaForm.formState.errors.resume_pdf_url.message}</p>}
                 </div>
@@ -424,7 +324,18 @@ export default function ResumeManager() {
                         </div>
                         <div className="flex space-x-2 flex-shrink-0">
                           <Button variant="outline" size="sm" onClick={() => handleOpenExperienceModal(exp)}><Edit className="mr-1 h-3 w-3" />Edit</Button>
-                          <Button variant="destructive" size="sm" onClick={() => setExperienceToDelete(exp)}><Trash2 className="mr-1 h-3 w-3" />Delete</Button>
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                                <Button variant="destructive" size="sm"><Trash2 className="mr-1 h-3 w-3" />Delete</Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent className="bg-destructive border-destructive text-destructive-foreground">
+                                <AlertDialogHeader><AlertDialogTitle className="text-destructive-foreground">Delete Experience: {exp.job_title}?</AlertDialogTitle><AlertDialogDescription className="text-destructive-foreground/90">This action cannot be undone.</AlertDialogDescription></AlertDialogHeader>
+                                <AlertDialogFooter>
+                                    <AlertDialogCancel onClick={() => setExperienceToDelete(null)} className={cn(buttonVariants({ variant: "outline" }), "border-destructive-foreground/40 text-destructive-foreground hover:bg-destructive-foreground/10 hover:text-destructive-foreground hover:border-destructive-foreground/60")}>Cancel</AlertDialogCancel>
+                                    <AlertDialogAction onClick={() => { setExperienceToDelete(exp); handleDeleteExperience(); }} className={cn(buttonVariants({ variant: "default" }), "bg-destructive-foreground text-destructive hover:bg-destructive-foreground/90")}>Delete</AlertDialogAction>
+                                </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
                         </div>
                       </div>
                     </Card>
@@ -452,7 +363,18 @@ export default function ResumeManager() {
                         </div>
                         <div className="flex space-x-2 flex-shrink-0">
                           <Button variant="outline" size="sm" onClick={() => handleOpenEducationModal(edu)}><Edit className="mr-1 h-3 w-3" />Edit</Button>
-                          <Button variant="destructive" size="sm" onClick={() => setEducationToDelete(edu)}><Trash2 className="mr-1 h-3 w-3" />Delete</Button>
+                           <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                                <Button variant="destructive" size="sm"><Trash2 className="mr-1 h-3 w-3" />Delete</Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent className="bg-destructive border-destructive text-destructive-foreground">
+                                <AlertDialogHeader><AlertDialogTitle className="text-destructive-foreground">Delete Education: {edu.degree_or_certification}?</AlertDialogTitle><AlertDialogDescription className="text-destructive-foreground/90">This action cannot be undone.</AlertDialogDescription></AlertDialogHeader>
+                                <AlertDialogFooter>
+                                    <AlertDialogCancel onClick={() => setEducationToDelete(null)} className={cn(buttonVariants({ variant: "outline" }), "border-destructive-foreground/40 text-destructive-foreground hover:bg-destructive-foreground/10 hover:text-destructive-foreground hover:border-destructive-foreground/60")}>Cancel</AlertDialogCancel>
+                                    <AlertDialogAction onClick={() => { setEducationToDelete(edu); handleDeleteEducation();}} className={cn(buttonVariants({ variant: "default" }), "bg-destructive-foreground text-destructive hover:bg-destructive-foreground/90")}>Delete</AlertDialogAction>
+                                </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
                         </div>
                       </div>
                     </Card>
@@ -487,13 +409,6 @@ export default function ResumeManager() {
               </form>
             </DialogContent>
           </Dialog>
-          {/* Experience Delete Confirmation */}
-          <AlertDialog open={!!experienceToDelete} onOpenChange={(isOpen) => { if(!isOpen) setExperienceToDelete(null); }}>
-            <AlertDialogContent className="bg-destructive border-destructive text-destructive-foreground">
-              <AlertDialogHeader><AlertDialogTitle className="text-destructive-foreground">Delete Experience: {experienceToDelete?.job_title}?</AlertDialogTitle><AlertDialogDescription className="text-destructive-foreground/90">This action cannot be undone.</AlertDialogDescription></AlertDialogHeader>
-              <AlertDialogFooter><AlertDialogCancel onClick={() => {setExperienceToDelete(null);}} className={cn(buttonVariants({ variant: "outline" }), "border-destructive-foreground/40 text-destructive-foreground hover:bg-destructive-foreground/10 hover:text-destructive-foreground hover:border-destructive-foreground/60")}>Cancel</AlertDialogCancel><AlertDialogAction onClick={handleDeleteExperience} className={cn(buttonVariants({ variant: "default" }), "bg-destructive-foreground text-destructive hover:bg-destructive-foreground/90")}>Delete</AlertDialogAction></AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
           
           {/* Education Modal */}
           <Dialog open={isEducationModalOpen} onOpenChange={(isOpen) => { setIsEducationModalOpen(isOpen); if (!isOpen) setCurrentEducation(null); }}>
@@ -517,16 +432,8 @@ export default function ResumeManager() {
               </form>
             </DialogContent>
           </Dialog>
-          {/* Education Delete Confirmation */}
-          <AlertDialog open={!!educationToDelete} onOpenChange={(isOpen) => { if(!isOpen) setEducationToDelete(null); }}>
-            <AlertDialogContent className="bg-destructive border-destructive text-destructive-foreground">
-              <AlertDialogHeader><AlertDialogTitle className="text-destructive-foreground">Delete Education: {educationToDelete?.degree_or_certification}?</AlertDialogTitle><AlertDialogDescription className="text-destructive-foreground/90">This action cannot be undone.</AlertDialogDescription></AlertDialogHeader>
-              <AlertDialogFooter><AlertDialogCancel onClick={() => {setEducationToDelete(null);}} className={cn(buttonVariants({ variant: "outline" }), "border-destructive-foreground/40 text-destructive-foreground hover:bg-destructive-foreground/10 hover:text-destructive-foreground hover:border-destructive-foreground/60")}>Cancel</AlertDialogCancel><AlertDialogAction onClick={handleDeleteEducation} className={cn(buttonVariants({ variant: "default" }), "bg-destructive-foreground text-destructive hover:bg-destructive-foreground/90")}>Delete</AlertDialogAction></AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
-
-        </TabsContent>
-      </Card>
+        </TabsContent> {/* This closes the Education TabContent */}
+      </Card> {/* This closes the "Manage Resume Sections" Card */}
     </>
   );
 }
