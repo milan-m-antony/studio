@@ -8,8 +8,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
-import { PlusCircle, Edit, Trash2, Briefcase, GraduationCap, ListChecks, Languages as LanguagesIcon, FileText as ResumeIcon, UploadCloud, Download, Link as LinkIcon, Image as ImageIcon } from 'lucide-react';
-import NextImage from 'next/image';
+import { PlusCircle, Edit, Trash2, Briefcase, GraduationCap, ListChecks, Languages as LanguagesIcon, FileText as ResumeIcon, UploadCloud, Download, Link as LinkIcon, Image as ImageIcon, Building } from 'lucide-react';
+import NextImage from 'next/image'; // Renamed to avoid conflict with local Image component if any
 import { supabase } from '@/lib/supabaseClient';
 import type { ResumeExperience, ResumeEducation, ResumeKeySkillCategory, ResumeKeySkill, ResumeLanguage, ResumeMeta } from '@/types/supabase';
 import {
@@ -19,7 +19,7 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useForm, type SubmitHandler, Controller } from "react-hook-form";
+import { useForm, type SubmitHandler } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useToast } from '@/hooks/use-toast';
@@ -61,9 +61,12 @@ type ResumeEducationFormData = z.infer<typeof resumeEducationSchema>;
 // Placeholder: Zod schemas for Key Skills and Languages will be added later
 
 const IconPreview = ({ url, alt = "Icon Preview" }: { url?: string | null; alt?: string }) => {
-  if (!url) return <ImageIcon className="h-8 w-8 text-muted-foreground border rounded p-1" />;
-  return <NextImage src={url} alt={alt} width={32} height={32} className="rounded object-contain border" />;
+  if (!url || typeof url !== 'string' || url.trim() === '') {
+    return <ImageIcon className="h-8 w-8 text-muted-foreground border rounded p-1" />;
+  }
+  return <NextImage src={url} alt={alt} width={32} height={32} className="rounded object-contain border" sizes="32px" />;
 };
+
 
 export default function ResumeManager() {
   const router = useRouter();
@@ -111,24 +114,33 @@ export default function ResumeManager() {
     // TODO: Fetch data for Key Skills and Languages when implemented
   }, []);
 
+  useEffect(() => {
+    if (resumeMeta) {
+      resumeMetaForm.reset({
+        id: resumeMeta.id,
+        description: resumeMeta.description || '',
+        resume_pdf_url: resumeMeta.resume_pdf_url || ''
+      });
+      setCurrentDbResumePdfUrl(resumeMeta.resume_pdf_url || null);
+    } else {
+      // Ensure form is reset to defaults if no data found
+      resumeMetaForm.reset({ id: RESUME_META_ID, description: '', resume_pdf_url: '' });
+      setCurrentDbResumePdfUrl(null);
+    }
+  }, [resumeMeta, resumeMetaForm]);
+
+
   // Fetch Resume Meta
   const fetchResumeMeta = async () => {
     setIsLoadingResumeMeta(true);
     const { data, error } = await supabase.from('resume_meta').select('*').eq('id', RESUME_META_ID).maybeSingle();
     if (error) {
       toast({ title: "Error fetching resume meta", description: error.message, variant: "destructive" });
+      setResumeMeta(null); // Explicitly set to null on error
     } else if (data) {
       setResumeMeta(data);
-      resumeMetaForm.reset({
-        id: data.id,
-        description: data.description || '',
-        resume_pdf_url: data.resume_pdf_url || ''
-      });
-      setCurrentDbResumePdfUrl(data.resume_pdf_url || null);
     } else {
-      // No data found, ensure form is reset to defaults
-      resumeMetaForm.reset({ id: RESUME_META_ID, description: '', resume_pdf_url: '' });
-      setCurrentDbResumePdfUrl(null);
+       setResumeMeta(null); // No data found
     }
     setIsLoadingResumeMeta(false);
   };
@@ -140,7 +152,7 @@ export default function ResumeManager() {
 
     if (currentDbResumePdfUrl) {
         const pathParts = currentDbResumePdfUrl.split('/resume-pdfs/');
-        if (pathParts.length > 1 && !pathParts[1].startsWith('http')) {
+        if (pathParts.length > 1 && !pathParts[1].startsWith('http')) { // Basic check to see if it's a Supabase storage path
             oldPdfStoragePathToDelete = pathParts[1];
         }
     }
@@ -149,7 +161,7 @@ export default function ResumeManager() {
       const fileName = `resume_${Date.now()}.${resumePdfFile.name.split('.').pop()}`;
       toast({ title: "Uploading Resume PDF", description: "Please wait..." });
       const { data: uploadData, error: uploadError } = await supabase.storage
-        .from('resume-pdfs')
+        .from('resume-pdfs') // Ensure this bucket name is correct
         .upload(fileName, resumePdfFile, { cacheControl: '3600', upsert: false });
 
       if (uploadError) {
@@ -166,9 +178,9 @@ export default function ResumeManager() {
     }
     
     const dataForUpsert = {
-      ...formData,
-      id: RESUME_META_ID,
-      resume_pdf_url: pdfUrlToSave || null,
+      ...formData, // Contains id, description, resume_pdf_url from form
+      id: RESUME_META_ID, // Ensure the fixed ID is always used
+      resume_pdf_url: pdfUrlToSave || null, // Use new URL or null if cleared
       updated_at: new Date().toISOString(),
     };
 
@@ -179,6 +191,7 @@ export default function ResumeManager() {
       toast({ title: "Error", description: `Failed to save resume info: ${upsertError.message}`, variant: "destructive" });
     } else {
       toast({ title: "Success", description: "Resume info saved." });
+      // Delete old PDF from storage if a new one was uploaded OR if the URL was cleared/changed
       if (oldPdfStoragePathToDelete && pdfUrlToSave !== currentDbResumePdfUrl) {
         console.log("[ResumeManager] Attempting to delete old resume PDF from storage:", oldPdfStoragePathToDelete);
         const { error: storageDeleteError } = await supabase.storage.from('resume-pdfs').remove([oldPdfStoragePathToDelete]);
@@ -189,18 +202,22 @@ export default function ResumeManager() {
           console.log("[ResumeManager] Old resume PDF successfully deleted:", oldPdfStoragePathToDelete);
         }
       }
-      fetchResumeMeta();
-      setResumePdfFile(null);
-      router.refresh();
+      fetchResumeMeta(); // Re-fetch to update currentDbResumePdfUrl and form state
+      setResumePdfFile(null); // Clear the file input after submission
+      router.refresh(); // Refresh to reflect changes on public pages if they fetch this data
     }
   };
   
   const handleResumePdfFileChange = (event: ChangeEvent<HTMLInputElement>) => {
     if (event.target.files?.[0]) {
       setResumePdfFile(event.target.files[0]);
-      resumeMetaForm.setValue('resume_pdf_url', ''); // Clear URL if file chosen
+      resumeMetaForm.setValue('resume_pdf_url', ''); // Clear URL input if file is chosen
     } else {
       setResumePdfFile(null);
+      // If file is deselected, restore URL from initial DB load if it existed
+      if (currentDbResumePdfUrl) {
+        resumeMetaForm.setValue('resume_pdf_url', currentDbResumePdfUrl);
+      }
     }
   };
 
@@ -309,6 +326,29 @@ export default function ResumeManager() {
     setIsEducationModalOpen(true);
   };
 
+  useEffect(() => {
+    if (currentExperience) {
+      experienceForm.reset({
+        ...currentExperience,
+        description_points: currentExperience.description_points?.join('\n') || '',
+        icon_image_url: currentExperience.icon_image_url || '', // Ensure this is part of reset
+      });
+    } else {
+      experienceForm.reset({ job_title: '', company_name: '', date_range: '', description_points: [], icon_image_url: '', sort_order: 0 });
+    }
+  }, [currentExperience, experienceForm]);
+
+  useEffect(() => {
+    if (currentEducation) {
+      educationForm.reset({
+        ...currentEducation,
+        icon_image_url: currentEducation.icon_image_url || '', // Ensure this is part of reset
+      });
+    } else {
+      educationForm.reset({ degree_or_certification: '', institution_name: '', date_range: '', description: '', icon_image_url: '', sort_order: 0 });
+    }
+  }, [currentEducation, educationForm]);
+
 
   return (
     <>
@@ -341,7 +381,7 @@ export default function ResumeManager() {
                   </div>
                 )}
                  <div>
-                  <Label htmlFor="resume_pdf_url_manual" className="text-xs text-muted-foreground">Or enter direct PDF URL (upload will override)</Label>
+                  <Label htmlFor="resume_pdf_url_manual" className="text-xs text-muted-foreground">Or enter direct PDF URL (upload will override if a file is chosen or if this field is cleared)</Label>
                   <Input id="resume_pdf_url_manual" {...resumeMetaForm.register("resume_pdf_url")} placeholder="https://example.com/your-resume.pdf" />
                   {resumeMetaForm.formState.errors.resume_pdf_url && <p className="text-destructive text-sm mt-1">{resumeMetaForm.formState.errors.resume_pdf_url.message}</p>}
                 </div>
@@ -450,7 +490,7 @@ export default function ResumeManager() {
           <AlertDialog open={!!experienceToDelete} onOpenChange={() => setExperienceToDelete(null)}>
             <AlertDialogContent className="bg-destructive border-destructive text-destructive-foreground">
               <AlertDialogHeader><AlertDialogTitle className="text-destructive-foreground">Delete Experience: {experienceToDelete?.job_title}?</AlertDialogTitle><AlertDialogDescription className="text-destructive-foreground/90">This action cannot be undone.</AlertDialogDescription></AlertDialogHeader>
-              <AlertDialogFooter><AlertDialogCancel className={cn(buttonVariants({ variant: "outline" }), "border-destructive-foreground/40 text-destructive-foreground hover:bg-destructive-foreground/10 hover:text-destructive-foreground hover:border-destructive-foreground/60")}>Cancel</AlertDialogCancel><AlertDialogAction onClick={handleDeleteExperience} className={cn(buttonVariants({ variant: "default" }), "bg-destructive-foreground text-destructive hover:bg-destructive-foreground/90")}>Delete</AlertDialogAction></AlertDialogFooter>
+              <AlertDialogFooter><AlertDialogCancel onClick={() => {setExperienceToDelete(null);}} className={cn(buttonVariants({ variant: "outline" }), "border-destructive-foreground/40 text-destructive-foreground hover:bg-destructive-foreground/10 hover:text-destructive-foreground hover:border-destructive-foreground/60")}>Cancel</AlertDialogCancel><AlertDialogAction onClick={handleDeleteExperience} className={cn(buttonVariants({ variant: "default" }), "bg-destructive-foreground text-destructive hover:bg-destructive-foreground/90")}>Delete</AlertDialogAction></AlertDialogFooter>
             </AlertDialogContent>
           </AlertDialog>
           
@@ -477,7 +517,7 @@ export default function ResumeManager() {
           <AlertDialog open={!!educationToDelete} onOpenChange={() => setEducationToDelete(null)}>
             <AlertDialogContent className="bg-destructive border-destructive text-destructive-foreground">
               <AlertDialogHeader><AlertDialogTitle className="text-destructive-foreground">Delete Education: {educationToDelete?.degree_or_certification}?</AlertDialogTitle><AlertDialogDescription className="text-destructive-foreground/90">This action cannot be undone.</AlertDialogDescription></AlertDialogHeader>
-              <AlertDialogFooter><AlertDialogCancel className={cn(buttonVariants({ variant: "outline" }), "border-destructive-foreground/40 text-destructive-foreground hover:bg-destructive-foreground/10 hover:text-destructive-foreground hover:border-destructive-foreground/60")}>Cancel</AlertDialogCancel><AlertDialogAction onClick={handleDeleteEducation} className={cn(buttonVariants({ variant: "default" }), "bg-destructive-foreground text-destructive hover:bg-destructive-foreground/90")}>Delete</AlertDialogAction></AlertDialogFooter>
+              <AlertDialogFooter><AlertDialogCancel onClick={() => {setEducationToDelete(null);}} className={cn(buttonVariants({ variant: "outline" }), "border-destructive-foreground/40 text-destructive-foreground hover:bg-destructive-foreground/10 hover:text-destructive-foreground hover:border-destructive-foreground/60")}>Cancel</AlertDialogCancel><AlertDialogAction onClick={handleDeleteEducation} className={cn(buttonVariants({ variant: "default" }), "bg-destructive-foreground text-destructive hover:bg-destructive-foreground/90")}>Delete</AlertDialogAction></AlertDialogFooter>
             </AlertDialogContent>
           </AlertDialog>
 
