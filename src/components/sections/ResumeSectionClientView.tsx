@@ -2,21 +2,22 @@
 "use client";
 
 import { Button } from '@/components/ui/button';
-import { Download, Eye, Briefcase, GraduationCap, ListChecks, Languages as LanguagesIcon, Building, HelpCircle, ExternalLink, Type as DefaultCategoryIcon } from 'lucide-react';
-import NextImage from 'next/image';
+import { Download, Eye, Briefcase, GraduationCap, ListChecks, Languages as LanguagesIcon, Building, ExternalLink, Type as DefaultCategoryIcon } from 'lucide-react';
+import NextImage from 'next/image'; // Changed from Image to NextImage
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogClose } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { format, parseISO } from 'date-fns';
+import { format, parseISO, isValid } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 
 import type { 
   ResumeExperience, 
   ResumeEducation, 
   ResumeKeySkillCategory, 
+  ResumeKeySkill,
   ResumeLanguage,
   ResumeMeta
 } from '@/types/supabase';
@@ -31,16 +32,25 @@ interface ResumeDetailItemProps {
 }
 
 const ResumeDetailItem: React.FC<ResumeDetailItemProps> = ({ title, subtitle, date, description, iconImageUrl, DefaultIconComponent = Building }) => {
+  let ActualIconComponent: React.ElementType = DefaultIconComponent;
+  if (iconImageUrl && typeof iconImageUrl === 'string' && iconImageUrl.startsWith('http')) {
+    // If an image URL is provided, we render an Image component
+  } else if (DefaultIconComponent) {
+    ActualIconComponent = DefaultIconComponent;
+  } else {
+    ActualIconComponent = ExternalLink; // Ultimate fallback
+  }
+
   return (
     <div className="mb-6 last:mb-0">
       <div className="flex items-start mb-1">
         <div className="flex-shrink-0 mr-3 mt-1">
-          {iconImageUrl ? (
+          {iconImageUrl && typeof iconImageUrl === 'string' && iconImageUrl.startsWith('http') ? (
             <div className="relative h-6 w-6 rounded-sm overflow-hidden border bg-muted">
               <NextImage src={iconImageUrl} alt={`${title} icon`} fill className="object-contain" sizes="24px" />
             </div>
           ) : (
-            <DefaultIconComponent className="h-6 w-6 text-primary" />
+            <ActualIconComponent className="h-6 w-6 text-primary" />
           )}
         </div>
         <div className="flex-grow">
@@ -83,11 +93,18 @@ export default function ResumeSectionClientView({
   const [formattedLastUpdated, setFormattedLastUpdated] = useState<string | null>(null);
   const { toast } = useToast();
 
+  const resumePdfUrl = resumeMetaData?.resume_pdf_url;
+  const resumeDescription = resumeMetaData?.description;
+
   useEffect(() => {
     if (resumeMetaData?.updated_at) {
       try {
         const date = parseISO(resumeMetaData.updated_at);
-        setFormattedLastUpdated(format(date, "MMMM d, yyyy 'at' h:mm a"));
+        if (isValid(date)) {
+          setFormattedLastUpdated(format(date, "MMMM d, yyyy 'at' h:mm a"));
+        } else {
+          setFormattedLastUpdated("Invalid date");
+        }
       } catch (error) {
         console.error("Error formatting resume updated_at date:", error);
         setFormattedLastUpdated("Date unavailable");
@@ -97,16 +114,43 @@ export default function ResumeSectionClientView({
     }
   }, [resumeMetaData?.updated_at]);
 
-  const handleDownloadClick = () => {
+  const handleDownloadClick = async () => {
+    if (!resumePdfUrl) {
+      toast({
+        title: "Download Unavailable",
+        description: "No resume PDF is currently available for download.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     toast({
       title: "Download Initiated",
       description: "Your resume PDF download has started.",
     });
-    // The actual download is handled by the <a> tag's href and download attributes
-  };
 
-  const resumePdfUrl = resumeMetaData?.resume_pdf_url;
-  const resumeDescription = resumeMetaData?.description;
+    try {
+      const response = await fetch(resumePdfUrl);
+      if (!response.ok) {
+        throw new Error(`Failed to fetch PDF: ${response.status} ${response.statusText}`);
+      }
+      const blob = await response.blob();
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = "Milan_Resume.pdf"; // Or a dynamic name from resumeMetaData if available
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(link.href); // Clean up
+    } catch (error) {
+      console.error("Error during PDF download:", error);
+      toast({
+        title: "Download Failed",
+        description: "Could not download the PDF. Please try again later.",
+        variant: "destructive",
+      });
+    }
+  };
 
   return (
     <>
@@ -118,17 +162,19 @@ export default function ResumeSectionClientView({
         )}
         <div className="flex flex-col sm:flex-row justify-center items-center gap-4">
           {resumePdfUrl && (
-            <>
-              <Button onClick={() => setIsPdfPreviewOpen(true)} size="lg" className="w-full sm:w-auto">
-                <Eye className="mr-2 h-5 w-5" /> Preview PDF
-              </Button>
-              <Button asChild size="lg" className="w-full sm:w-auto" onClick={handleDownloadClick}>
-                <a href={resumePdfUrl} download="Milan_Resume.pdf" target="_blank" rel="noopener noreferrer">
-                  <Download className="mr-2 h-5 w-5" /> Download PDF
-                </a>
-              </Button>
-            </>
+            <Button onClick={() => setIsPdfPreviewOpen(true)} size="lg" className="w-full sm:w-auto">
+              <Eye className="mr-2 h-5 w-5" /> Preview PDF
+            </Button>
           )}
+          <Button 
+            size="lg" 
+            className="w-full sm:w-auto" 
+            onClick={handleDownloadClick} 
+            disabled={!resumePdfUrl}
+            aria-disabled={!resumePdfUrl}
+          >
+            <Download className="mr-2 h-5 w-5" /> Download PDF
+          </Button>
         </div>
         {!resumePdfUrl && (
            <p className="text-xs text-muted-foreground mt-2">
@@ -148,7 +194,7 @@ export default function ResumeSectionClientView({
             <DialogHeader className="p-4 border-b shrink-0">
               <DialogTitle>Resume Preview</DialogTitle>
               <DialogDescription>
-                Viewing PDF. You can also download it or print from your browser's PDF viewer.
+                Viewing PDF. You can also download it using the "Download PDF" button.
               </DialogDescription>
             </DialogHeader>
             <div className="flex-grow p-0 m-0 overflow-hidden">
@@ -159,7 +205,7 @@ export default function ResumeSectionClientView({
               />
             </div>
             <DialogClose asChild>
-                <Button type="button" variant="outline" className="m-4 mt-0 self-end shrink-0">Close</Button>
+                <Button type="button" variant="outline" className="m-4 mt-0 self-end shrink-0">Close Preview</Button>
             </DialogClose>
           </DialogContent>
         </Dialog>
@@ -287,3 +333,5 @@ export default function ResumeSectionClientView({
     </>
   );
 }
+
+    
