@@ -35,7 +35,7 @@ export interface Database {
           repo_url?: string | null
           tags?: string[] | null
           status?: string | null
-          progress?: number | null
+          progress?: string | null
           created_at?: string
         }
         Update: {
@@ -47,7 +47,7 @@ export interface Database {
           repo_url?: string | null
           tags?: string[] | null
           status?: string | null
-          progress?: number | null
+          progress?: string | null
           created_at?: string
         }
         Relationships: []
@@ -310,19 +310,16 @@ export interface Database {
           id: string
           skill_name: string
           category_id: string | null
-          // created_at column removed to match SQL schema
         }
         Insert: {
           id?: string
           skill_name: string
           category_id?: string | null
-          // created_at?: string // Removed
         }
         Update: {
           id?: string
           skill_name?: string
           category_id?: string | null
-          // created_at?: string // Removed
         }
         Relationships: [
           {
@@ -360,6 +357,27 @@ export interface Database {
         }
         Relationships: []
       }
+      resume_meta: { // New table
+        Row: {
+          id: string; // Should be a fixed UUID
+          description: string | null;
+          resume_pdf_url: string | null;
+          updated_at: string;
+        }
+        Insert: {
+          id: string;
+          description?: string | null;
+          resume_pdf_url?: string | null;
+          updated_at?: string;
+        }
+        Update: {
+          id?: string;
+          description?: string | null;
+          resume_pdf_url?: string | null;
+          updated_at?: string;
+        }
+        Relationships: [];
+      }
     }
     Views: {
       [_ in never]: never
@@ -394,16 +412,16 @@ export interface Project {
 export interface Skill {
   id: string;
   name: string;
-  iconImageUrl: string | null;
+  iconImageUrl: string | null; // Changed from iconName
   description: string | null;
   categoryId?: string | null;
-  created_at?: string; // Assuming skills might have created_at from their table
+  // created_at?: string; // Assuming skills might have created_at from their table
 }
 
 export interface SkillCategory {
   id: string;
   name: string;
-  iconImageUrl?: string | null;
+  iconImageUrl?: string | null; // Changed from iconName
   skills?: Skill[];
   skillCount?: number;
   sort_order?: number | null;
@@ -417,7 +435,7 @@ export interface TimelineEvent {
   date: string;
   title: string;
   description: string;
-  iconImageUrl: string | null;
+  iconImageUrl: string | null; // Changed from iconName
   type: TimelineEventType;
   sort_order?: number | null;
   created_at?: string;
@@ -431,6 +449,7 @@ export interface Certification {
   imageUrl: string | null;
   verifyUrl?: string | null;
   created_at: string;
+  // image_hint was removed
 }
 
 export interface AboutContent {
@@ -454,7 +473,7 @@ export interface ResumeExperience {
   company_name: string;
   date_range: string | null;
   description_points: string[] | null;
-  icon_image_url: string | null;
+  icon_image_url: string | null; // Changed from icon_name
   sort_order?: number | null;
   created_at: string;
 }
@@ -465,7 +484,7 @@ export interface ResumeEducation {
   institution_name: string;
   date_range: string | null;
   description: string | null;
-  icon_image_url: string | null;
+  icon_image_url: string | null; // Changed from icon_name
   sort_order?: number | null;
   created_at: string;
 }
@@ -474,13 +493,13 @@ export interface ResumeKeySkill {
   id: string;
   skill_name: string;
   category_id?: string | null;
-  // created_at field removed
+  // icon_image_url is not on individual skills, it's on the category
 }
 
 export interface ResumeKeySkillCategory {
   id: string;
   category_name: string;
-  icon_image_url: string | null;
+  icon_image_url: string | null; // Changed from icon_name
   skills?: ResumeKeySkill[];
   sort_order?: number | null;
   created_at?: string;
@@ -490,7 +509,16 @@ export interface ResumeLanguage {
   id: string;
   language_name: string;
   proficiency: string | null;
-  icon_image_url: string | null;
+  icon_image_url: string | null; // Changed from icon_name
   sort_order?: number | null;
   created_at: string;
 }
+
+export interface ResumeMeta { // New interface
+  id: string; // Fixed ID
+  description: string | null;
+  resume_pdf_url: string | null;
+  updated_at: string;
+}
+
+    
