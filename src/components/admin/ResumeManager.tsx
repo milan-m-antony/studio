@@ -171,7 +171,7 @@ export default function ResumeManager() {
       const fileName = `resume_${Date.now()}.${resumePdfFile.name.split('.').pop()}`;
       toast({ title: "Uploading Resume PDF", description: "Please wait..." });
       const { data: uploadData, error: uploadError } = await supabase.storage
-        .from('resume-pdfs') // Ensure this bucket name is correct in your Supabase setup
+        .from('resume-pdfs')
         .upload(fileName, resumePdfFile, { cacheControl: '3600', upsert: false });
 
       if (uploadError) {
@@ -224,8 +224,12 @@ export default function ResumeManager() {
   const onExperienceSubmit: SubmitHandler<ResumeExperienceFormData> = async (formData) => {
     const dataToSave = { ...formData, description_points: formData.description_points || [], icon_image_url: formData.icon_image_url?.trim() === '' ? null : formData.icon_image_url, };
     let response;
-    if (formData.id) response = await supabase.from('resume_experience').update(dataToSave).eq('id', formData.id).select();
-    else { const { id, ...insertData } = dataToSave; response = await supabase.from('resume_experience').insert(insertData).select(); }
+    if (formData.id) {
+      response = await supabase.from('resume_experience').update(dataToSave).eq('id', formData.id).select();
+    } else { 
+      const { id, ...insertData } = dataToSave; 
+      response = await supabase.from('resume_experience').insert(insertData).select(); 
+    }
     
     if (response.error) {
       toast({ title: "Error saving experience", description: response.error.message, variant: "destructive" });
