@@ -31,6 +31,7 @@ import { z } from "zod";
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Badge } from '@/components/ui/badge'; // Added Badge import
 
 // Fixed ID for resume_meta table (single row)
 const RESUME_META_ID = '00000000-0000-0000-0000-000000000003';
@@ -156,40 +157,9 @@ export default function ResumeManager() {
   const languageForm = useForm<ResumeLanguageFormData>({ resolver: zodResolver(resumeLanguageSchema), defaultValues: { language_name: '', proficiency: '', icon_image_url: '', sort_order: 0 }});
 
   // Fetch Resume Meta
-  const fetchResumeMeta = async () => {
-    setIsLoadingResumeMeta(true);
-    const { data, error } = await supabase.from('resume_meta').select('*').eq('id', RESUME_META_ID).maybeSingle();
-    if (error) { toast({ title: "Error fetching resume meta", description: error.message, variant: "destructive" }); setResumeMeta(null); }
-    else if (data) { setResumeMeta(data); resumeMetaForm.reset({ id: data.id, description: data.description || '', resume_pdf_url: data.resume_pdf_url || '' }); setCurrentDbResumePdfUrl(data.resume_pdf_url || null); }
-    else { setResumeMeta(null); resumeMetaForm.reset({ id: RESUME_META_ID, description: '', resume_pdf_url: '' }); setCurrentDbResumePdfUrl(null); }
-    setIsLoadingResumeMeta(false);
-  };
-
-  const handleResumePdfFileChange = (event: ChangeEvent<HTMLInputElement>) => {
-    if (event.target.files?.[0]) { setResumePdfFile(event.target.files[0]); resumeMetaForm.setValue('resume_pdf_url', ''); }
-    else { setResumePdfFile(null); if (currentDbResumePdfUrl) { resumeMetaForm.setValue('resume_pdf_url', currentDbResumePdfUrl); } }
-  };
-
-  const onResumeMetaSubmit: SubmitHandler<ResumeMetaFormData> = async (formData) => {
-    setIsLoadingResumeMeta(true);
-    let pdfUrlToSave = formData.resume_pdf_url;
-    let oldPdfStoragePathToDelete: string | null = null;
-    if (currentDbResumePdfUrl) { try { const url = new URL(currentDbResumePdfUrl); const pathParts = url.pathname.split('/resume-pdfs/'); if (pathParts.length > 1 && !pathParts[1].startsWith('http')) { oldPdfStoragePathToDelete = pathParts[1]; } } catch (e) { console.warn("[ResumeManager] Could not parse currentDbResumePdfUrl:", currentDbResumePdfUrl); } }
-    if (resumePdfFile) {
-      const fileExt = resumePdfFile.name.split('.').pop(); const fileName = `resume_${Date.now()}.${fileExt}`; const filePath = `${fileName}`;
-      toast({ title: "Uploading Resume PDF", description: "Please wait..." });
-      const { error: uploadError } = await supabase.storage.from('resume-pdfs').upload(filePath, resumePdfFile, { cacheControl: '3600', upsert: false });
-      if (uploadError) { toast({ title: "Upload Error", description: `Failed to upload PDF: ${uploadError.message}`, variant: "destructive" }); setIsLoadingResumeMeta(false); return; }
-      const { data: publicUrlData } = supabase.storage.from('resume-pdfs').getPublicUrl(filePath);
-      if (!publicUrlData?.publicUrl) { toast({ title: "Error", description: "Failed to get public URL for PDF.", variant: "destructive" }); setIsLoadingResumeMeta(false); return; }
-      pdfUrlToSave = publicUrlData.publicUrl;
-    }
-    const dataForUpsert = { id: RESUME_META_ID, description: formData.description || null, resume_pdf_url: pdfUrlToSave || null, updated_at: new Date().toISOString() };
-    const { error: upsertError } = await supabase.from('resume_meta').upsert(dataForUpsert, { onConflict: 'id' });
-    if (upsertError) { toast({ title: "Error", description: `Failed to save resume info: ${upsertError.message}`, variant: "destructive" }); }
-    else { toast({ title: "Success", description: "Resume info saved." }); if (oldPdfStoragePathToDelete && pdfUrlToSave !== currentDbResumePdfUrl) { const { error: storageDeleteError } = await supabase.storage.from('resume-pdfs').remove([oldPdfStoragePathToDelete]); if (storageDeleteError) { toast({title: "Storage Warning", description: `Updated content, but failed to delete old PDF: ${storageDeleteError.message}`, variant: "default"}); } } fetchResumeMeta(); router.refresh(); }
-    setResumePdfFile(null); setIsLoadingResumeMeta(false);
-  };
+  const fetchResumeMeta = async () => { setIsLoadingResumeMeta(true); const { data, error } = await supabase.from('resume_meta').select('*').eq('id', RESUME_META_ID).maybeSingle(); if (error) { toast({ title: "Error fetching resume meta", description: error.message, variant: "destructive" }); setResumeMeta(null); } else if (data) { setResumeMeta(data); resumeMetaForm.reset({ id: data.id, description: data.description || '', resume_pdf_url: data.resume_pdf_url || '' }); setCurrentDbResumePdfUrl(data.resume_pdf_url || null); } else { setResumeMeta(null); resumeMetaForm.reset({ id: RESUME_META_ID, description: '', resume_pdf_url: '' }); setCurrentDbResumePdfUrl(null); } setIsLoadingResumeMeta(false); };
+  const handleResumePdfFileChange = (event: ChangeEvent<HTMLInputElement>) => { if (event.target.files?.[0]) { setResumePdfFile(event.target.files[0]); resumeMetaForm.setValue('resume_pdf_url', ''); } else { setResumePdfFile(null); if (currentDbResumePdfUrl) { resumeMetaForm.setValue('resume_pdf_url', currentDbResumePdfUrl); } } };
+  const onResumeMetaSubmit: SubmitHandler<ResumeMetaFormData> = async (formData) => { setIsLoadingResumeMeta(true); let pdfUrlToSave = formData.resume_pdf_url; let oldPdfStoragePathToDelete: string | null = null; if (currentDbResumePdfUrl) { try { const url = new URL(currentDbResumePdfUrl); const pathParts = url.pathname.split('/resume-pdfs/'); if (pathParts.length > 1 && !pathParts[1].startsWith('http')) { oldPdfStoragePathToDelete = pathParts[1]; } } catch (e) { console.warn("[ResumeManager] Could not parse currentDbResumePdfUrl:", currentDbResumePdfUrl); } } if (resumePdfFile) { const fileExt = resumePdfFile.name.split('.').pop(); const fileName = `resume_${Date.now()}.${fileExt}`; const filePath = `${fileName}`; toast({ title: "Uploading Resume PDF", description: "Please wait..." }); const { error: uploadError } = await supabase.storage.from('resume-pdfs').upload(filePath, resumePdfFile, { cacheControl: '3600', upsert: false }); if (uploadError) { toast({ title: "Upload Error", description: `Failed to upload PDF: ${uploadError.message}`, variant: "destructive" }); setIsLoadingResumeMeta(false); return; } const { data: publicUrlData } = supabase.storage.from('resume-pdfs').getPublicUrl(filePath); if (!publicUrlData?.publicUrl) { toast({ title: "Error", description: "Failed to get public URL for PDF.", variant: "destructive" }); setIsLoadingResumeMeta(false); return; } pdfUrlToSave = publicUrlData.publicUrl; } const dataForUpsert = { id: RESUME_META_ID, description: formData.description || null, resume_pdf_url: pdfUrlToSave || null, updated_at: new Date().toISOString() }; const { error: upsertError } = await supabase.from('resume_meta').upsert(dataForUpsert, { onConflict: 'id' }); if (upsertError) { toast({ title: "Error", description: `Failed to save resume info: ${upsertError.message}`, variant: "destructive" }); } else { toast({ title: "Success", description: "Resume info saved." }); if (oldPdfStoragePathToDelete && pdfUrlToSave !== currentDbResumePdfUrl) { const { error: storageDeleteError } = await supabase.storage.from('resume-pdfs').remove([oldPdfStoragePathToDelete]); if (storageDeleteError) { toast({title: "Storage Warning", description: `Updated content, but failed to delete old PDF: ${storageDeleteError.message}`, variant: "default"}); } } fetchResumeMeta(); router.refresh(); } setResumePdfFile(null); setIsLoadingResumeMeta(false); };
 
   // Experience CRUD
   const fetchExperiences = async () => { setIsLoadingExperiences(true); const { data, error } = await supabase.from('resume_experience').select('*').order('sort_order', { ascending: true }); if (error) { toast({ title: "Error fetching experiences", description: error.message, variant: "destructive" }); setExperiences([]); } else { setExperiences((data || []).map(item => ({ ...item, description_points: item.description_points || [], icon_image_url: item.icon_image_url || null }))); } setIsLoadingExperiences(false); };
@@ -298,7 +268,7 @@ export default function ResumeManager() {
       </Card>
 
       {/* Modals & Dialogs */}
-      {/* Experience Modal & Delete Dialog (existing) */}
+      {/* Experience Modal & Delete Dialog */}
       <Dialog open={isExperienceModalOpen} onOpenChange={(isOpen) => { setIsExperienceModalOpen(isOpen); if (!isOpen) setCurrentExperience(null); }}>
         <DialogContent className="sm:max-w-[525px]"><DialogHeader><DialogTitle>{currentExperience ? 'Edit Experience' : 'Add New Experience'}</DialogTitle></DialogHeader>
           <form onSubmit={experienceForm.handleSubmit(onExperienceSubmit)} className="grid gap-4 py-4">
@@ -316,7 +286,7 @@ export default function ResumeManager() {
       </Dialog>
       <AlertDialog open={showExperienceDeleteConfirm} onOpenChange={setShowExperienceDeleteConfirm}><AlertDialogContent className="bg-destructive border-destructive text-destructive-foreground"><AlertDialogHeader><AlertDialogTitle className="text-destructive-foreground">Delete Experience: {experienceToDelete?.job_title}?</AlertDialogTitle><AlertDialogDescription className="text-destructive-foreground/90">This cannot be undone.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel onClick={() => { setExperienceToDelete(null); setShowExperienceDeleteConfirm(false); }} className={cn(buttonVariants({ variant: "outline" }), "border-destructive-foreground/40 text-destructive-foreground hover:bg-destructive-foreground/10 hover:text-destructive-foreground hover:border-destructive-foreground/60")}>Cancel</AlertDialogCancel><AlertDialogAction onClick={handleDeleteExperience} className={cn(buttonVariants({ variant: "default" }), "bg-destructive-foreground text-destructive hover:bg-destructive-foreground/90")}>Delete</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
 
-      {/* Education Modal & Delete Dialog (existing) */}
+      {/* Education Modal & Delete Dialog */}
       <Dialog open={isEducationModalOpen} onOpenChange={(isOpen) => { setIsEducationModalOpen(isOpen); if (!isOpen) setCurrentEducation(null); }}><DialogContent className="sm:max-w-[525px]"><DialogHeader><DialogTitle>{currentEducation ? 'Edit Education' : 'Add New Education'}</DialogTitle></DialogHeader><form onSubmit={educationForm.handleSubmit(onEducationSubmit)} className="grid gap-4 py-4"><ScrollArea className="max-h-[70vh] p-1"><div className="grid gap-4 p-3"><div><Label htmlFor="degree_or_certification">Degree/Certification</Label><Input id="degree_or_certification" {...educationForm.register("degree_or_certification")} />{educationForm.formState.errors.degree_or_certification && <p className="text-destructive text-sm mt-1">{educationForm.formState.errors.degree_or_certification.message}</p>}</div><div><Label htmlFor="institution_name">Institution Name</Label><Input id="institution_name" {...educationForm.register("institution_name")} />{educationForm.formState.errors.institution_name && <p className="text-destructive text-sm mt-1">{educationForm.formState.errors.institution_name.message}</p>}</div><div><Label htmlFor="edu_date_range">Date Range</Label><Input id="edu_date_range" {...educationForm.register("date_range")} /></div><div><Label htmlFor="edu_description">Description (Optional)</Label><Textarea id="edu_description" {...educationForm.register("description")} rows={3} /></div><div><Label htmlFor="edu_icon_image_url">Icon Image URL (Optional)</Label><Input id="edu_icon_image_url" {...educationForm.register("icon_image_url")} placeholder="https://..." />{educationForm.formState.errors.icon_image_url && <p className="text-destructive text-sm mt-1">{educationForm.formState.errors.icon_image_url.message}</p>}{educationForm.watch("icon_image_url") && (<div className="mt-2 flex items-center gap-2"><span className="text-xs">Preview:</span><IconPreview url={educationForm.watch("icon_image_url")} DefaultIcon={GraduationCap}/></div>)}</div><div><Label htmlFor="edu_sort_order">Sort Order</Label><Input id="edu_sort_order" type="number" {...educationForm.register("sort_order")} /></div></div></ScrollArea><DialogFooter><DialogClose asChild><Button type="button" variant="outline">Cancel</Button></DialogClose><Button type="submit">{currentEducation ? 'Save Changes' : 'Add Education'}</Button></DialogFooter></form></DialogContent></Dialog>
       <AlertDialog open={showEducationDeleteConfirm} onOpenChange={setShowEducationDeleteConfirm}><AlertDialogContent className="bg-destructive border-destructive text-destructive-foreground"><AlertDialogHeader><AlertDialogTitle className="text-destructive-foreground">Delete Education: {educationToDelete?.degree_or_certification}?</AlertDialogTitle><AlertDialogDescription className="text-destructive-foreground/90">This cannot be undone.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel onClick={() => { setEducationToDelete(null); setShowEducationDeleteConfirm(false);}} className={cn(buttonVariants({ variant: "outline" }), "border-destructive-foreground/40 text-destructive-foreground hover:bg-destructive-foreground/10 hover:text-destructive-foreground hover:border-destructive-foreground/60")}>Cancel</AlertDialogCancel><AlertDialogAction onClick={handleDeleteEducation} className={cn(buttonVariants({ variant: "default" }), "bg-destructive-foreground text-destructive hover:bg-destructive-foreground/90")}>Delete</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
 
