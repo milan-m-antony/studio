@@ -35,7 +35,7 @@ export interface Database {
           repo_url?: string | null
           tags?: string[] | null
           status?: string | null
-          progress?: string | null
+          progress?: number | null // Changed from string to number
           created_at?: string
         }
         Update: {
@@ -47,7 +47,7 @@ export interface Database {
           repo_url?: string | null
           tags?: string[] | null
           status?: string | null
-          progress?: string | null
+          progress?: number | null // Changed from string to number
           created_at?: string
         }
         Relationships: []
@@ -215,6 +215,27 @@ export interface Database {
         }
         Relationships: []
       }
+      resume_meta: {
+        Row: {
+          id: string;
+          description: string | null;
+          resume_pdf_url: string | null;
+          updated_at: string;
+        }
+        Insert: {
+          id: string;
+          description?: string | null;
+          resume_pdf_url?: string | null;
+          updated_at?: string;
+        }
+        Update: {
+          id?: string;
+          description?: string | null;
+          resume_pdf_url?: string | null;
+          updated_at?: string;
+        }
+        Relationships: [];
+      }
       resume_experience: {
         Row: {
           id: string
@@ -357,23 +378,35 @@ export interface Database {
         }
         Relationships: []
       }
-      resume_meta: { // New table
+      hero_content: { // New table for Hero section
         Row: {
-          id: string; // Should be a fixed UUID
-          description: string | null;
-          resume_pdf_url: string | null;
+          id: string; // Fixed UUID
+          main_name: string | null;
+          subtitles: string[] | null; // Array of strings for typewriter
+          social_github_url: string | null;
+          social_linkedin_url: string | null;
+          social_instagram_url: string | null;
+          social_facebook_url: string | null;
           updated_at: string;
         }
         Insert: {
           id: string;
-          description?: string | null;
-          resume_pdf_url?: string | null;
+          main_name?: string | null;
+          subtitles?: string[] | null;
+          social_github_url?: string | null;
+          social_linkedin_url?: string | null;
+          social_instagram_url?: string | null;
+          social_facebook_url?: string | null;
           updated_at?: string;
         }
         Update: {
           id?: string;
-          description?: string | null;
-          resume_pdf_url?: string | null;
+          main_name?: string | null;
+          subtitles?: string[] | null;
+          social_github_url?: string | null;
+          social_linkedin_url?: string | null;
+          social_instagram_url?: string | null;
+          social_facebook_url?: string | null;
           updated_at?: string;
         }
         Relationships: [];
@@ -400,9 +433,9 @@ export interface Project {
   id: string;
   title: string;
   description: string | null;
-  imageUrl: string | null;
-  liveDemoUrl?: string | null;
-  repoUrl?: string | null;
+  imageUrl: string | null; // Mapped from image_url
+  liveDemoUrl?: string | null; // Mapped from live_demo_url
+  repoUrl?: string | null; // Mapped from repo_url
   tags: string[] | null;
   status: ProjectStatus | null;
   progress?: number | null;
@@ -412,18 +445,18 @@ export interface Project {
 export interface Skill {
   id: string;
   name: string;
-  iconImageUrl: string | null; // Changed from iconName
+  iconImageUrl: string | null; // Changed from iconName, now URL
   description: string | null;
   categoryId?: string | null;
-  // created_at?: string; // Assuming skills might have created_at from their table
+  created_at?: string;
 }
 
 export interface SkillCategory {
   id: string;
   name: string;
-  iconImageUrl?: string | null; // Changed from iconName
+  iconImageUrl?: string | null; // Changed from iconName, now URL
   skills?: Skill[];
-  skillCount?: number;
+  skillCount?: number; // Helper for UI, not in DB
   sort_order?: number | null;
   created_at?: string;
 }
@@ -435,7 +468,7 @@ export interface TimelineEvent {
   date: string;
   title: string;
   description: string;
-  iconImageUrl: string | null; // Changed from iconName
+  iconImageUrl: string | null; // Changed from iconName, now URL
   type: TimelineEventType;
   sort_order?: number | null;
   created_at?: string;
@@ -446,10 +479,9 @@ export interface Certification {
   title: string;
   issuer: string;
   date: string;
-  imageUrl: string | null;
-  verifyUrl?: string | null;
+  imageUrl: string | null; // Mapped from image_url
+  verifyUrl?: string | null; // Mapped from verify_url
   created_at: string;
-  // image_hint was removed
 }
 
 export interface AboutContent {
@@ -461,12 +493,18 @@ export interface AboutContent {
   paragraph1: string | null;
   paragraph2: string | null;
   paragraph3: string | null;
-  imageUrl: string | null;
+  imageUrl: string | null; // Mapped from image_url
   image_tagline: string | null;
   updated_at?: string;
 }
 
-// Resume Section Types
+export interface ResumeMeta {
+  id: string;
+  description: string | null;
+  resume_pdf_url: string | null;
+  updated_at: string;
+}
+
 export interface ResumeExperience {
   id: string;
   job_title: string;
@@ -493,7 +531,6 @@ export interface ResumeKeySkill {
   id: string;
   skill_name: string;
   category_id?: string | null;
-  // icon_image_url is not on individual skills, it's on the category
 }
 
 export interface ResumeKeySkillCategory {
@@ -514,10 +551,14 @@ export interface ResumeLanguage {
   created_at: string;
 }
 
-export interface ResumeMeta { // New interface
-  id: string; // Fixed ID
-  description: string | null;
-  resume_pdf_url: string | null;
+export interface HeroContent { // New interface for Hero section
+  id: string;
+  main_name: string | null;
+  subtitles: string[] | null;
+  social_github_url: string | null;
+  social_linkedin_url: string | null;
+  social_instagram_url: string | null;
+  social_facebook_url: string | null;
   updated_at: string;
 }
 

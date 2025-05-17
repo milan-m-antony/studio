@@ -11,12 +11,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { ShieldCheck, LogOut, AlertTriangle, LogIn, Home } from 'lucide-react';
 import Link from 'next/link';
+
 import ProjectsManager from '@/components/admin/ProjectsManager';
 import SkillsManager from '@/components/admin/SkillsManager';
 import AboutManager from '@/components/admin/AboutManager';
 import TimelineManager from '@/components/admin/TimelineManager';
 import CertificationsManager from '@/components/admin/CertificationsManager';
-import ResumeManager from '@/components/admin/ResumeManager'; // Import the new ResumeManager
+import ResumeManager from '@/components/admin/ResumeManager';
+import HeroManager from '@/components/admin/HeroManager'; // Import the new HeroManager
 import SectionWrapper from '@/components/ui/SectionWrapper';
 
 export default function AdminDashboardPage() {
@@ -134,13 +136,16 @@ export default function AdminDashboardPage() {
       </div>
 
       <div className="space-y-12">
+        <HeroManager /> {/* Add the new HeroManager here */}
         <ProjectsManager />
         <SkillsManager />
         <AboutManager />
         <TimelineManager />
         <CertificationsManager />
-        <ResumeManager /> {/* Add the new ResumeManager here */}
+        <ResumeManager />
       </div>
     </SectionWrapper>
   );
 }
+
+    
