@@ -7,22 +7,12 @@ import Link from 'next/link';
 import type { LucideIcon } from 'lucide-react';
 import * as LucideIcons from 'lucide-react';
 import type { ContactPageDetail, SocialLink } from '@/types/supabase';
+import NextImage from 'next/image'; // For social link icons
 
 interface ContactSectionClientViewProps {
   contactDetails: ContactPageDetail | null;
   socialLinks: SocialLink[];
 }
-
-const getLucideIcon = (iconName: string | null, DefaultIcon: LucideIcon): LucideIcon => {
-  if (iconName && LucideIcons[iconName as keyof typeof LucideIcons]) {
-    const Icon = LucideIcons[iconName as keyof typeof LucideIcons] as LucideIcon;
-    if (typeof Icon === 'function') { // Check if it's a component
-      return Icon;
-    }
-  }
-  return DefaultIcon;
-};
-
 
 export default function ContactSectionClientView({ contactDetails, socialLinks }: ContactSectionClientViewProps) {
   
@@ -40,7 +30,7 @@ export default function ContactSectionClientView({ contactDetails, socialLinks }
   const currentEmail = contactDetails?.email || defaultContactDetails.email;
   const currentEmailHref = contactDetails?.email_href || defaultContactDetails.email_href;
 
-  const DefaultSocialIcon = LucideIcons.Link2; // Fallback for social links if icon_name is invalid
+  const DefaultSocialIcon = LucideIcons.Link2; 
 
   return (
     <Card className="max-w-5xl mx-auto shadow-xl">
@@ -84,10 +74,21 @@ export default function ContactSectionClientView({ contactDetails, socialLinks }
             <div className="space-y-4">
               {socialLinks && socialLinks.length > 0 ? (
                 socialLinks.map((social) => {
-                  const IconComponent = getLucideIcon(social.icon_name, DefaultSocialIcon);
                   return (
                     <div key={social.id} className="flex items-center gap-3">
-                      <IconComponent className="h-5 w-5 text-primary flex-shrink-0" />
+                      {social.icon_image_url ? (
+                        <div className="relative h-5 w-5 rounded-sm overflow-hidden">
+                          <NextImage 
+                            src={social.icon_image_url} 
+                            alt={`${social.label} icon`} 
+                            layout="fill" 
+                            objectFit="contain" 
+                            className="dark:filter dark:brightness-0 dark:invert"
+                          />
+                        </div>
+                      ) : (
+                        <DefaultSocialIcon className="h-5 w-5 text-primary flex-shrink-0" />
+                      )}
                       <Link href={social.url} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-[hsl(var(--primary-hover))] transition-colors text-sm break-all">
                         {social.display_text || social.label}
                       </Link>
@@ -111,3 +112,5 @@ export default function ContactSectionClientView({ contactDetails, socialLinks }
     </Card>
   );
 }
+
+    

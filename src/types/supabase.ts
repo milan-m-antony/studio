@@ -56,7 +56,7 @@ export interface Database {
         Row: {
           id: string
           name: string
-          icon_image_url: string | null
+          icon_image_url: string | null // Changed from icon_name
           sort_order: number | null
           created_at: string
         }
@@ -80,7 +80,7 @@ export interface Database {
         Row: {
           id: string
           name: string
-          icon_image_url: string | null
+          icon_image_url: string | null // Changed from icon_name
           description: string | null
           category_id: string | null
           created_at: string
@@ -146,7 +146,7 @@ export interface Database {
           date: string
           title: string
           description: string
-          icon_image_url: string | null
+          icon_image_url: string | null // Changed from icon_name
           type: string
           sort_order: number | null
           created_at: string
@@ -243,7 +243,7 @@ export interface Database {
           company_name: string
           date_range: string | null
           description_points: string[] | null
-          icon_image_url: string | null
+          icon_image_url: string | null // Changed from icon_name
           sort_order: number | null
           created_at: string
         }
@@ -276,7 +276,7 @@ export interface Database {
           institution_name: string
           date_range: string | null
           description: string | null
-          icon_image_url: string | null
+          icon_image_url: string | null // Changed from icon_name
           sort_order: number | null
           created_at: string
         }
@@ -306,7 +306,7 @@ export interface Database {
         Row: {
           id: string
           category_name: string
-          icon_image_url: string | null
+          icon_image_url: string | null // Changed from icon_name
           sort_order: number | null
           created_at: string
         }
@@ -356,7 +356,7 @@ export interface Database {
           id: string
           language_name: string
           proficiency: string | null
-          icon_image_url: string | null
+          icon_image_url: string | null // Changed from icon_name
           sort_order: number | null
           created_at: string
         }
@@ -380,9 +380,9 @@ export interface Database {
       }
       hero_content: {
         Row: {
-          id: string; 
+          id: string;
           main_name: string | null;
-          subtitles: string[] | null; 
+          subtitles: string[] | null;
           social_github_url: string | null;
           social_linkedin_url: string | null;
           social_instagram_url: string | null;
@@ -411,9 +411,9 @@ export interface Database {
         }
         Relationships: [];
       }
-      contact_page_details: { // New
+      contact_page_details: {
         Row: {
-          id: string; // Fixed UUID
+          id: string;
           address: string | null;
           phone: string | null;
           phone_href: string | null;
@@ -441,11 +441,11 @@ export interface Database {
         }
         Relationships: [];
       }
-      social_links: { // New
+      social_links: {
         Row: {
           id: string;
           label: string;
-          icon_name: string | null; // Lucide icon name
+          icon_image_url: string | null; // Changed from icon_name
           url: string;
           display_text: string | null;
           sort_order: number | null;
@@ -454,7 +454,7 @@ export interface Database {
         Insert: {
           id?: string;
           label: string;
-          icon_name?: string | null;
+          icon_image_url?: string | null; // Changed
           url: string;
           display_text?: string | null;
           sort_order?: number | null;
@@ -463,7 +463,7 @@ export interface Database {
         Update: {
           id?: string;
           label?: string;
-          icon_name?: string | null;
+          icon_image_url?: string | null; // Changed
           url?: string;
           display_text?: string | null;
           sort_order?: number | null;
@@ -471,7 +471,7 @@ export interface Database {
         }
         Relationships: [];
       }
-      contact_submissions: { // New
+      contact_submissions: {
         Row: {
           id: string;
           name: string;
@@ -479,10 +479,10 @@ export interface Database {
           subject: string | null;
           message: string;
           phone_number: string | null;
-          status: string | null; // 'New', 'Replied', 'Archived'
+          status: string | null;
           is_starred: boolean | null;
           submitted_at: string;
-          notes: string | null; // Admin notes
+          notes: string | null;
         }
         Insert: {
           id?: string;
@@ -532,7 +532,7 @@ export interface Project {
   id: string;
   title: string;
   description: string | null;
-  imageUrl: string | null;
+  imageUrl: string | null; // Mapped from image_url
   liveDemoUrl?: string | null;
   repoUrl?: string | null;
   tags: string[] | null;
@@ -544,7 +544,7 @@ export interface Project {
 export interface Skill {
   id: string;
   name: string;
-  iconImageUrl: string | null;
+  iconImageUrl: string | null; // Mapped from icon_image_url
   description: string | null;
   categoryId?: string | null;
   created_at?: string;
@@ -553,9 +553,8 @@ export interface Skill {
 export interface SkillCategory {
   id: string;
   name: string;
-  iconImageUrl?: string | null;
+  iconImageUrl?: string | null; // Mapped from icon_image_url
   skills?: Skill[];
-  skillCount?: number; 
   sort_order?: number | null;
   created_at?: string;
 }
@@ -567,7 +566,7 @@ export interface TimelineEvent {
   date: string;
   title: string;
   description: string;
-  iconImageUrl: string | null;
+  iconImageUrl: string | null; // Mapped from icon_image_url
   type: TimelineEventType;
   sort_order?: number | null;
   created_at?: string;
@@ -578,7 +577,7 @@ export interface Certification {
   title: string;
   issuer: string;
   date: string;
-  imageUrl: string | null;
+  imageUrl: string | null; // Mapped from image_url
   verifyUrl?: string | null;
   created_at: string;
 }
@@ -592,7 +591,7 @@ export interface AboutContent {
   paragraph1: string | null;
   paragraph2: string | null;
   paragraph3: string | null;
-  imageUrl: string | null;
+  imageUrl: string | null; // Mapped from image_url
   image_tagline: string | null;
   updated_at?: string;
 }
@@ -610,7 +609,7 @@ export interface ResumeExperience {
   company_name: string;
   date_range: string | null;
   description_points: string[] | null;
-  icon_image_url: string | null;
+  icon_image_url: string | null; // Changed from icon_name
   sort_order?: number | null;
   created_at: string;
 }
@@ -621,7 +620,7 @@ export interface ResumeEducation {
   institution_name: string;
   date_range: string | null;
   description: string | null;
-  icon_image_url: string | null;
+  icon_image_url: string | null; // Changed from icon_name
   sort_order?: number | null;
   created_at: string;
 }
@@ -630,12 +629,13 @@ export interface ResumeKeySkill {
   id: string;
   skill_name: string;
   category_id?: string | null;
+  // No icon_image_url for individual skills as per schema
 }
 
 export interface ResumeKeySkillCategory {
   id: string;
   category_name: string;
-  icon_image_url: string | null;
+  icon_image_url: string | null; // Changed from icon_name
   skills?: ResumeKeySkill[];
   sort_order?: number | null;
   created_at: string;
@@ -645,7 +645,7 @@ export interface ResumeLanguage {
   id: string;
   language_name: string;
   proficiency: string | null;
-  icon_image_url: string | null;
+  icon_image_url: string | null; // Changed from icon_name
   sort_order?: number | null;
   created_at: string;
 }
@@ -661,9 +661,8 @@ export interface HeroContent {
   updated_at: string;
 }
 
-// New Types for Contact Section Management
 export interface ContactPageDetail {
-  id: string; // Fixed UUID
+  id: string;
   address: string | null;
   phone: string | null;
   phone_href: string | null;
@@ -675,7 +674,7 @@ export interface ContactPageDetail {
 export interface SocialLink {
   id: string;
   label: string;
-  icon_name: string | null; // Lucide Icon Name
+  icon_image_url: string | null; // Changed from icon_name
   url: string;
   display_text: string | null;
   sort_order?: number | null;
@@ -689,8 +688,10 @@ export interface ContactSubmission {
   subject: string | null;
   message: string;
   phone_number: string | null;
-  status?: 'New' | 'Replied' | 'Archived' | string | null; // Allow string for flexibility if more statuses are added
+  status?: 'New' | 'Replied' | 'Archived' | string | null;
   is_starred?: boolean | null;
   submitted_at: string;
-  notes?: string | null; // Admin notes
+  notes?: string | null;
 }
+
+    

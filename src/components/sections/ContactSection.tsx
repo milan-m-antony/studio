@@ -3,11 +3,10 @@
 
 import SectionWrapper from '@/components/ui/SectionWrapper';
 import SectionTitle from '@/components/ui/SectionTitle';
-import ContactSectionClientView from './ContactSectionClientView'; // New Client Component
+import ContactSectionClientView from './ContactSectionClientView';
 import { supabase } from '@/lib/supabaseClient';
 import type { ContactPageDetail, SocialLink } from '@/types/supabase';
 
-// Fixed ID for the single contact_page_details entry
 const PRIMARY_CONTACT_DETAILS_ID = '00000000-0000-0000-0000-000000000005';
 
 async function getContactPageDetails(): Promise<ContactPageDetail | null> {
@@ -27,14 +26,16 @@ async function getContactPageDetails(): Promise<ContactPageDetail | null> {
 async function getSocialLinks(): Promise<SocialLink[]> {
   const { data, error } = await supabase
     .from('social_links')
-    .select('*')
+    .select('id, label, icon_image_url, url, display_text, sort_order, created_at') // Ensure icon_image_url is selected
     .order('sort_order', { ascending: true });
 
   if (error) {
     console.error('Error fetching social links:', JSON.stringify(error, null, 2));
     return [];
   }
-  return data || [];
+  // Map icon_image_url from the database to the camelCase prop if needed,
+  // but our type already uses icon_image_url, so direct mapping is fine.
+  return (data || []).map(link => ({ ...link, icon_image_url: link.icon_image_url || null }));
 }
 
 export default async function ContactSection() {
@@ -42,6 +43,12 @@ export default async function ContactSection() {
     getContactPageDetails(),
     getSocialLinks()
   ]);
+
+  // The page.tsx has force-dynamic, so this section will re-fetch on each page load.
+  // router.refresh() in the admin panel also helps trigger re-fetches for server components.
+  console.log('[ContactSection] Fetched social links count:', socialLinks.length);
+  console.log('[ContactSection] Fetched contact details address:', contactDetails?.address);
+
 
   return (
     <SectionWrapper id="contact" className="bg-background section-fade-in" style={{ animationDelay: '1.4s' }}>
@@ -53,3 +60,4 @@ export default async function ContactSection() {
   );
 }
 
+    

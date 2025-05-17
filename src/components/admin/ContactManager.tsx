@@ -7,7 +7,7 @@ import { Button, buttonVariants } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
-import { PlusCircle, Edit, Trash2, Mail, Link as LinkIcon, Phone, MapPin, Save } from 'lucide-react';
+import { PlusCircle, Edit, Trash2, Mail, Link as LinkIcon, Phone, MapPin, Save, Image as ImageIcon } from 'lucide-react'; // Added ImageIcon
 import { supabase } from '@/lib/supabaseClient';
 import type { ContactPageDetail, SocialLink } from '@/types/supabase';
 import {
@@ -35,6 +35,7 @@ import { z } from "zod";
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import NextImage from 'next/image'; // For image previews
 
 const PRIMARY_CONTACT_DETAILS_ID = '00000000-0000-0000-0000-000000000005'; // Fixed ID
 
@@ -52,7 +53,7 @@ type ContactPageDetailsFormData = z.infer<typeof contactPageDetailsSchema>;
 const socialLinkSchema = z.object({
   id: z.string().uuid().optional(),
   label: z.string().min(1, "Label is required"),
-  icon_name: z.string().optional().nullable(),
+  icon_image_url: z.string().url("Must be a valid URL if provided.").optional().or(z.literal("")).nullable(), // Changed from icon_name
   url: z.string().url("Must be a valid URL"),
   display_text: z.string().optional().nullable(),
   sort_order: z.coerce.number().optional().default(0),
@@ -63,7 +64,6 @@ export default function ContactManager() {
   const router = useRouter();
   const { toast } = useToast();
 
-  // Contact Page Details State & Form
   const [isLoadingContactDetails, setIsLoadingContactDetails] = useState(false);
   const contactDetailsForm = useForm<ContactPageDetailsFormData>({
     resolver: zodResolver(contactPageDetailsSchema),
@@ -73,7 +73,6 @@ export default function ContactManager() {
     }
   });
 
-  // Social Links State & Form
   const [socialLinks, setSocialLinks] = useState<SocialLink[]>([]);
   const [isLoadingSocialLinks, setIsLoadingSocialLinks] = useState(false);
   const [isSocialLinkModalOpen, setIsSocialLinkModalOpen] = useState(false);
@@ -82,10 +81,9 @@ export default function ContactManager() {
   const [socialLinkToDelete, setSocialLinkToDelete] = useState<SocialLink | null>(null);
   const socialLinkForm = useForm<SocialLinkFormData>({
     resolver: zodResolver(socialLinkSchema),
-    defaultValues: { label: '', icon_name: '', url: '', display_text: '', sort_order: 0 }
+    defaultValues: { label: '', icon_image_url: '', url: '', display_text: '', sort_order: 0 }
   });
 
-  // Fetch Contact Details
   const fetchContactDetails = async () => {
     setIsLoadingContactDetails(true);
     const { data, error } = await supabase
@@ -101,7 +99,6 @@ export default function ContactManager() {
     setIsLoadingContactDetails(false);
   };
 
-  // Fetch Social Links
   const fetchSocialLinks = async () => {
     setIsLoadingSocialLinks(true);
     const { data, error } = await supabase
@@ -112,7 +109,7 @@ export default function ContactManager() {
       toast({ title: "Error", description: `Could not fetch social links: ${error.message}`, variant: "destructive" });
       setSocialLinks([]);
     } else {
-      setSocialLinks(data || []);
+      setSocialLinks(data.map(link => ({ ...link, icon_image_url: link.icon_image_url || null })) || []);
     }
     setIsLoadingSocialLinks(false);
   };
@@ -122,12 +119,11 @@ export default function ContactManager() {
     fetchSocialLinks();
   }, []);
 
-  // Submit Contact Details
   const onContactDetailsSubmit: SubmitHandler<ContactPageDetailsFormData> = async (formData) => {
     setIsLoadingContactDetails(true);
     const dataToUpsert = {
       ...formData,
-      id: PRIMARY_CONTACT_DETAILS_ID, // Ensure fixed ID
+      id: PRIMARY_CONTACT_DETAILS_ID,
       updated_at: new Date().toISOString(),
     };
     const { error } = await supabase
@@ -144,19 +140,18 @@ export default function ContactManager() {
     setIsLoadingContactDetails(false);
   };
 
-  // Submit Social Link (Add/Edit)
   const onSocialLinkSubmit: SubmitHandler<SocialLinkFormData> = async (formData) => {
     const dataToSave = {
       ...formData,
-      icon_name: formData.icon_name || null,
+      icon_image_url: formData.icon_image_url?.trim() === '' ? null : formData.icon_image_url, // Changed from icon_name
       display_text: formData.display_text || null,
       sort_order: Number(formData.sort_order) || 0,
     };
 
     let response;
-    if (formData.id) { // Update existing
+    if (formData.id) {
       response = await supabase.from('social_links').update(dataToSave).eq('id', formData.id).select();
-    } else { // Add new
+    } else {
       const { id, ...insertData } = dataToSave;
       response = await supabase.from('social_links').insert(insertData).select();
     }
@@ -171,9 +166,10 @@ export default function ContactManager() {
     }
   };
 
-  // Delete Social Link
   const handleDeleteSocialLink = async () => {
     if (!socialLinkToDelete) return;
+    // Note: If social link icons were uploaded to Supabase Storage, add deletion logic here.
+    // For now, we assume URLs are external or managed elsewhere.
     const { error } = await supabase.from('social_links').delete().eq('id', socialLinkToDelete.id);
     if (error) {
       toast({ title: "Error", description: `Failed to delete social link: ${error.message}`, variant: "destructive" });
@@ -188,7 +184,7 @@ export default function ContactManager() {
 
   const handleOpenSocialLinkModal = (link?: SocialLink) => {
     setCurrentSocialLink(link || null);
-    socialLinkForm.reset(link ? { ...link, sort_order: link.sort_order ?? 0 } : { label: '', icon_name: '', url: '', display_text: '', sort_order: 0 });
+    socialLinkForm.reset(link ? { ...link, icon_image_url: link.icon_image_url || '', sort_order: link.sort_order ?? 0 } : { label: '', icon_image_url: '', url: '', display_text: '', sort_order: 0 });
     setIsSocialLinkModalOpen(true);
   };
 
@@ -196,10 +192,11 @@ export default function ContactManager() {
     setSocialLinkToDelete(link);
     setShowSocialLinkDeleteConfirm(true);
   };
+  
+  const currentSocialLinkIconUrl = socialLinkForm.watch("icon_image_url");
 
   return (
     <>
-      {/* Manage Contact Page Details Card */}
       <Card className="mb-8 shadow-lg">
         <CardHeader>
           <CardTitle className="flex items-center justify-between">
@@ -244,7 +241,6 @@ export default function ContactManager() {
         </CardContent>
       </Card>
 
-      {/* Manage Social Links Card */}
       <Card className="mb-8 shadow-lg">
         <CardHeader>
           <CardTitle className="flex items-center justify-between">
@@ -267,10 +263,14 @@ export default function ContactManager() {
             <div className="space-y-4">
               {socialLinks.map((link) => (
                 <Card key={link.id} className="flex flex-col sm:flex-row justify-between items-start sm:items-center p-4 hover:shadow-md transition-shadow">
+                  {link.icon_image_url && (
+                    <div className="w-10 h-10 relative mr-4 mb-2 sm:mb-0 flex-shrink-0 rounded-sm overflow-hidden border bg-muted">
+                       <NextImage src={link.icon_image_url} alt={`${link.label} icon`} layout="fill" objectFit="contain" className="dark:filter dark:brightness-0 dark:invert" />
+                    </div>
+                  )}
                   <div className="flex-grow mb-3 sm:mb-0">
                     <h4 className="font-semibold text-lg">{link.label} <span className="text-xs text-muted-foreground">(Sort: {link.sort_order ?? 0})</span></h4>
                     <p className="text-sm text-muted-foreground truncate" title={link.url}>{link.display_text || link.url}</p>
-                    {link.icon_name && <p className="text-xs text-muted-foreground">Icon: {link.icon_name}</p>}
                   </div>
                   <div className="flex space-x-2 self-start sm:self-center shrink-0">
                     <Button variant="outline" size="sm" onClick={() => handleOpenSocialLinkModal(link)}>
@@ -287,7 +287,6 @@ export default function ContactManager() {
         </CardContent>
       </Card>
       
-      {/* Social Link Modal */}
       <Dialog open={isSocialLinkModalOpen} onOpenChange={(isOpen) => { setIsSocialLinkModalOpen(isOpen); if (!isOpen) setCurrentSocialLink(null); }}>
         <DialogContent className="sm:max-w-[525px]">
           <DialogHeader><DialogTitle>{currentSocialLink ? 'Edit Social Link' : 'Add New Social Link'}</DialogTitle></DialogHeader>
@@ -295,11 +294,14 @@ export default function ContactManager() {
             <ScrollArea className="max-h-[70vh] p-1"><div className="grid gap-4 p-3">
               <div><Label htmlFor="social_label">Label <span className="text-destructive">*</span></Label><Input id="social_label" {...socialLinkForm.register("label")} placeholder="e.g., LinkedIn, GitHub" />{socialLinkForm.formState.errors.label && <p className="text-destructive text-sm mt-1">{socialLinkForm.formState.errors.label.message}</p>}</div>
               <div>
-                <Label htmlFor="social_icon_name">
-                    Icon Name (Lucide){" "}
-                    <a href="https://lucide.dev/icons/" target="_blank" rel="noopener noreferrer" className="text-xs text-primary hover:underline">(Browse)</a>
-                </Label>
-                <Input id="social_icon_name" {...socialLinkForm.register("icon_name")} placeholder="e.g., Linkedin, Github" />
+                <Label htmlFor="social_icon_image_url">Icon Image URL (Optional)</Label>
+                <Input id="social_icon_image_url" {...socialLinkForm.register("icon_image_url")} placeholder="https://example.com/icon.png" />
+                {socialLinkForm.formState.errors.icon_image_url && <p className="text-destructive text-sm mt-1">{socialLinkForm.formState.errors.icon_image_url.message}</p>}
+                {currentSocialLinkIconUrl && (
+                   <div className="mt-2 w-16 h-16 relative border rounded-md bg-muted overflow-hidden">
+                     <NextImage src={currentSocialLinkIconUrl} alt="Icon Preview" layout="fill" objectFit="contain" className="dark:filter dark:brightness-0 dark:invert" />
+                   </div>
+                )}
               </div>
               <div><Label htmlFor="social_url">URL <span className="text-destructive">*</span></Label><Input id="social_url" type="url" {...socialLinkForm.register("url")} placeholder="https://www.example.com" />{socialLinkForm.formState.errors.url && <p className="text-destructive text-sm mt-1">{socialLinkForm.formState.errors.url.message}</p>}</div>
               <div><Label htmlFor="social_display_text">Display Text (Optional)</Label><Input id="social_display_text" {...socialLinkForm.register("display_text")} placeholder="e.g., Follow me on X" /></div>
@@ -310,7 +312,6 @@ export default function ContactManager() {
         </DialogContent>
       </Dialog>
 
-      {/* Social Link Delete Confirmation */}
       <AlertDialog open={showSocialLinkDeleteConfirm} onOpenChange={setShowSocialLinkDeleteConfirm}>
         <AlertDialogContent className="bg-destructive border-destructive text-destructive-foreground">
           <AlertDialogHeader><AlertDialogTitle className="text-destructive-foreground">Delete Social Link: {socialLinkToDelete?.label}?</AlertDialogTitle><AlertDialogDescription className="text-destructive-foreground/90">This action cannot be undone.</AlertDialogDescription></AlertDialogHeader>
@@ -321,8 +322,7 @@ export default function ContactManager() {
         </AlertDialogContent>
       </AlertDialog>
 
-       {/* Placeholder for Contact Submissions Management */}
-        <Card className="shadow-lg">
+       <Card className="shadow-lg">
           <CardHeader>
             <CardTitle>View Contact Form Submissions</CardTitle>
             <CardDescription>
@@ -336,3 +336,5 @@ export default function ContactManager() {
     </>
   );
 }
+
+    
