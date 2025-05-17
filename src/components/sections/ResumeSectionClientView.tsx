@@ -2,12 +2,12 @@
 "use client";
 
 import { Button } from '@/components/ui/button';
-import { Download, Eye, Briefcase, GraduationCap, ListChecks, Languages as LanguagesIcon } from 'lucide-react'; // Added Briefcase, GraduationCap, ListChecks, LanguagesIcon
+import { Download, Eye, Briefcase, GraduationCap, ListChecks, Languages as LanguagesIcon, Type as TypeIcon } from 'lucide-react'; // Added TypeIcon
 import NextImage from 'next/image';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, type ReactNode } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogClose } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { format, parseISO, isValid } from 'date-fns';
@@ -42,6 +42,7 @@ const ResumeDetailItem: React.FC<ResumeDetailItemProps> = ({ title, subtitle, da
     <ActualIconComponent className="h-6 w-6 text-primary flex-shrink-0" />
   ) : (
     <div className="h-6 w-6 text-primary flex-shrink-0"> 
+      {/* Fallback simple circle if no DefaultIconComponent and no image URL */}
       <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle></svg>
     </div>
   );
@@ -93,7 +94,6 @@ export default function ResumeSectionClientView({
   const { toast } = useToast();
 
   const resumePdfUrl = resumeMetaData?.resume_pdf_url;
-  const resumeDescription = resumeMetaData?.description;
 
   useEffect(() => {
     if (resumeMetaData?.updated_at) {
@@ -153,13 +153,12 @@ export default function ResumeSectionClientView({
     }
   };
 
-
   return (
     <>
       <div className="text-center space-y-6 max-w-3xl mx-auto mb-12">
-        {resumeDescription && (
+        {resumeMetaData?.description && (
           <p className="text-muted-foreground text-lg leading-relaxed">
-            {resumeDescription}
+            {resumeMetaData.description}
           </p>
         )}
         <div className="flex flex-col sm:flex-row justify-center items-center gap-4">
@@ -286,7 +285,7 @@ export default function ResumeSectionClientView({
                                 <NextImage src={skillCategory.icon_image_url} alt={skillCategory.category_name} fill className="object-contain dark:filter dark:brightness-0 dark:invert" sizes="20px" />
                             </div>
                         ) : (
-                            <ListChecks className="h-5 w-5 mr-2 text-primary flex-shrink-0" /> 
+                            <TypeIcon className="h-5 w-5 mr-2 text-primary flex-shrink-0" /> 
                         )}
                         <h4 className="text-lg font-semibold text-foreground">{skillCategory.category_name}</h4>
                       </div>
@@ -303,7 +302,7 @@ export default function ResumeSectionClientView({
                   )
                 )
               ) : (
-                <p className="text-muted-foreground text-center py-4">No key skill categories yet.</p>
+                <p className="text-muted-foreground text-center py-4">No key skill entries yet.</p>
               )}
             </CardContent>
           </Card>
@@ -320,7 +319,7 @@ export default function ResumeSectionClientView({
                   <ResumeDetailItem
                     key={lang.id}
                     title={lang.language_name}
-                    description={lang.proficiency || undefined}
+                    description={lang.proficiency || undefined} // Display proficiency in the description area
                     iconImageUrl={lang.icon_image_url}
                     DefaultIconComponent={LanguagesIcon} 
                   />
@@ -335,3 +334,4 @@ export default function ResumeSectionClientView({
     </>
   );
 }
+
