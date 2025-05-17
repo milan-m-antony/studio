@@ -21,8 +21,7 @@ import TimelineManager from '@/components/admin/TimelineManager';
 import CertificationsManager from '@/components/admin/CertificationsManager';
 import ResumeManager from '@/components/admin/ResumeManager';
 import HeroManager from '@/components/admin/HeroManager';
-// Placeholder for ContactManager - will be created in a future step
-// import ContactManager from '@/components/admin/ContactManager';
+import ContactManager from '@/components/admin/ContactManager'; // Added import
 
 
 export default function AdminDashboardPage() {
@@ -147,18 +146,7 @@ export default function AdminDashboardPage() {
         <TimelineManager />
         <CertificationsManager />
         <ResumeManager />
-        {/* <ContactManager />  Will be added in a future step */}
-        <Card className="shadow-lg">
-          <CardHeader>
-            <CardTitle>Manage Contact Page & Submissions</CardTitle>
-            <CardDescription>
-              Edit contact information, social links, and view form submissions. (Full functionality coming soon)
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <p className="text-muted-foreground">Contact management section is under construction. In the next steps, we will add UI to edit contact details, social links, and view submitted messages.</p>
-          </CardContent>
-        </Card>
+        <ContactManager /> {/* Replaced placeholder with actual component */}
       </div>
     </SectionWrapper>
   );
