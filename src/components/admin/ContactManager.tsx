@@ -1,15 +1,15 @@
 
 "use client";
 
-import React, { useEffect, useState, type ChangeEvent } from 'react';
+import React, { useEffect, useState, type ChangeEvent, type FormEventHandler } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
-import { PlusCircle, Edit, Trash2, Mail, Link as LinkIcon, Phone, MapPin, Save, Image as ImageIcon } from 'lucide-react'; // Added ImageIcon
+import { PlusCircle, Edit, Trash2, Mail, Link as LinkIcon, Phone, MapPin, Save, MessageSquare, Star, Eye, Filter } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
-import type { ContactPageDetail, SocialLink } from '@/types/supabase';
+import type { ContactPageDetail, SocialLink, ContactSubmission } from '@/types/supabase';
 import {
   Dialog,
   DialogContent,
@@ -18,6 +18,7 @@ import {
   DialogTrigger,
   DialogFooter,
   DialogClose,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import {
   AlertDialog,
@@ -35,9 +36,12 @@ import { z } from "zod";
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import NextImage from 'next/image'; // For image previews
+import NextImage from 'next/image';
+import { format, parseISO, isValid } from 'date-fns';
+import { Badge } from '@/components/ui/badge';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
-const PRIMARY_CONTACT_DETAILS_ID = '00000000-0000-0000-0000-000000000005'; // Fixed ID
+const PRIMARY_CONTACT_DETAILS_ID = '00000000-0000-0000-0000-000000000005';
 
 // Zod Schemas
 const contactPageDetailsSchema = z.object({
@@ -53,26 +57,28 @@ type ContactPageDetailsFormData = z.infer<typeof contactPageDetailsSchema>;
 const socialLinkSchema = z.object({
   id: z.string().uuid().optional(),
   label: z.string().min(1, "Label is required"),
-  icon_image_url: z.string().url("Must be a valid URL if provided.").optional().or(z.literal("")).nullable(), // Changed from icon_name
+  icon_image_url: z.string().url("Must be a valid URL if an image URL is provided.").optional().or(z.literal("")).nullable(),
   url: z.string().url("Must be a valid URL"),
   display_text: z.string().optional().nullable(),
   sort_order: z.coerce.number().optional().default(0),
 });
 type SocialLinkFormData = z.infer<typeof socialLinkSchema>;
 
+type SubmissionStatus = 'New' | 'Replied' | 'Archived';
+const submissionStatuses: SubmissionStatus[] = ['New', 'Replied', 'Archived'];
+
 export default function ContactManager() {
   const router = useRouter();
   const { toast } = useToast();
 
+  // Contact Details State & Form
   const [isLoadingContactDetails, setIsLoadingContactDetails] = useState(false);
   const contactDetailsForm = useForm<ContactPageDetailsFormData>({
     resolver: zodResolver(contactPageDetailsSchema),
-    defaultValues: {
-      id: PRIMARY_CONTACT_DETAILS_ID,
-      address: '', phone: '', phone_href: '', email: '', email_href: ''
-    }
+    defaultValues: { id: PRIMARY_CONTACT_DETAILS_ID, address: '', phone: '', phone_href: '', email: '', email_href: '' }
   });
 
+  // Social Links State & Form
   const [socialLinks, setSocialLinks] = useState<SocialLink[]>([]);
   const [isLoadingSocialLinks, setIsLoadingSocialLinks] = useState(false);
   const [isSocialLinkModalOpen, setIsSocialLinkModalOpen] = useState(false);
@@ -83,35 +89,45 @@ export default function ContactManager() {
     resolver: zodResolver(socialLinkSchema),
     defaultValues: { label: '', icon_image_url: '', url: '', display_text: '', sort_order: 0 }
   });
+  const currentSocialLinkIconUrl = socialLinkForm.watch("icon_image_url");
 
+  // Contact Submissions State
+  const [submissions, setSubmissions] = useState<ContactSubmission[]>([]);
+  const [isLoadingSubmissions, setIsLoadingSubmissions] = useState(false);
+  const [selectedSubmission, setSelectedSubmission] = useState<ContactSubmission | null>(null);
+  const [isViewMessageModalOpen, setIsViewMessageModalOpen] = useState(false);
+  const [submissionToDelete, setSubmissionToDelete] = useState<ContactSubmission | null>(null);
+  const [showSubmissionDeleteConfirm, setShowSubmissionDeleteConfirm] = useState(false);
+  const [statusFilter, setStatusFilter] = useState<SubmissionStatus | 'All'>('All');
+
+
+  // Fetchers
   const fetchContactDetails = async () => {
     setIsLoadingContactDetails(true);
-    const { data, error } = await supabase
-      .from('contact_page_details')
-      .select('*')
-      .eq('id', PRIMARY_CONTACT_DETAILS_ID)
-      .maybeSingle();
-    if (error) {
-      toast({ title: "Error", description: `Could not fetch contact details: ${error.message}`, variant: "destructive" });
-    } else if (data) {
-      contactDetailsForm.reset(data);
-    }
+    const { data, error } = await supabase.from('contact_page_details').select('*').eq('id', PRIMARY_CONTACT_DETAILS_ID).maybeSingle();
+    if (error) toast({ title: "Error", description: `Could not fetch contact details: ${error.message}`, variant: "destructive" });
+    else if (data) contactDetailsForm.reset(data);
     setIsLoadingContactDetails(false);
   };
 
   const fetchSocialLinks = async () => {
     setIsLoadingSocialLinks(true);
-    const { data, error } = await supabase
-      .from('social_links')
-      .select('*')
-      .order('sort_order', { ascending: true });
-    if (error) {
-      toast({ title: "Error", description: `Could not fetch social links: ${error.message}`, variant: "destructive" });
-      setSocialLinks([]);
-    } else {
-      setSocialLinks(data.map(link => ({ ...link, icon_image_url: link.icon_image_url || null })) || []);
-    }
+    const { data, error } = await supabase.from('social_links').select('*').order('sort_order', { ascending: true });
+    if (error) toast({ title: "Error", description: `Could not fetch social links: ${error.message}`, variant: "destructive" });
+    else setSocialLinks((data || []).map(link => ({ ...link, icon_image_url: link.icon_image_url || null })));
     setIsLoadingSocialLinks(false);
+  };
+
+  const fetchSubmissions = async () => {
+    setIsLoadingSubmissions(true);
+    let query = supabase.from('contact_submissions').select('*').order('submitted_at', { ascending: false });
+    if (statusFilter !== 'All') {
+      query = query.eq('status', statusFilter);
+    }
+    const { data, error } = await query;
+    if (error) toast({ title: "Error", description: `Could not fetch submissions: ${error.message}`, variant: "destructive" });
+    else setSubmissions(data || []);
+    setIsLoadingSubmissions(false);
   };
 
   useEffect(() => {
@@ -119,123 +135,86 @@ export default function ContactManager() {
     fetchSocialLinks();
   }, []);
 
+  useEffect(() => {
+    fetchSubmissions();
+  }, [statusFilter]);
+
+
+  // Handlers for Contact Details
   const onContactDetailsSubmit: SubmitHandler<ContactPageDetailsFormData> = async (formData) => {
     setIsLoadingContactDetails(true);
-    const dataToUpsert = {
-      ...formData,
-      id: PRIMARY_CONTACT_DETAILS_ID,
-      updated_at: new Date().toISOString(),
-    };
-    const { error } = await supabase
-      .from('contact_page_details')
-      .upsert(dataToUpsert, { onConflict: 'id' });
-
-    if (error) {
-      toast({ title: "Error", description: `Failed to save contact details: ${error.message}`, variant: "destructive" });
-    } else {
-      toast({ title: "Success", description: "Contact details saved successfully." });
-      fetchContactDetails();
-      router.refresh();
-    }
+    const dataToUpsert = { ...formData, id: PRIMARY_CONTACT_DETAILS_ID, updated_at: new Date().toISOString() };
+    const { error } = await supabase.from('contact_page_details').upsert(dataToUpsert, { onConflict: 'id' });
+    if (error) toast({ title: "Error", description: `Failed to save contact details: ${error.message}`, variant: "destructive" });
+    else { toast({ title: "Success", description: "Contact details saved." }); fetchContactDetails(); router.refresh(); }
     setIsLoadingContactDetails(false);
   };
 
+  // Handlers for Social Links
   const onSocialLinkSubmit: SubmitHandler<SocialLinkFormData> = async (formData) => {
-    const dataToSave = {
-      ...formData,
-      icon_image_url: formData.icon_image_url?.trim() === '' ? null : formData.icon_image_url, // Changed from icon_name
-      display_text: formData.display_text || null,
-      sort_order: Number(formData.sort_order) || 0,
-    };
-
-    let response;
-    if (formData.id) {
-      response = await supabase.from('social_links').update(dataToSave).eq('id', formData.id).select();
-    } else {
-      const { id, ...insertData } = dataToSave;
-      response = await supabase.from('social_links').insert(insertData).select();
-    }
-
-    if (response.error) {
-      toast({ title: "Error", description: `Failed to save social link: ${response.error.message}`, variant: "destructive" });
-    } else {
-      toast({ title: "Success", description: `Social link ${formData.id ? 'updated' : 'added'} successfully.` });
-      fetchSocialLinks();
-      setIsSocialLinkModalOpen(false);
-      router.refresh();
-    }
+    const dataToSave = { ...formData, icon_image_url: formData.icon_image_url?.trim() === '' ? null : formData.icon_image_url, sort_order: Number(formData.sort_order) || 0 };
+    const { error } = formData.id
+      ? await supabase.from('social_links').update(dataToSave).eq('id', formData.id)
+      : await supabase.from('social_links').insert(dataToSave);
+    if (error) toast({ title: "Error", description: `Failed to save social link: ${error.message}`, variant: "destructive" });
+    else { toast({ title: "Success", description: `Social link ${formData.id ? 'updated' : 'added'}.` }); fetchSocialLinks(); setIsSocialLinkModalOpen(false); router.refresh(); }
   };
-
   const handleDeleteSocialLink = async () => {
     if (!socialLinkToDelete) return;
-    // Note: If social link icons were uploaded to Supabase Storage, add deletion logic here.
-    // For now, we assume URLs are external or managed elsewhere.
     const { error } = await supabase.from('social_links').delete().eq('id', socialLinkToDelete.id);
-    if (error) {
-      toast({ title: "Error", description: `Failed to delete social link: ${error.message}`, variant: "destructive" });
-    } else {
-      toast({ title: "Success", description: "Social link deleted." });
-      fetchSocialLinks();
-    }
-    setShowSocialLinkDeleteConfirm(false);
-    setSocialLinkToDelete(null);
-    router.refresh();
+    if (error) toast({ title: "Error", description: `Failed to delete social link: ${error.message}`, variant: "destructive" });
+    else { toast({ title: "Success", description: "Social link deleted." }); fetchSocialLinks(); router.refresh(); }
+    setShowSocialLinkDeleteConfirm(false); setSocialLinkToDelete(null);
   };
-
   const handleOpenSocialLinkModal = (link?: SocialLink) => {
     setCurrentSocialLink(link || null);
     socialLinkForm.reset(link ? { ...link, icon_image_url: link.icon_image_url || '', sort_order: link.sort_order ?? 0 } : { label: '', icon_image_url: '', url: '', display_text: '', sort_order: 0 });
     setIsSocialLinkModalOpen(true);
   };
+  const triggerSocialLinkDeleteConfirmation = (link: SocialLink) => { setSocialLinkToDelete(link); setShowSocialLinkDeleteConfirm(true); };
 
-  const triggerSocialLinkDeleteConfirmation = (link: SocialLink) => {
-    setSocialLinkToDelete(link);
-    setShowSocialLinkDeleteConfirm(true);
-  };
+  // Handlers for Contact Submissions
+  const handleViewMessage = (submission: ContactSubmission) => { setSelectedSubmission(submission); setIsViewMessageModalOpen(true); };
   
-  const currentSocialLinkIconUrl = socialLinkForm.watch("icon_image_url");
+  const handleUpdateSubmissionStatus = async (submissionId: string, newStatus: SubmissionStatus) => {
+    const { error } = await supabase.from('contact_submissions').update({ status: newStatus }).eq('id', submissionId);
+    if (error) toast({ title: "Error", description: `Failed to update status: ${error.message}`, variant: "destructive" });
+    else { toast({ title: "Success", description: "Submission status updated." }); fetchSubmissions(); }
+  };
+
+  const handleToggleStar = async (submission: ContactSubmission) => {
+    const { error } = await supabase.from('contact_submissions').update({ is_starred: !submission.is_starred }).eq('id', submission.id);
+    if (error) toast({ title: "Error", description: `Failed to update star: ${error.message}`, variant: "destructive" });
+    else { toast({ title: "Success", description: "Star status updated." }); fetchSubmissions(); }
+  };
+
+  const handleDeleteSubmission = async () => {
+    if (!submissionToDelete) return;
+    const { error } = await supabase.from('contact_submissions').delete().eq('id', submissionToDelete.id);
+    if (error) toast({ title: "Error", description: `Failed to delete submission: ${error.message}`, variant: "destructive" });
+    else { toast({ title: "Success", description: "Submission deleted." }); fetchSubmissions(); }
+    setShowSubmissionDeleteConfirm(false); setSubmissionToDelete(null);
+  };
+  const triggerSubmissionDeleteConfirmation = (submission: ContactSubmission) => { setSubmissionToDelete(submission); setShowSubmissionDeleteConfirm(true); };
 
   return (
     <>
       <Card className="mb-8 shadow-lg">
         <CardHeader>
-          <CardTitle className="flex items-center justify-between">
-            Manage Contact Page Information
-            <Mail className="h-6 w-6 text-primary" />
-          </CardTitle>
-          <CardDescription>Update the address, phone, and email displayed on your contact page.</CardDescription>
+          <CardTitle className="flex items-center justify-between">Manage Contact Page Information <Mail className="h-6 w-6 text-primary" /></CardTitle>
+          <CardDescription>Update address, phone, email, and social media links for your contact page.</CardDescription>
         </CardHeader>
         <CardContent>
-          {isLoadingContactDetails ? (
-            <p className="text-center text-muted-foreground">Loading contact details...</p>
-          ) : (
+          {isLoadingContactDetails ? (<p className="text-center text-muted-foreground">Loading contact details...</p>) : (
             <form onSubmit={contactDetailsForm.handleSubmit(onContactDetailsSubmit)} className="grid gap-6 py-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="contact_address">Address</Label>
-                  <Input id="contact_address" {...contactDetailsForm.register("address")} placeholder="123 Main St, Anytown, USA" />
-                </div>
-                <div>
-                  <Label htmlFor="contact_phone">Phone Display Text</Label>
-                  <Input id="contact_phone" {...contactDetailsForm.register("phone")} placeholder="+1 (555) 123-4567" />
-                </div>
-                <div>
-                  <Label htmlFor="contact_phone_href">Phone Link (tel:)</Label>
-                  <Input id="contact_phone_href" {...contactDetailsForm.register("phone_href")} placeholder="tel:+15551234567" />
-                </div>
-                 <div>
-                  <Label htmlFor="contact_email">Email Address</Label>
-                  <Input id="contact_email" type="email" {...contactDetailsForm.register("email")} placeholder="your.email@example.com" />
-                   {contactDetailsForm.formState.errors.email && <p className="text-destructive text-sm mt-1">{contactDetailsForm.formState.errors.email.message}</p>}
-                </div>
-                 <div>
-                  <Label htmlFor="contact_email_href">Email Link (mailto:)</Label>
-                  <Input id="contact_email_href" {...contactDetailsForm.register("email_href")} placeholder="mailto:your.email@example.com" />
-                </div>
+                <div><Label htmlFor="contact_address">Address</Label><Input id="contact_address" {...contactDetailsForm.register("address")} placeholder="123 Main St, Anytown, USA" /></div>
+                <div><Label htmlFor="contact_phone">Phone Display Text</Label><Input id="contact_phone" {...contactDetailsForm.register("phone")} placeholder="+1 (555) 123-4567" /></div>
+                <div><Label htmlFor="contact_phone_href">Phone Link (tel:)</Label><Input id="contact_phone_href" {...contactDetailsForm.register("phone_href")} placeholder="tel:+15551234567" /></div>
+                <div><Label htmlFor="contact_email">Email Address</Label><Input id="contact_email" type="email" {...contactDetailsForm.register("email")} placeholder="your.email@example.com" />{contactDetailsForm.formState.errors.email && <p className="text-destructive text-sm mt-1">{contactDetailsForm.formState.errors.email.message}</p>}</div>
+                <div><Label htmlFor="contact_email_href">Email Link (mailto:)</Label><Input id="contact_email_href" {...contactDetailsForm.register("email_href")} placeholder="mailto:your.email@example.com" /></div>
               </div>
-              <Button type="submit" className="w-full sm:w-auto justify-self-start" disabled={isLoadingContactDetails}>
-                <Save className="mr-2 h-4 w-4" /> {isLoadingContactDetails ? 'Saving...' : 'Save Contact Info'}
-              </Button>
+              <Button type="submit" className="w-full sm:w-auto justify-self-start" disabled={isLoadingContactDetails}><Save className="mr-2 h-4 w-4" /> {isLoadingContactDetails ? 'Saving...' : 'Save Contact Info'}</Button>
             </form>
           )}
         </CardContent>
@@ -243,43 +222,18 @@ export default function ContactManager() {
 
       <Card className="mb-8 shadow-lg">
         <CardHeader>
-          <CardTitle className="flex items-center justify-between">
-            Manage Social Links
-            <LinkIcon className="h-6 w-6 text-primary" />
-          </CardTitle>
-          <CardDescription>Add, edit, or delete social media links for your contact page.</CardDescription>
+          <CardTitle className="flex items-center justify-between">Manage Social Links <LinkIcon className="h-6 w-6 text-primary" /></CardTitle>
+          <CardDescription>Add, edit, or delete social media links.</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="mb-6 text-right">
-            <Button onClick={() => handleOpenSocialLinkModal()}>
-              <PlusCircle className="mr-2 h-4 w-4" /> Add Social Link
-            </Button>
-          </div>
-          {isLoadingSocialLinks ? (
-            <p className="text-center text-muted-foreground">Loading social links...</p>
-          ) : socialLinks.length === 0 ? (
-            <p className="text-center text-muted-foreground py-8">No social links found. Add one to get started.</p>
-          ) : (
+          <div className="mb-6 text-right"><Button onClick={() => handleOpenSocialLinkModal()}><PlusCircle className="mr-2 h-4 w-4" /> Add Social Link</Button></div>
+          {isLoadingSocialLinks ? (<p className="text-center text-muted-foreground">Loading social links...</p>) : socialLinks.length === 0 ? (<p className="text-center text-muted-foreground py-8">No social links found.</p>) : (
             <div className="space-y-4">
               {socialLinks.map((link) => (
                 <Card key={link.id} className="flex flex-col sm:flex-row justify-between items-start sm:items-center p-4 hover:shadow-md transition-shadow">
-                  {link.icon_image_url && (
-                    <div className="w-10 h-10 relative mr-4 mb-2 sm:mb-0 flex-shrink-0 rounded-sm overflow-hidden border bg-muted">
-                       <NextImage src={link.icon_image_url} alt={`${link.label} icon`} layout="fill" objectFit="contain" className="dark:filter dark:brightness-0 dark:invert" />
-                    </div>
-                  )}
-                  <div className="flex-grow mb-3 sm:mb-0">
-                    <h4 className="font-semibold text-lg">{link.label} <span className="text-xs text-muted-foreground">(Sort: {link.sort_order ?? 0})</span></h4>
-                    <p className="text-sm text-muted-foreground truncate" title={link.url}>{link.display_text || link.url}</p>
-                  </div>
-                  <div className="flex space-x-2 self-start sm:self-center shrink-0">
-                    <Button variant="outline" size="sm" onClick={() => handleOpenSocialLinkModal(link)}>
-                      <Edit className="mr-1.5 h-3.5 w-3.5" /> Edit
-                    </Button>
-                    <Button variant="destructive" size="sm" onClick={() => triggerSocialLinkDeleteConfirmation(link)}>
-                      <Trash2 className="mr-1.5 h-3.5 w-3.5" /> Delete
-                    </Button>
-                  </div>
+                  {link.icon_image_url && (<div className="w-10 h-10 relative mr-4 mb-2 sm:mb-0 flex-shrink-0 rounded-sm overflow-hidden border bg-muted"><NextImage src={link.icon_image_url} alt={`${link.label} icon`} layout="fill" objectFit="contain" className="dark:filter dark:brightness-0 dark:invert" /></div>)}
+                  <div className="flex-grow mb-3 sm:mb-0"><h4 className="font-semibold text-lg">{link.label} <span className="text-xs text-muted-foreground">(Sort: {link.sort_order ?? 0})</span></h4><p className="text-sm text-muted-foreground truncate" title={link.url}>{link.display_text || link.url}</p></div>
+                  <div className="flex space-x-2 self-start sm:self-center shrink-0"><Button variant="outline" size="sm" onClick={() => handleOpenSocialLinkModal(link)}><Edit className="mr-1.5 h-3.5 w-3.5" /> Edit</Button><Button variant="destructive" size="sm" onClick={() => triggerSocialLinkDeleteConfirmation(link)}><Trash2 className="mr-1.5 h-3.5 w-3.5" /> Delete</Button></div>
                 </Card>
               ))}
             </div>
@@ -287,22 +241,79 @@ export default function ContactManager() {
         </CardContent>
       </Card>
       
+      <Card className="shadow-lg">
+        <CardHeader>
+          <CardTitle className="flex items-center justify-between">Contact Form Submissions <MessageSquare className="h-6 w-6 text-primary" /></CardTitle>
+          <CardDescription>View and manage messages submitted through your contact form.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="mb-6 flex items-center gap-4">
+            <Label htmlFor="statusFilter" className="shrink-0">Filter by status:</Label>
+            <Select value={statusFilter} onValueChange={(value) => setStatusFilter(value as SubmissionStatus | 'All')}>
+              <SelectTrigger id="statusFilter" className="w-[180px]">
+                <SelectValue placeholder="Select status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="All">All</SelectItem>
+                {submissionStatuses.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+              </SelectContent>
+            </Select>
+             <Button variant="outline" onClick={fetchSubmissions} disabled={isLoadingSubmissions}>
+              <Filter className="mr-2 h-4 w-4"/> Apply Filter
+            </Button>
+          </div>
+
+          {isLoadingSubmissions ? (<p className="text-center text-muted-foreground py-8">Loading submissions...</p>) : submissions.length === 0 ? (<p className="text-center text-muted-foreground py-8">No submissions found{statusFilter !== 'All' ? ` with status "${statusFilter}"` : ''}.</p>) : (
+            <ScrollArea className="h-[600px] pr-4">
+              <div className="space-y-4">
+                {submissions.map((sub) => (
+                  <Card key={sub.id} className={cn("p-4 hover:shadow-md transition-shadow", sub.status === 'New' ? 'border-primary' : '')}>
+                    <div className="flex flex-col sm:flex-row justify-between items-start gap-2">
+                      <div className="flex-grow">
+                        <div className="flex items-center gap-2 mb-1">
+                          <Button variant="ghost" size="icon" className="h-7 w-7 p-0" onClick={() => handleToggleStar(sub)} aria-label={sub.is_starred ? "Unstar submission" : "Star submission"}>
+                            <Star className={cn("h-5 w-5", sub.is_starred ? "fill-yellow-400 text-yellow-500" : "text-muted-foreground hover:text-yellow-500")} />
+                          </Button>
+                          <h4 className="font-semibold text-lg" title={sub.subject || 'No Subject'}>{sub.subject || '(No Subject)'}</h4>
+                          <Badge variant={sub.status === 'New' ? 'default' : sub.status === 'Replied' ? 'secondary' : 'outline'}>{sub.status}</Badge>
+                        </div>
+                        <p className="text-sm text-muted-foreground">From: {sub.name} &lt;{sub.email}&gt;</p>
+                        {sub.phone_number && <p className="text-sm text-muted-foreground">Phone: {sub.phone_number}</p>}
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Received: {isValid(parseISO(sub.submitted_at)) ? format(parseISO(sub.submitted_at), "PPpp") : 'Invalid Date'}
+                        </p>
+                      </div>
+                      <div className="flex flex-col sm:flex-row sm:items-center gap-2 mt-2 sm:mt-0 self-start sm:self-center shrink-0">
+                        <Select
+                          value={sub.status || 'New'}
+                          onValueChange={(newStatus) => handleUpdateSubmissionStatus(sub.id, newStatus as SubmissionStatus)}
+                        >
+                          <SelectTrigger className="w-full sm:w-[120px] h-9 text-xs">
+                            <SelectValue placeholder="Change status" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {submissionStatuses.map(s => <SelectItem key={s} value={s} className="text-xs">{s}</SelectItem>)}
+                          </SelectContent>
+                        </Select>
+                        <Button variant="outline" size="sm" onClick={() => handleViewMessage(sub)}><Eye className="mr-1.5 h-3.5 w-3.5" /> View</Button>
+                        <Button variant="destructive" size="sm" onClick={() => triggerSubmissionDeleteConfirmation(sub)}><Trash2 className="mr-1.5 h-3.5 w-3.5" /> Delete</Button>
+                      </div>
+                    </div>
+                  </Card>
+                ))}
+              </div>
+            </ScrollArea>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Social Link Modal & Delete Dialog */}
       <Dialog open={isSocialLinkModalOpen} onOpenChange={(isOpen) => { setIsSocialLinkModalOpen(isOpen); if (!isOpen) setCurrentSocialLink(null); }}>
-        <DialogContent className="sm:max-w-[525px]">
-          <DialogHeader><DialogTitle>{currentSocialLink ? 'Edit Social Link' : 'Add New Social Link'}</DialogTitle></DialogHeader>
+        <DialogContent className="sm:max-w-[525px]"><DialogHeader><DialogTitle>{currentSocialLink ? 'Edit Social Link' : 'Add New Social Link'}</DialogTitle></DialogHeader>
           <form onSubmit={socialLinkForm.handleSubmit(onSocialLinkSubmit)} className="grid gap-4 py-4">
             <ScrollArea className="max-h-[70vh] p-1"><div className="grid gap-4 p-3">
               <div><Label htmlFor="social_label">Label <span className="text-destructive">*</span></Label><Input id="social_label" {...socialLinkForm.register("label")} placeholder="e.g., LinkedIn, GitHub" />{socialLinkForm.formState.errors.label && <p className="text-destructive text-sm mt-1">{socialLinkForm.formState.errors.label.message}</p>}</div>
-              <div>
-                <Label htmlFor="social_icon_image_url">Icon Image URL (Optional)</Label>
-                <Input id="social_icon_image_url" {...socialLinkForm.register("icon_image_url")} placeholder="https://example.com/icon.png" />
-                {socialLinkForm.formState.errors.icon_image_url && <p className="text-destructive text-sm mt-1">{socialLinkForm.formState.errors.icon_image_url.message}</p>}
-                {currentSocialLinkIconUrl && (
-                   <div className="mt-2 w-16 h-16 relative border rounded-md bg-muted overflow-hidden">
-                     <NextImage src={currentSocialLinkIconUrl} alt="Icon Preview" layout="fill" objectFit="contain" className="dark:filter dark:brightness-0 dark:invert" />
-                   </div>
-                )}
-              </div>
+              <div><Label htmlFor="social_icon_image_url">Icon Image URL (Optional)</Label><Input id="social_icon_image_url" {...socialLinkForm.register("icon_image_url")} placeholder="https://example.com/icon.png" />{socialLinkForm.formState.errors.icon_image_url && <p className="text-destructive text-sm mt-1">{socialLinkForm.formState.errors.icon_image_url.message}</p>}{currentSocialLinkIconUrl && (<div className="mt-2 w-16 h-16 relative border rounded-md bg-muted overflow-hidden"><NextImage src={currentSocialLinkIconUrl} alt="Icon Preview" layout="fill" objectFit="contain" className="dark:filter dark:brightness-0 dark:invert" /></div>)}</div>
               <div><Label htmlFor="social_url">URL <span className="text-destructive">*</span></Label><Input id="social_url" type="url" {...socialLinkForm.register("url")} placeholder="https://www.example.com" />{socialLinkForm.formState.errors.url && <p className="text-destructive text-sm mt-1">{socialLinkForm.formState.errors.url.message}</p>}</div>
               <div><Label htmlFor="social_display_text">Display Text (Optional)</Label><Input id="social_display_text" {...socialLinkForm.register("display_text")} placeholder="e.g., Follow me on X" /></div>
               <div><Label htmlFor="social_sort_order">Sort Order</Label><Input id="social_sort_order" type="number" {...socialLinkForm.register("sort_order")} /></div>
@@ -311,30 +322,33 @@ export default function ContactManager() {
           </form>
         </DialogContent>
       </Dialog>
+      <AlertDialog open={showSocialLinkDeleteConfirm} onOpenChange={setShowSocialLinkDeleteConfirm}><AlertDialogContent className="bg-destructive border-destructive text-destructive-foreground"><AlertDialogHeader><AlertDialogTitle className="text-destructive-foreground">Delete Social Link: {socialLinkToDelete?.label}?</AlertDialogTitle><AlertDialogDescription className="text-destructive-foreground/90">This action cannot be undone.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel onClick={() => { setShowSocialLinkDeleteConfirm(false); setSocialLinkToDelete(null); }} className={cn(buttonVariants({ variant: "outline" }), "border-destructive-foreground/40 text-destructive-foreground hover:bg-destructive-foreground/10 hover:text-destructive-foreground hover:border-destructive-foreground/60")}>Cancel</AlertDialogCancel><AlertDialogAction onClick={handleDeleteSocialLink} className={cn(buttonVariants({ variant: "default" }), "bg-destructive-foreground text-destructive hover:bg-destructive-foreground/90")}>Delete</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
 
-      <AlertDialog open={showSocialLinkDeleteConfirm} onOpenChange={setShowSocialLinkDeleteConfirm}>
-        <AlertDialogContent className="bg-destructive border-destructive text-destructive-foreground">
-          <AlertDialogHeader><AlertDialogTitle className="text-destructive-foreground">Delete Social Link: {socialLinkToDelete?.label}?</AlertDialogTitle><AlertDialogDescription className="text-destructive-foreground/90">This action cannot be undone.</AlertDialogDescription></AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => { setShowSocialLinkDeleteConfirm(false); setSocialLinkToDelete(null); }} className={cn(buttonVariants({ variant: "outline" }), "border-destructive-foreground/40 text-destructive-foreground hover:bg-destructive-foreground/10 hover:text-destructive-foreground hover:border-destructive-foreground/60")}>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDeleteSocialLink} className={cn(buttonVariants({ variant: "default" }), "bg-destructive-foreground text-destructive hover:bg-destructive-foreground/90")}>Delete</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-       <Card className="shadow-lg">
-          <CardHeader>
-            <CardTitle>View Contact Form Submissions</CardTitle>
-            <CardDescription>
-              Browse messages submitted through your contact form. (Full functionality for status updates and filtering coming soon)
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <p className="text-muted-foreground">Contact submissions viewing is under construction. In the next steps, we will add UI to list submissions, view details, and manage their status (New/Replied/Archived) with filtering options.</p>
-          </CardContent>
-        </Card>
+      {/* View Message Modal */}
+      {selectedSubmission && (
+        <Dialog open={isViewMessageModalOpen} onOpenChange={setIsViewMessageModalOpen}>
+          <DialogContent className="sm:max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>Message from: {selectedSubmission.name}</DialogTitle>
+              <DialogDescription>Subject: {selectedSubmission.subject || '(No Subject)'}</DialogDescription>
+            </DialogHeader>
+            <ScrollArea className="max-h-[60vh] my-4 pr-3">
+              <div className="space-y-4">
+                <div><p className="text-sm font-medium text-muted-foreground">From:</p><p>{selectedSubmission.name} &lt;{selectedSubmission.email}&gt;</p></div>
+                {selectedSubmission.phone_number && <div><p className="text-sm font-medium text-muted-foreground">Phone:</p><p>{selectedSubmission.phone_number}</p></div>}
+                <div><p className="text-sm font-medium text-muted-foreground">Received:</p><p>{isValid(parseISO(selectedSubmission.submitted_at)) ? format(parseISO(selectedSubmission.submitted_at), "PPpp") : 'Invalid Date'}</p></div>
+                <div><p className="text-sm font-medium text-muted-foreground">Status:</p><p>{selectedSubmission.status}</p></div>
+                <div><p className="text-sm font-medium text-muted-foreground">Message:</p><p className="whitespace-pre-wrap bg-muted p-3 rounded-md">{selectedSubmission.message}</p></div>
+              </div>
+            </ScrollArea>
+            <DialogFooter>
+              <DialogClose asChild><Button type="button" variant="outline">Close</Button></DialogClose>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
+      {/* Delete Submission Confirmation Dialog */}
+      <AlertDialog open={showSubmissionDeleteConfirm} onOpenChange={setShowSubmissionDeleteConfirm}><AlertDialogContent className="bg-destructive border-destructive text-destructive-foreground"><AlertDialogHeader><AlertDialogTitle className="text-destructive-foreground">Delete Submission from: {submissionToDelete?.name}?</AlertDialogTitle><AlertDialogDescription className="text-destructive-foreground/90">This action cannot be undone and will permanently delete this message.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel onClick={() => { setShowSubmissionDeleteConfirm(false); setSubmissionToDelete(null); }} className={cn(buttonVariants({ variant: "outline" }), "border-destructive-foreground/40 text-destructive-foreground hover:bg-destructive-foreground/10 hover:text-destructive-foreground hover:border-destructive-foreground/60")}>Cancel</AlertDialogCancel><AlertDialogAction onClick={handleDeleteSubmission} className={cn(buttonVariants({ variant: "default" }), "bg-destructive-foreground text-destructive hover:bg-destructive-foreground/90")}>Delete Message</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
     </>
   );
 }
-
-    

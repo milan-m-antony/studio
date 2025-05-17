@@ -56,7 +56,7 @@ export interface Database {
         Row: {
           id: string
           name: string
-          icon_image_url: string | null // Changed from icon_name
+          icon_image_url: string | null
           sort_order: number | null
           created_at: string
         }
@@ -80,7 +80,7 @@ export interface Database {
         Row: {
           id: string
           name: string
-          icon_image_url: string | null // Changed from icon_name
+          icon_image_url: string | null
           description: string | null
           category_id: string | null
           created_at: string
@@ -146,7 +146,7 @@ export interface Database {
           date: string
           title: string
           description: string
-          icon_image_url: string | null // Changed from icon_name
+          icon_image_url: string | null
           type: string
           sort_order: number | null
           created_at: string
@@ -243,7 +243,7 @@ export interface Database {
           company_name: string
           date_range: string | null
           description_points: string[] | null
-          icon_image_url: string | null // Changed from icon_name
+          icon_image_url: string | null
           sort_order: number | null
           created_at: string
         }
@@ -276,7 +276,7 @@ export interface Database {
           institution_name: string
           date_range: string | null
           description: string | null
-          icon_image_url: string | null // Changed from icon_name
+          icon_image_url: string | null
           sort_order: number | null
           created_at: string
         }
@@ -306,7 +306,7 @@ export interface Database {
         Row: {
           id: string
           category_name: string
-          icon_image_url: string | null // Changed from icon_name
+          icon_image_url: string | null
           sort_order: number | null
           created_at: string
         }
@@ -331,6 +331,7 @@ export interface Database {
           id: string
           skill_name: string
           category_id: string | null
+          // created_at was removed here
         }
         Insert: {
           id?: string
@@ -356,7 +357,7 @@ export interface Database {
           id: string
           language_name: string
           proficiency: string | null
-          icon_image_url: string | null // Changed from icon_name
+          icon_image_url: string | null
           sort_order: number | null
           created_at: string
         }
@@ -445,7 +446,7 @@ export interface Database {
         Row: {
           id: string;
           label: string;
-          icon_image_url: string | null; // Changed from icon_name
+          icon_image_url: string | null;
           url: string;
           display_text: string | null;
           sort_order: number | null;
@@ -454,7 +455,7 @@ export interface Database {
         Insert: {
           id?: string;
           label: string;
-          icon_image_url?: string | null; // Changed
+          icon_image_url?: string | null;
           url: string;
           display_text?: string | null;
           sort_order?: number | null;
@@ -463,7 +464,7 @@ export interface Database {
         Update: {
           id?: string;
           label?: string;
-          icon_image_url?: string | null; // Changed
+          icon_image_url?: string | null;
           url?: string;
           display_text?: string | null;
           sort_order?: number | null;
@@ -479,7 +480,7 @@ export interface Database {
           subject: string | null;
           message: string;
           phone_number: string | null;
-          status: string | null;
+          status: string | null; // Should match SubmissionStatus type ('New', 'Replied', 'Archived')
           is_starred: boolean | null;
           submitted_at: string;
           notes: string | null;
@@ -546,8 +547,8 @@ export interface Skill {
   name: string;
   iconImageUrl: string | null; // Mapped from icon_image_url
   description: string | null;
-  categoryId?: string | null;
-  created_at?: string;
+  categoryId?: string | null; // Foreign key
+  created_at: string; // Added back as per schema
 }
 
 export interface SkillCategory {
@@ -609,7 +610,7 @@ export interface ResumeExperience {
   company_name: string;
   date_range: string | null;
   description_points: string[] | null;
-  icon_image_url: string | null; // Changed from icon_name
+  icon_image_url: string | null;
   sort_order?: number | null;
   created_at: string;
 }
@@ -620,7 +621,7 @@ export interface ResumeEducation {
   institution_name: string;
   date_range: string | null;
   description: string | null;
-  icon_image_url: string | null; // Changed from icon_name
+  icon_image_url: string | null;
   sort_order?: number | null;
   created_at: string;
 }
@@ -629,14 +630,14 @@ export interface ResumeKeySkill {
   id: string;
   skill_name: string;
   category_id?: string | null;
-  // No icon_image_url for individual skills as per schema
+  // No created_at for individual skills based on schema
 }
 
 export interface ResumeKeySkillCategory {
   id: string;
   category_name: string;
-  icon_image_url: string | null; // Changed from icon_name
-  skills?: ResumeKeySkill[];
+  icon_image_url: string | null;
+  skills?: ResumeKeySkill[]; // Nested skills
   sort_order?: number | null;
   created_at: string;
 }
@@ -645,7 +646,7 @@ export interface ResumeLanguage {
   id: string;
   language_name: string;
   proficiency: string | null;
-  icon_image_url: string | null; // Changed from icon_name
+  icon_image_url: string | null;
   sort_order?: number | null;
   created_at: string;
 }
@@ -681,6 +682,8 @@ export interface SocialLink {
   created_at: string;
 }
 
+export type SubmissionStatus = 'New' | 'Replied' | 'Archived';
+
 export interface ContactSubmission {
   id: string;
   name: string;
@@ -688,10 +691,17 @@ export interface ContactSubmission {
   subject: string | null;
   message: string;
   phone_number: string | null;
-  status?: 'New' | 'Replied' | 'Archived' | string | null;
+  status?: SubmissionStatus | null; // Use the defined type
   is_starred?: boolean | null;
   submitted_at: string;
   notes?: string | null;
 }
 
-    
+// Ensure the Database interface aligns with these specific types.
+// For example, skills.Row should have icon_image_url, not icon_name.
+// certifications.Row should not have image_hint if we removed it.
+// timeline_events.Row should have icon_image_url.
+// resume tables should have icon_image_url where applicable.
+// social_links.Row should have icon_image_url.
+// contact_submissions.Row.status should ideally be typed against SubmissionStatus enum if possible in DB or validated against it.
+// Make sure resume_key_skills.Row does not have created_at
