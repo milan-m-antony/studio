@@ -35,7 +35,7 @@ export interface Database {
           repo_url?: string | null
           tags?: string[] | null
           status?: string | null
-          progress?: number | null // Changed from string to number
+          progress?: number | null
           created_at?: string
         }
         Update: {
@@ -47,7 +47,7 @@ export interface Database {
           repo_url?: string | null
           tags?: string[] | null
           status?: string | null
-          progress?: number | null // Changed from string to number
+          progress?: number | null
           created_at?: string
         }
         Relationships: []
@@ -378,11 +378,11 @@ export interface Database {
         }
         Relationships: []
       }
-      hero_content: { // New table for Hero section
+      hero_content: {
         Row: {
-          id: string; // Fixed UUID
+          id: string; 
           main_name: string | null;
-          subtitles: string[] | null; // Array of strings for typewriter
+          subtitles: string[] | null; 
           social_github_url: string | null;
           social_linkedin_url: string | null;
           social_instagram_url: string | null;
@@ -411,6 +411,105 @@ export interface Database {
         }
         Relationships: [];
       }
+      contact_page_details: { // New
+        Row: {
+          id: string; // Fixed UUID
+          address: string | null;
+          phone: string | null;
+          phone_href: string | null;
+          email: string | null;
+          email_href: string | null;
+          updated_at: string;
+        }
+        Insert: {
+          id: string;
+          address?: string | null;
+          phone?: string | null;
+          phone_href?: string | null;
+          email?: string | null;
+          email_href?: string | null;
+          updated_at?: string;
+        }
+        Update: {
+          id?: string;
+          address?: string | null;
+          phone?: string | null;
+          phone_href?: string | null;
+          email?: string | null;
+          email_href?: string | null;
+          updated_at?: string;
+        }
+        Relationships: [];
+      }
+      social_links: { // New
+        Row: {
+          id: string;
+          label: string;
+          icon_name: string | null; // Lucide icon name
+          url: string;
+          display_text: string | null;
+          sort_order: number | null;
+          created_at: string;
+        }
+        Insert: {
+          id?: string;
+          label: string;
+          icon_name?: string | null;
+          url: string;
+          display_text?: string | null;
+          sort_order?: number | null;
+          created_at?: string;
+        }
+        Update: {
+          id?: string;
+          label?: string;
+          icon_name?: string | null;
+          url?: string;
+          display_text?: string | null;
+          sort_order?: number | null;
+          created_at?: string;
+        }
+        Relationships: [];
+      }
+      contact_submissions: { // New
+        Row: {
+          id: string;
+          name: string;
+          email: string;
+          subject: string | null;
+          message: string;
+          phone_number: string | null;
+          status: string | null; // 'New', 'Replied', 'Archived'
+          is_starred: boolean | null;
+          submitted_at: string;
+          notes: string | null; // Admin notes
+        }
+        Insert: {
+          id?: string;
+          name: string;
+          email: string;
+          subject?: string | null;
+          message: string;
+          phone_number?: string | null;
+          status?: string | null;
+          is_starred?: boolean | null;
+          submitted_at?: string;
+          notes?: string | null;
+        }
+        Update: {
+          id?: string;
+          name?: string;
+          email?: string;
+          subject?: string | null;
+          message?: string;
+          phone_number?: string | null;
+          status?: string | null;
+          is_starred?: boolean | null;
+          submitted_at?: string;
+          notes?: string | null;
+        }
+        Relationships: [];
+      }
     }
     Views: {
       [_ in never]: never
@@ -433,9 +532,9 @@ export interface Project {
   id: string;
   title: string;
   description: string | null;
-  imageUrl: string | null; // Mapped from image_url
-  liveDemoUrl?: string | null; // Mapped from live_demo_url
-  repoUrl?: string | null; // Mapped from repo_url
+  imageUrl: string | null;
+  liveDemoUrl?: string | null;
+  repoUrl?: string | null;
   tags: string[] | null;
   status: ProjectStatus | null;
   progress?: number | null;
@@ -445,7 +544,7 @@ export interface Project {
 export interface Skill {
   id: string;
   name: string;
-  iconImageUrl: string | null; // Changed from iconName, now URL
+  iconImageUrl: string | null;
   description: string | null;
   categoryId?: string | null;
   created_at?: string;
@@ -454,9 +553,9 @@ export interface Skill {
 export interface SkillCategory {
   id: string;
   name: string;
-  iconImageUrl?: string | null; // Changed from iconName, now URL
+  iconImageUrl?: string | null;
   skills?: Skill[];
-  skillCount?: number; // Helper for UI, not in DB
+  skillCount?: number; 
   sort_order?: number | null;
   created_at?: string;
 }
@@ -468,7 +567,7 @@ export interface TimelineEvent {
   date: string;
   title: string;
   description: string;
-  iconImageUrl: string | null; // Changed from iconName, now URL
+  iconImageUrl: string | null;
   type: TimelineEventType;
   sort_order?: number | null;
   created_at?: string;
@@ -479,8 +578,8 @@ export interface Certification {
   title: string;
   issuer: string;
   date: string;
-  imageUrl: string | null; // Mapped from image_url
-  verifyUrl?: string | null; // Mapped from verify_url
+  imageUrl: string | null;
+  verifyUrl?: string | null;
   created_at: string;
 }
 
@@ -493,7 +592,7 @@ export interface AboutContent {
   paragraph1: string | null;
   paragraph2: string | null;
   paragraph3: string | null;
-  imageUrl: string | null; // Mapped from image_url
+  imageUrl: string | null;
   image_tagline: string | null;
   updated_at?: string;
 }
@@ -511,7 +610,7 @@ export interface ResumeExperience {
   company_name: string;
   date_range: string | null;
   description_points: string[] | null;
-  icon_image_url: string | null; // Changed from icon_name
+  icon_image_url: string | null;
   sort_order?: number | null;
   created_at: string;
 }
@@ -522,7 +621,7 @@ export interface ResumeEducation {
   institution_name: string;
   date_range: string | null;
   description: string | null;
-  icon_image_url: string | null; // Changed from icon_name
+  icon_image_url: string | null;
   sort_order?: number | null;
   created_at: string;
 }
@@ -536,22 +635,22 @@ export interface ResumeKeySkill {
 export interface ResumeKeySkillCategory {
   id: string;
   category_name: string;
-  icon_image_url: string | null; // Changed from icon_name
+  icon_image_url: string | null;
   skills?: ResumeKeySkill[];
   sort_order?: number | null;
-  created_at?: string;
+  created_at: string;
 }
 
 export interface ResumeLanguage {
   id: string;
   language_name: string;
   proficiency: string | null;
-  icon_image_url: string | null; // Changed from icon_name
+  icon_image_url: string | null;
   sort_order?: number | null;
   created_at: string;
 }
 
-export interface HeroContent { // New interface for Hero section
+export interface HeroContent {
   id: string;
   main_name: string | null;
   subtitles: string[] | null;
@@ -562,4 +661,36 @@ export interface HeroContent { // New interface for Hero section
   updated_at: string;
 }
 
-    
+// New Types for Contact Section Management
+export interface ContactPageDetail {
+  id: string; // Fixed UUID
+  address: string | null;
+  phone: string | null;
+  phone_href: string | null;
+  email: string | null;
+  email_href: string | null;
+  updated_at: string;
+}
+
+export interface SocialLink {
+  id: string;
+  label: string;
+  icon_name: string | null; // Lucide Icon Name
+  url: string;
+  display_text: string | null;
+  sort_order?: number | null;
+  created_at: string;
+}
+
+export interface ContactSubmission {
+  id: string;
+  name: string;
+  email: string;
+  subject: string | null;
+  message: string;
+  phone_number: string | null;
+  status?: 'New' | 'Replied' | 'Archived' | string | null; // Allow string for flexibility if more statuses are added
+  is_starred?: boolean | null;
+  submitted_at: string;
+  notes?: string | null; // Admin notes
+}

@@ -2,16 +2,17 @@
 "use server";
 
 import { z } from "zod";
-import { supabase } from './supabaseClient'; // Import Supabase client
-import { revalidatePath } from 'next/cache'; // For revalidating cache after DB operations
+import { supabase } from './supabaseClient';
+import { revalidatePath } from 'next/cache';
 
-// Contact Form Schema and Action (remains client-side for now or can be adapted)
-const contactFormSchema = z.object({
+// Schema for contact form submissions (to be saved in DB)
+const contactSubmissionSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters."),
   email: z.string().email("Invalid email address."),
   subject: z.string().min(2, "Subject must be at least 2 characters."),
   message: z.string().min(10, "Message must be at least 10 characters."),
-  phoneNumber: z.string().optional(),
+  phoneNumber: z.string().optional().or(z.literal("").transform(() => undefined)),
+  // Supabase will add id, submitted_at, status, is_starred automatically
 });
 
 export interface SubmitContactFormState {
@@ -30,7 +31,7 @@ export async function submitContactForm(
   prevState: SubmitContactFormState,
   formData: FormData
 ): Promise<SubmitContactFormState> {
-  const validatedFields = contactFormSchema.safeParse({
+  const validatedFields = contactSubmissionSchema.safeParse({
     name: formData.get("name"),
     email: formData.get("email"),
     subject: formData.get("subject"),
@@ -46,15 +47,25 @@ export async function submitContactForm(
     };
   }
 
-  // Example: Save to Supabase 'contacts' table (ensure table exists)
-  // const { error } = await supabase.from('contacts').insert([validatedFields.data]);
-  // if (error) {
-  //   console.error('Supabase error:', error);
-  //   return { success: false, message: "Failed to submit message. Please try again." };
-  // }
+  // Map to Supabase table columns
+  const submissionData = {
+    name: validatedFields.data.name,
+    email: validatedFields.data.email,
+    subject: validatedFields.data.subject,
+    message: validatedFields.data.message,
+    phone_number: validatedFields.data.phoneNumber, // Supabase uses snake_case
+    // status and is_starred will use default values from the table definition
+  };
 
-  console.log("Form data (simulated submission):", validatedFields.data);
-  await new Promise(resolve => setTimeout(resolve, 1000));
+  const { error } = await supabase.from('contact_submissions').insert([submissionData]);
+
+  if (error) {
+    console.error('Supabase error inserting contact submission:', JSON.stringify(error, null, 2));
+    return { success: false, message: "Failed to submit message. Please try again later." };
+  }
+
+  // Optionally revalidate a path if you have a page that lists submissions or counts them.
+  // revalidatePath('/admin/contact-submissions'); // Example
 
   return {
     success: true,
@@ -63,16 +74,12 @@ export async function submitContactForm(
 }
 
 
-// Supabase Project CRUD Actions (These are examples, adapt as needed)
-
-// Define Project schema for validation if using with react-hook-form in server components
-// or for direct server action validation
+// Supabase Project CRUD Actions
 const projectActionSchema = z.object({
   id: z.string().uuid().optional(),
   title: z.string().min(1, "Title is required"),
   description: z.string().optional(),
   image_url: z.string().url().optional().or(z.literal('')),
-  // image_hint: z.string().optional(), // Removed
   live_demo_url: z.string().url().optional().or(z.literal('')),
   repo_url: z.string().url().optional().or(z.literal('')),
   tags: z.array(z.string()).optional(),
@@ -83,13 +90,11 @@ const projectActionSchema = z.object({
 
 export async function addProjectAction(formData: FormData) {
   const rawData = Object.fromEntries(formData.entries());
-  // Transform tags from comma-separated string to array
   if (typeof rawData.tags === 'string') {
     rawData.tags = rawData.tags.split(',').map(tag => tag.trim()).filter(Boolean);
   } else {
     rawData.tags = [];
   }
-  // Ensure progress is a number or null
   rawData.progress = rawData.progress ? parseInt(rawData.progress as string, 10) : null;
 
 
@@ -99,7 +104,6 @@ export async function addProjectAction(formData: FormData) {
     return { success: false, message: "Validation failed.", errors: validatedFields.error.flatten().fieldErrors };
   }
   
-  // Remove id for insert
   const { id, ...dataToInsert } = validatedFields.data;
 
   const { error } = await supabase.from('projects').insert(dataToInsert);
@@ -109,8 +113,8 @@ export async function addProjectAction(formData: FormData) {
     return { success: false, message: error.message };
   }
 
-  revalidatePath('/'); // Revalidate home page to show new project
-  revalidatePath('/admin/dashboard'); // Revalidate admin page
+  revalidatePath('/'); 
+  revalidatePath('/admin/dashboard'); 
   return { success: true, message: "Project added successfully." };
 }
 
@@ -163,5 +167,3 @@ export async function deleteProjectAction(projectId: string) {
   revalidatePath('/admin/dashboard');
   return { success: true, message: "Project deleted successfully." };
 }
-
-// Add similar actions for Skills, About content, etc.

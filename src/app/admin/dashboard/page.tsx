@@ -3,14 +3,16 @@
 
 import React, { useEffect, useState, type FormEvent, type ChangeEvent } from 'react';
 import { useRouter } from 'next/navigation';
+import SectionWrapper from '@/components/ui/SectionWrapper';
 import SectionTitle from '@/components/ui/SectionTitle';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { ShieldCheck, LogOut, AlertTriangle, LogIn, Home } from 'lucide-react';
 import Link from 'next/link';
+import { cn } from '@/lib/utils';
 
 import ProjectsManager from '@/components/admin/ProjectsManager';
 import SkillsManager from '@/components/admin/SkillsManager';
@@ -18,8 +20,10 @@ import AboutManager from '@/components/admin/AboutManager';
 import TimelineManager from '@/components/admin/TimelineManager';
 import CertificationsManager from '@/components/admin/CertificationsManager';
 import ResumeManager from '@/components/admin/ResumeManager';
-import HeroManager from '@/components/admin/HeroManager'; // Import the new HeroManager
-import SectionWrapper from '@/components/ui/SectionWrapper';
+import HeroManager from '@/components/admin/HeroManager';
+// Placeholder for ContactManager - will be created in a future step
+// import ContactManager from '@/components/admin/ContactManager';
+
 
 export default function AdminDashboardPage() {
   const router = useRouter();
@@ -112,8 +116,8 @@ export default function AdminDashboardPage() {
             </form>
           </CardContent>
            <CardFooter className="mt-6 flex flex-col items-center space-y-2">
-             <Link href="/" className="inline-flex items-center justify-center text-sm font-medium text-muted-foreground hover:text-primary transition-colors p-0 h-auto">
-                <span><Home className="mr-2 h-4 w-4 inline-block" />Back to Portfolio</span>
+             <Link href="/" className={cn(buttonVariants({ variant: "link" }), "text-muted-foreground hover:text-primary p-0 h-auto")}>
+                <Home className="mr-2 h-4 w-4 inline-block" />Back to Portfolio
              </Link>
           </CardFooter>
         </Card>
@@ -136,16 +140,26 @@ export default function AdminDashboardPage() {
       </div>
 
       <div className="space-y-12">
-        <HeroManager /> {/* Add the new HeroManager here */}
+        <HeroManager />
+        <AboutManager />
         <ProjectsManager />
         <SkillsManager />
-        <AboutManager />
         <TimelineManager />
         <CertificationsManager />
         <ResumeManager />
+        {/* <ContactManager />  Will be added in a future step */}
+        <Card className="shadow-lg">
+          <CardHeader>
+            <CardTitle>Manage Contact Page & Submissions</CardTitle>
+            <CardDescription>
+              Edit contact information, social links, and view form submissions. (Full functionality coming soon)
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <p className="text-muted-foreground">Contact management section is under construction. In the next steps, we will add UI to edit contact details, social links, and view submitted messages.</p>
+          </CardContent>
+        </Card>
       </div>
     </SectionWrapper>
   );
 }
-
-    
