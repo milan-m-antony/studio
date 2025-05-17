@@ -1,3 +1,4 @@
+
 // src/app/page.tsx
 import { use } from 'react';
 import HeroSection from '@/components/sections/HeroSection';
@@ -9,7 +10,7 @@ import CertificationsSection from '@/components/sections/CertificationsSection';
 import ResumeSection from '@/components/sections/ResumeSection';
 import ContactSection from '@/components/sections/ContactSection';
 import { supabase } from '@/lib/supabaseClient';
-import type { HeroContent } from '@/types/supabase';
+import type { HeroContent, StoredHeroSocialLink, HeroSocialLinkItem } from '@/types/supabase';
 
 export const dynamic = "force-dynamic";
 
@@ -20,7 +21,7 @@ async function getHeroContentData(): Promise<HeroContent | null> {
   try {
     const { data, error, status } = await supabase
       .from('hero_content')
-      .select('*')
+      .select('id, main_name, subtitles, social_media_links, updated_at') // Ensure social_media_links is selected
       .eq('id', PRIMARY_HERO_CONTENT_ID)
       .maybeSingle();
 
@@ -33,15 +34,18 @@ async function getHeroContentData(): Promise<HeroContent | null> {
     } else {
       console.log('[HomePage] No hero_content found for ID, returning null.');
     }
-    // Ensure all expected fields are present or defaulted if necessary for HeroContent type
+    
+    // Map StoredHeroSocialLink to HeroSocialLinkItem by adding a client-side id
+    const mappedSocialLinks = data?.social_media_links?.map((link: StoredHeroSocialLink) => ({
+        ...link,
+        id: crypto.randomUUID(), // For client-side keying, not part of stored JSON
+    })) || null;
+
     return data ? {
         id: data.id,
         main_name: data.main_name || null,
         subtitles: data.subtitles || null,
-        social_github_url: data.social_github_url || null,
-        social_linkedin_url: data.social_linkedin_url || null,
-        social_instagram_url: data.social_instagram_url || null,
-        social_facebook_url: data.social_facebook_url || null,
+        social_media_links: mappedSocialLinks, // Use the mapped links
         updated_at: data.updated_at,
     } : null;
   } catch (e: any) {
@@ -51,16 +55,11 @@ async function getHeroContentData(): Promise<HeroContent | null> {
 }
 
 interface HomePageProps {
-  // params and searchParams are not directly used by this static page,
-  // but defining them satisfies the Next.js page component signature.
   params?: { [key: string]: string | string[] | undefined };
   searchParams?: { [key: string]: string | string[] | undefined };
 }
 
 export default async function HomePage(props: HomePageProps) {
-  // The 'use' hook for params/searchParams is generally for when they are actively used
-  // or to resolve promise-like structures. For this static page, direct access
-  // for logging (if needed) or passing down is usually fine.
   // const resolvedParams = props.params ? use(props.params) : {};
   // const resolvedSearchParams = props.searchParams ? use(props.searchParams) : {};
 
@@ -81,3 +80,5 @@ export default async function HomePage(props: HomePageProps) {
     </>
   );
 }
+
+    

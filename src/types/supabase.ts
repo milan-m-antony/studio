@@ -10,6 +10,21 @@ export type Json =
   | { [key: string]: Json | undefined }
   | Json[]
 
+// Interface for individual social links within HeroContent
+export interface HeroSocialLinkItem {
+  id: string; // Client-side temporary ID for list management, not necessarily stored in DB JSON
+  label: string;
+  url: string;
+  icon_name: string; // Lucide icon name
+}
+
+// Interface for the structure stored in the JSONB column (without client-side id)
+export interface StoredHeroSocialLink {
+  label: string;
+  url: string;
+  icon_name: string;
+}
+
 export interface Database {
   public: {
     Tables: {
@@ -331,7 +346,6 @@ export interface Database {
           id: string
           skill_name: string
           category_id: string | null
-          // created_at was removed here
         }
         Insert: {
           id?: string
@@ -384,30 +398,21 @@ export interface Database {
           id: string;
           main_name: string | null;
           subtitles: string[] | null;
-          social_github_url: string | null;
-          social_linkedin_url: string | null;
-          social_instagram_url: string | null;
-          social_facebook_url: string | null;
+          social_media_links: StoredHeroSocialLink[] | null; // Changed from individual social urls
           updated_at: string;
         }
         Insert: {
           id: string;
           main_name?: string | null;
           subtitles?: string[] | null;
-          social_github_url?: string | null;
-          social_linkedin_url?: string | null;
-          social_instagram_url?: string | null;
-          social_facebook_url?: string | null;
+          social_media_links?: StoredHeroSocialLink[] | null;
           updated_at?: string;
         }
         Update: {
           id?: string;
           main_name?: string | null;
           subtitles?: string[] | null;
-          social_github_url?: string | null;
-          social_linkedin_url?: string | null;
-          social_instagram_url?: string | null;
-          social_facebook_url?: string | null;
+          social_media_links?: StoredHeroSocialLink[] | null;
           updated_at?: string;
         }
         Relationships: [];
@@ -442,11 +447,11 @@ export interface Database {
         }
         Relationships: [];
       }
-      social_links: {
+      social_links: { // This table is for general social links (e.g., footer or contact page)
         Row: {
           id: string;
           label: string;
-          icon_image_url: string | null;
+          icon_image_url: string | null; // For image URLs
           url: string;
           display_text: string | null;
           sort_order: number | null;
@@ -480,7 +485,7 @@ export interface Database {
           subject: string | null;
           message: string;
           phone_number: string | null;
-          status: string | null; // Should match SubmissionStatus type ('New', 'Replied', 'Archived')
+          status: string | null; // 'New', 'Replied', 'Archived'
           is_starred: boolean | null;
           submitted_at: string;
           notes: string | null;
@@ -533,7 +538,7 @@ export interface Project {
   id: string;
   title: string;
   description: string | null;
-  imageUrl: string | null; // Mapped from image_url
+  imageUrl: string | null;
   liveDemoUrl?: string | null;
   repoUrl?: string | null;
   tags: string[] | null;
@@ -545,16 +550,16 @@ export interface Project {
 export interface Skill {
   id: string;
   name: string;
-  iconImageUrl: string | null; // Mapped from icon_image_url
+  iconImageUrl: string | null;
   description: string | null;
-  categoryId?: string | null; // Foreign key
-  created_at: string; // Added back as per schema
+  categoryId?: string | null;
+  created_at: string;
 }
 
 export interface SkillCategory {
   id: string;
   name: string;
-  iconImageUrl?: string | null; // Mapped from icon_image_url
+  iconImageUrl?: string | null;
   skills?: Skill[];
   sort_order?: number | null;
   created_at?: string;
@@ -567,7 +572,7 @@ export interface TimelineEvent {
   date: string;
   title: string;
   description: string;
-  iconImageUrl: string | null; // Mapped from icon_image_url
+  icon_image_url: string | null;
   type: TimelineEventType;
   sort_order?: number | null;
   created_at?: string;
@@ -578,7 +583,7 @@ export interface Certification {
   title: string;
   issuer: string;
   date: string;
-  imageUrl: string | null; // Mapped from image_url
+  imageUrl: string | null;
   verifyUrl?: string | null;
   created_at: string;
 }
@@ -592,7 +597,7 @@ export interface AboutContent {
   paragraph1: string | null;
   paragraph2: string | null;
   paragraph3: string | null;
-  imageUrl: string | null; // Mapped from image_url
+  imageUrl: string | null;
   image_tagline: string | null;
   updated_at?: string;
 }
@@ -630,14 +635,13 @@ export interface ResumeKeySkill {
   id: string;
   skill_name: string;
   category_id?: string | null;
-  // No created_at for individual skills based on schema
 }
 
 export interface ResumeKeySkillCategory {
   id: string;
   category_name: string;
   icon_image_url: string | null;
-  skills?: ResumeKeySkill[]; // Nested skills
+  skills?: ResumeKeySkill[];
   sort_order?: number | null;
   created_at: string;
 }
@@ -655,10 +659,7 @@ export interface HeroContent {
   id: string;
   main_name: string | null;
   subtitles: string[] | null;
-  social_github_url: string | null;
-  social_linkedin_url: string | null;
-  social_instagram_url: string | null;
-  social_facebook_url: string | null;
+  social_media_links: StoredHeroSocialLink[] | null; // Uses StoredHeroSocialLink for DB structure
   updated_at: string;
 }
 
@@ -672,10 +673,10 @@ export interface ContactPageDetail {
   updated_at: string;
 }
 
-export interface SocialLink {
+export interface SocialLink { // This is for general social links (Contact Manager)
   id: string;
   label: string;
-  icon_image_url: string | null; // Changed from icon_name
+  icon_image_url: string | null; // Switched from icon_name to icon_image_url
   url: string;
   display_text: string | null;
   sort_order?: number | null;
@@ -691,17 +692,10 @@ export interface ContactSubmission {
   subject: string | null;
   message: string;
   phone_number: string | null;
-  status?: SubmissionStatus | null; // Use the defined type
+  status?: SubmissionStatus | null;
   is_starred?: boolean | null;
   submitted_at: string;
   notes?: string | null;
 }
 
-// Ensure the Database interface aligns with these specific types.
-// For example, skills.Row should have icon_image_url, not icon_name.
-// certifications.Row should not have image_hint if we removed it.
-// timeline_events.Row should have icon_image_url.
-// resume tables should have icon_image_url where applicable.
-// social_links.Row should have icon_image_url.
-// contact_submissions.Row.status should ideally be typed against SubmissionStatus enum if possible in DB or validated against it.
-// Make sure resume_key_skills.Row does not have created_at
+    
