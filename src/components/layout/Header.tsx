@@ -1,9 +1,10 @@
+
 "use client";
 
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
 import { usePathname } from 'next/navigation';
-import { Menu, X, Sun, Moon, Code2, Home, User, Briefcase, Wrench, Map as MapIcon, Award, FileText, Mail, LayoutDashboard } from 'lucide-react';
+import { Menu, X, Sun, Moon, Code2, Home, User, Briefcase, Wrench, Map as MapIcon, Award, FileText, Mail } from 'lucide-react'; // Removed LayoutDashboard
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { useTheme } from '@/contexts/ThemeProvider';
@@ -21,12 +22,11 @@ const publicNavItems = [
   { href: '#contact', label: 'Contact', icon: Mail },
 ];
 
-// Admin dashboard navigation item
-const adminDashboardNavItem = { href: '/admin/dashboard', label: 'Dashboard', icon: LayoutDashboard };
+// Removed adminDashboardNavItem and logic for isUserAdmin affecting nav items
 
-const NavLinks = ({ onClick, activeHref, navItemsToRender }: { onClick?: () => void; activeHref: string; navItemsToRender: Array<typeof publicNavItems[0] | typeof adminDashboardNavItem> }) => (
+const NavLinks = ({ onClick, activeHref }: { onClick?: () => void; activeHref: string; }) => (
   <>
-    {navItemsToRender.map((item) => {
+    {publicNavItems.map((item) => { // Always render publicNavItems
       const IconComponent = item.icon;
       const isActive = item.href === activeHref;
       return (
@@ -72,76 +72,43 @@ export default function Header() {
   const { theme, setTheme } = useTheme();
   const [activeLink, setActiveLink] = useState<string>('#hero');
   const pathname = usePathname();
-  const [isUserAdmin, setIsUserAdmin] = useState(false);
-  const [currentNavItems, setCurrentNavItems] = useState(publicNavItems);
+  // Removed isUserAdmin and related useEffect for authChange affecting nav items here
 
   useEffect(() => setMounted(true), []);
-
-  useEffect(() => {
-    const updateAdminStatusAndNavItems = () => {
-      if (typeof window !== 'undefined') {
-        const authenticated = localStorage.getItem('isAdminAuthenticated') === 'true';
-        setIsUserAdmin(authenticated);
-        setCurrentNavItems(authenticated ? [...publicNavItems, adminDashboardNavItem] : publicNavItems);
-      }
-    };
-
-    updateAdminStatusAndNavItems(); // Initial check on mount
-
-    const handleAuthChange = () => {
-      updateAdminStatusAndNavItems();
-    };
-
-    window.addEventListener('authChange', handleAuthChange);
-    // Listen to storage events for changes in other tabs/windows
-    window.addEventListener('storage', (event) => {
-        if (event.key === 'isAdminAuthenticated') {
-            updateAdminStatusAndNavItems();
-        }
-    });
-
-
-    return () => {
-      window.removeEventListener('authChange', handleAuthChange);
-      window.removeEventListener('storage', (event) => {
-         if (event.key === 'isAdminAuthenticated') {
-            updateAdminStatusAndNavItems();
-        }
-      });
-    };
-  }, []); // Empty dependency array: runs once on mount for setup, cleanup on unmount
 
   useEffect(() => {
     const determineActiveLink = () => {
       const currentPath = pathname;
       const currentHash = window.location.hash;
 
-      // Handle admin dashboard link explicitly
-      if (currentPath === '/admin/dashboard' && currentNavItems.some(item => item.href === '/admin/dashboard')) {
-        setActiveLink('/admin/dashboard');
-        return;
-      }
-      // If on any other /admin page, and dashboard link is not the target, no public nav should be active
-      if (currentPath.startsWith('/admin') && currentPath !== '/admin/dashboard') {
-        setActiveLink('');
+      // If on any /admin page, no public nav should be active unless it's a link to the main page
+      if (currentPath.startsWith('/admin')) {
+         // Check if we are on /admin/dashboard and one of the public items points to '/'
+        const homeItem = publicNavItems.find(item => item.href === '/');
+        if(currentPath === '/admin/dashboard' && homeItem) {
+            // setActiveLink(homeItem.href); // Or set to empty if dashboard has its own active state
+            setActiveLink(''); // Admin has its own active link system
+        } else {
+            setActiveLink('');
+        }
         return;
       }
       
       // Logic for public pages (scroll spy)
       if (currentPath === '/') {
         if (currentHash && currentHash !== '#') {
-          if (currentNavItems.some(item => item.href === currentHash)) {
+          if (publicNavItems.some(item => item.href === currentHash)) {
             setActiveLink(currentHash);
             return;
           }
         }
 
-        let newActiveLink = '#hero'; // Default for top of page
+        let newActiveLink = '#hero'; 
         let minDistance = Infinity;
-        const referencePoint = 150; // Pixels from top of viewport to consider an item "active"
+        const referencePoint = 150; 
 
-        for (const item of currentNavItems) {
-          if (item.href.startsWith('/')) continue; // Skip page links like /admin/dashboard
+        for (const item of publicNavItems) {
+          if (item.href.startsWith('/')) continue; 
 
           const element = document.getElementById(item.href.substring(1));
           if (element) {
@@ -160,14 +127,12 @@ export default function Header() {
             }
           }
         }
-        // Check if user has scrolled to the bottom of the page
         if ((window.innerHeight + Math.ceil(window.scrollY)) >= document.body.offsetHeight - 50) {
-            const contactItem = currentNavItems.find(item => item.href === '#contact');
+            const contactItem = publicNavItems.find(item => item.href === '#contact');
             if (contactItem) newActiveLink = contactItem.href;
         }
-        // Check if user is at the top of the page
         else if (window.scrollY <= 50) {
-            const heroItem = currentNavItems.find(item => item.href === '#hero');
+            const heroItem = publicNavItems.find(item => item.href === '#hero');
             if (heroItem) newActiveLink = heroItem.href;
         }
         setActiveLink(newActiveLink);
@@ -175,10 +140,10 @@ export default function Header() {
     };
 
     if (mounted) {
-      determineActiveLink(); // Initial call
+      determineActiveLink(); 
       window.addEventListener('scroll', determineActiveLink, { passive: true });
       window.addEventListener('hashchange', determineActiveLink);
-      window.addEventListener('resize', determineActiveLink); // Recalculate on resize
+      window.addEventListener('resize', determineActiveLink); 
     }
 
     return () => {
@@ -188,7 +153,7 @@ export default function Header() {
         window.removeEventListener('resize', determineActiveLink);
       }
     };
-  }, [pathname, mounted, currentNavItems]); // Re-run if currentNavItems changes (e.g., admin logs in/out)
+  }, [pathname, mounted]); 
 
 
   if (!mounted) return null;
@@ -199,12 +164,13 @@ export default function Header() {
   }
 
   const toggleTheme = () => {
-    if (effectiveTheme === 'dark') {
-      setTheme('light');
-    } else {
-      setTheme('dark');
-    }
+    setTheme(effectiveTheme === 'dark' ? 'light' : 'dark');
   };
+
+  // Do not show the public header on admin routes
+  if (pathname.startsWith('/admin')) {
+    return null;
+  }
 
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -215,7 +181,7 @@ export default function Header() {
         </Link>
 
         <nav className="hidden md:flex items-center space-x-1">
-          <NavLinks activeHref={activeLink} navItemsToRender={currentNavItems} />
+          <NavLinks activeHref={activeLink} />
         </nav>
 
         <div className="flex items-center gap-2">
@@ -248,7 +214,7 @@ export default function Header() {
                 </SheetHeader>
                 <div className="p-6">
                   <nav className="flex flex-col space-y-3">
-                    <NavLinks onClick={() => setIsMobileMenuOpen(false)} activeHref={activeLink} navItemsToRender={currentNavItems} />
+                    <NavLinks onClick={() => setIsMobileMenuOpen(false)} activeHref={activeLink} />
                   </nav>
                 </div>
               </SheetContent>

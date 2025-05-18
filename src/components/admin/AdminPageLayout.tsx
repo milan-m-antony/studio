@@ -9,14 +9,14 @@ import { Home, Users, Briefcase, Wrench, MapPin as JourneyIcon, Award, FileText 
 import type { LucideIcon } from 'lucide-react';
 import { useTheme } from '@/contexts/ThemeProvider';
 import { cn } from '@/lib/utils';
-import { usePathname } from 'next/navigation'; // To manage sidebar state if needed
+import { usePathname } from 'next/navigation'; 
 import React, { useState, useEffect } from 'react';
 
 export interface AdminNavItem {
   key: string;
   label: string;
   icon: LucideIcon;
-  href?: string; // Optional, if direct navigation is needed, otherwise handled by onSelectSection
+  href?: string; 
 }
 
 interface AdminPageLayoutProps {
@@ -44,14 +44,14 @@ export default function AdminPageLayout({
 
   useEffect(() => setMounted(true), []);
 
-  if (!mounted) return null; // Avoid hydration mismatch for theme toggle
+  if (!mounted) return null; 
 
   let effectiveTheme = theme;
   if (theme === 'system' && typeof window !== 'undefined') {
     effectiveTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
   }
 
-  const toggleTheme = () => setTheme(effectiveTheme === 'dark' ? 'light' : 'light');
+  const toggleTheme = () => setTheme(effectiveTheme === 'dark' ? 'light' : 'dark');
 
 
   const SidebarContent = ({ isMobile = false }: { isMobile?: boolean }) => (
@@ -136,7 +136,6 @@ export default function AdminPageLayout({
             <Button variant="ghost" size="icon" onClick={toggleTheme} aria-label="Toggle theme">
               {effectiveTheme === 'dark' ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
             </Button>
-            {/* User Menu - Simplified */}
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <span>{username}</span>
               <Button variant="outline" size="sm" onClick={onLogout}>
