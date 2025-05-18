@@ -1,27 +1,58 @@
 
 "use client";
 
-import React, { useEffect, useState, type FormEvent, type ChangeEvent } from 'react';
+import React, { useEffect, useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
-import SectionWrapper from '@/components/ui/SectionWrapper';
-import SectionTitle from '@/components/ui/SectionTitle';
-import { Button, buttonVariants } from '@/components/ui/button';
+import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { ShieldCheck, LogOut, AlertTriangle, LogIn, Home } from 'lucide-react';
+import { ShieldCheck, LogOut, AlertTriangle, LogIn, Home as HomeIcon, Users, Briefcase, Wrench, MapPin as JourneyIcon, Award, FileText as ResumeIcon, Mail, Settings as SettingsIcon, LayoutDashboard } from 'lucide-react';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
 
+// Import Admin Managers
+import HeroManager from '@/components/admin/HeroManager';
+import AboutManager from '@/components/admin/AboutManager';
 import ProjectsManager from '@/components/admin/ProjectsManager';
 import SkillsManager from '@/components/admin/SkillsManager';
-import AboutManager from '@/components/admin/AboutManager';
 import TimelineManager from '@/components/admin/TimelineManager';
 import CertificationsManager from '@/components/admin/CertificationsManager';
 import ResumeManager from '@/components/admin/ResumeManager';
-import HeroManager from '@/components/admin/HeroManager';
-import ContactManager from '@/components/admin/ContactManager'; // Added import
+import ContactManager from '@/components/admin/ContactManager';
+import AdminPageLayout, { type AdminNavItem } from '@/components/admin/AdminPageLayout';
+
+
+const adminNavItems: AdminNavItem[] = [
+  { key: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+  { key: 'hero', label: 'Home Section', icon: HomeIcon },
+  { key: 'about', label: 'About Section', icon: Users },
+  { key: 'projects', label: 'Projects', icon: Briefcase },
+  { key: 'skills', label: 'Skills', icon: Wrench },
+  { key: 'journey', label: 'Journey', icon: JourneyIcon },
+  { key: 'certifications', label: 'Certifications', icon: Award },
+  { key: 'resume', label: 'Resume', icon: ResumeIcon },
+  { key: 'contact', label: 'Contact & Submissions', icon: Mail },
+  // { key: 'settings', label: 'Settings', icon: SettingsIcon }, // Future
+];
+
+function getPageTitle(sectionKey: string): string {
+  const item = adminNavItems.find(navItem => navItem.key === sectionKey);
+  return item ? item.label : "Portfolio Admin";
+}
+
+const DashboardOverview = () => (
+    <Card>
+        <CardHeader>
+            <CardTitle>Welcome to your Dashboard</CardTitle>
+            <CardDescription>Select a section from the sidebar to manage your portfolio content.</CardDescription>
+        </CardHeader>
+        <CardContent>
+            <p>This is the main overview page. More widgets and summaries can be added here in the future.</p>
+        </CardContent>
+    </Card>
+);
 
 
 export default function AdminDashboardPage() {
@@ -31,12 +62,16 @@ export default function AdminDashboardPage() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [activeSection, setActiveSection] = useState('dashboard'); // Default section
 
   useEffect(() => {
     setIsMounted(true);
     if (typeof window !== 'undefined') {
       const authStatus = localStorage.getItem('isAdminAuthenticated') === 'true';
       setIsAuthenticatedForRender(authStatus);
+      // Restore username if needed for display, or if you implement "remember me"
+      // const storedUsername = localStorage.getItem('adminUsername');
+      // if (authStatus && storedUsername) setUsername(storedUsername);
     }
   }, []);
 
@@ -49,37 +84,31 @@ export default function AdminDashboardPage() {
     const expectedUsername = process.env.NEXT_PUBLIC_ADMIN_USERNAME;
     const expectedPassword = process.env.NEXT_PUBLIC_ADMIN_PASSWORD;
 
-    console.log('[Admin Login] Attempting login...');
-    console.log('[Admin Login] Entered Username:', `"${trimmedUsername}"`);
-    console.log('[Admin Login] Expected Username from env:', `"${expectedUsername}"`);
-    console.log('[Admin Login] Username match status:', trimmedUsername === expectedUsername);
-    console.log('[Admin Login] Password match status (not logging actual passwords):', trimmedPassword === expectedPassword);
-
-
     if (trimmedUsername === expectedUsername && trimmedPassword === expectedPassword) {
       if (typeof window !== 'undefined') {
         localStorage.setItem('isAdminAuthenticated', 'true');
+        // localStorage.setItem('adminUsername', trimmedUsername); // Optional: store username
         window.dispatchEvent(new CustomEvent('authChange'));
       }
       setIsAuthenticatedForRender(true);
-      console.log('[Admin Login] Login successful.');
     } else {
       setError("Invalid username or password.");
       setIsAuthenticatedForRender(false);
-      console.log('[Admin Login] Login failed.');
     }
   };
 
   const handleLogout = () => {
     if (typeof window !== 'undefined') {
       localStorage.removeItem('isAdminAuthenticated');
+      // localStorage.removeItem('adminUsername'); // Optional: clear stored username
       window.dispatchEvent(new CustomEvent('authChange'));
     }
     setIsAuthenticatedForRender(false);
     setUsername('');
     setPassword('');
+    setActiveSection('dashboard'); // Reset to dashboard view on logout
+    router.push('/admin/dashboard'); // Ensure user is on the login view
   };
-
 
   if (!isMounted) {
     return (
@@ -116,7 +145,7 @@ export default function AdminDashboardPage() {
           </CardContent>
            <CardFooter className="mt-6 flex flex-col items-center space-y-2">
              <Link href="/" className={cn(buttonVariants({ variant: "link" }), "text-muted-foreground hover:text-primary p-0 h-auto")}>
-                <Home className="mr-2 h-4 w-4 inline-block" />Back to Portfolio
+                <HomeIcon className="mr-2 h-4 w-4 inline-block" />Back to Portfolio
              </Link>
           </CardFooter>
         </Card>
@@ -125,29 +154,30 @@ export default function AdminDashboardPage() {
   }
 
   return (
-    <SectionWrapper>
-      <SectionTitle subtitle="Manage portfolio content.">Admin Dashboard</SectionTitle>
-      <div className="flex justify-between items-center mb-8">
-        <Button asChild className="mb-0">
-          <Link href="/">
-            <span>
-                <Home className="mr-2 h-4 w-4"/>Back to Portfolio
-            </span>
-          </Link>
-        </Button>
-        <Button variant="outline" onClick={handleLogout}><LogOut className="mr-2 h-4 w-4" /> Logout</Button>
-      </div>
-
-      <div className="space-y-12">
-        <HeroManager />
-        <AboutManager />
-        <ProjectsManager />
-        <SkillsManager />
-        <TimelineManager />
-        <CertificationsManager />
-        <ResumeManager />
-        <ContactManager /> {/* Replaced placeholder with actual component */}
-      </div>
-    </SectionWrapper>
+    <AdminPageLayout
+      navItems={adminNavItems}
+      activeSection={activeSection}
+      onSelectSection={setActiveSection}
+      onLogout={handleLogout}
+      username={process.env.NEXT_PUBLIC_ADMIN_USERNAME || "Admin"} // Display logged-in username
+      pageTitle={getPageTitle(activeSection)}
+    >
+      {activeSection === 'dashboard' && <DashboardOverview />}
+      {activeSection === 'hero' && <HeroManager />}
+      {activeSection === 'about' && <AboutManager />}
+      {activeSection === 'projects' && <ProjectsManager />}
+      {activeSection === 'skills' && <SkillsManager />}
+      {activeSection === 'journey' && <TimelineManager />}
+      {activeSection === 'certifications' && <CertificationsManager />}
+      {activeSection === 'resume' && <ResumeManager />}
+      {activeSection === 'contact' && <ContactManager />}
+      {/* Add other sections here */}
+      {activeSection === 'settings' && (
+        <Card>
+          <CardHeader><CardTitle>Settings</CardTitle><CardDescription>Site settings and account actions.</CardDescription></CardHeader>
+          <CardContent><p>Settings management coming soon.</p></CardContent>
+        </Card>
+      )}
+    </AdminPageLayout>
   );
 }
