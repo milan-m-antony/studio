@@ -2,10 +2,11 @@
 "use client";
 
 import { useEffect, useState, type ComponentType } from 'react';
-import { ChevronDown, type LucideProps } from 'lucide-react';
-import Link from 'next/link';
+import { ChevronDown, Link as GenericLinkIcon } from 'lucide-react'; // Link renamed to GenericLinkIcon
+import NextLink from 'next/link'; // Renamed to avoid conflict with our Link component
+import Image from 'next/image'; // For displaying social icons if URLs are provided
 import type { HeroContent, HeroSocialLinkItem } from '@/types/supabase';
-import * as LucideIcons from 'lucide-react'; // Import all Lucide icons
+// LucideIcons import is removed as we will use image URLs for icons
 
 const EnhancedTypewriter = ({
   texts,
@@ -27,9 +28,10 @@ const EnhancedTypewriter = ({
 
   useEffect(() => {
     if (!texts || texts.length === 0) {
-        setDisplayedText("— a Developer");
+        setDisplayedText("— a Developer"); // Default if no texts provided
         return;
     }
+    // Reset when texts or currentTextIndex changes
     setCharDisplayProgress(0);
     setDisplayedText('');
     setIsDeleting(false);
@@ -42,27 +44,27 @@ const EnhancedTypewriter = ({
     const currentTargetText = texts[currentTextIndex];
     let timer: NodeJS.Timeout;
 
-    if (!isDeleting) {
+    if (!isDeleting) { // Typing mode
       if (charDisplayProgress < currentTargetText.length) {
         timer = setTimeout(() => {
           setDisplayedText(currentTargetText.substring(0, charDisplayProgress + 1));
           setCharDisplayProgress((prev) => prev + 1);
         }, typingSpeed);
-      } else {
+      } else { // Finished typing current text
         timer = setTimeout(() => {
           setIsDeleting(true);
         }, pauseAfterTypingDuration);
       }
-    } else {
+    } else { // Deleting mode
       if (charDisplayProgress > 0) {
         timer = setTimeout(() => {
           setDisplayedText(currentTargetText.substring(0, charDisplayProgress - 1));
           setCharDisplayProgress((prev) => prev - 1);
         }, deletingSpeed);
-      } else {
+      } else { // Finished deleting current text
         timer = setTimeout(() => {
           setIsDeleting(false);
-          setCurrentTextIndex((prev) => (prev + 1) % texts.length);
+          setCurrentTextIndex((prev) => (prev + 1) % texts.length); // Move to next text
         }, pauseAfterDeletingDuration);
       }
     }
@@ -78,22 +80,12 @@ const EnhancedTypewriter = ({
     pauseAfterDeletingDuration,
   ]);
 
-  return <span>{displayedText || <>&nbsp;</>}</span>;
+  return <span>{displayedText || <>&nbsp;</>}</span>; // Render a space if empty to maintain height
 };
 
 interface HeroSectionProps {
   heroContent: HeroContent | null;
 }
-
-const getLucideIcon = (iconName: string): ComponentType<LucideProps> => {
-  const IconComponent = LucideIcons[iconName as keyof typeof LucideIcons] as ComponentType<LucideProps> | undefined;
-  if (IconComponent && typeof IconComponent === 'function') {
-    return IconComponent;
-  }
-  console.warn(`HeroSection: Lucide icon "${iconName}" not found or invalid. Falling back to Link icon.`);
-  return LucideIcons.Link2; // Default fallback icon
-};
-
 
 export default function HeroSection({ heroContent }: HeroSectionProps) {
   const [offsetY, setOffsetY] = useState(0);
@@ -114,38 +106,56 @@ export default function HeroSection({ heroContent }: HeroSectionProps) {
   const mainName = heroContent?.main_name || "Your Name"; 
   const subtitles = (heroContent?.subtitles && heroContent.subtitles.length > 0)
     ? heroContent.subtitles 
-    : ["— a Creative Developer", "— a Full-Stack Engineer", "— a Tech Enthusiast"];
+    : ["— a Creative Developer", "— a Full-Stack Engineer", "— a Tech Enthusiast"]; // Default subtitles
 
-  const socialLinksToRender: Array<{ href: string; icon: ComponentType<LucideProps>; label: string }> = 
+  // Use HeroSocialLinkItem which expects icon_image_url
+  const socialLinksToRender: Array<{ href: string; iconImageUrl: string | null; label: string }> = 
     heroContent?.social_media_links?.map(link => ({
       href: link.url,
-      icon: getLucideIcon(link.icon_name),
+      iconImageUrl: link.icon_image_url || null, // Use image URL
       label: link.label
     })) || [
       // Default fallback links if none are provided from DB
-      { href: "https://github.com", icon: LucideIcons.Github, label: "GitHub" },
-      { href: "https://linkedin.com", icon: LucideIcons.Linkedin, label: "LinkedIn" },
+      { href: "https://github.com", iconImageUrl: null, label: "GitHub" }, // No default image, will use GenericLinkIcon
+      { href: "https://linkedin.com", iconImageUrl: null, label: "LinkedIn" },
     ];
+  console.log('[HeroSection] Rendering with socialLinksToRender:', socialLinksToRender);
+
 
   return (
     <section id="hero" className="relative h-screen flex flex-col items-center justify-center overflow-hidden text-center bg-background text-foreground p-4">
+      {/* Parallax Background Elements */}
       <div className="absolute inset-0 z-0" style={{ transform: `translateY(${offsetY * 0.5}px)` }}>
+        {/* Example subtle animated background - can be replaced with Vanta.js or similar if desired */}
         <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-background to-accent/10 opacity-50" />
       </div>
       
+      {/* Social Media Icons - Vertical on Left */}
       {socialLinksToRender.length > 0 && (
         <div 
-          className="absolute left-4 md:left-6 lg:left-8 top-1/2 -translate-y-1/2 z-20 flex flex-col space-y-6" // Increased space-y-4 to space-y-6
+          className="absolute left-4 md:left-6 lg:left-8 top-1/2 -translate-y-1/2 z-20 flex flex-col space-y-6"
           style={{ transform: `translateY(-50%) translateY(${offsetY * 0.1}px)` }}
         >
           {socialLinksToRender.map((social) => (
-            <Link key={social.label} href={social.href} target="_blank" rel="noopener noreferrer" aria-label={social.label}>
-              <social.icon className="h-6 w-6 text-foreground/70 hover:text-primary transition-colors duration-300 ease-in-out transform hover:scale-110" />
-            </Link>
+            <NextLink key={social.label} href={social.href} target="_blank" rel="noopener noreferrer" aria-label={social.label}>
+              {social.iconImageUrl ? (
+                <div className="relative h-6 w-6 transition-transform duration-300 ease-in-out transform hover:scale-125">
+                  <Image 
+                    src={social.iconImageUrl} 
+                    alt={social.label} 
+                    fill 
+                    className="object-contain dark:filter dark:brightness-0 dark:invert" // Invert in dark mode for visibility
+                  />
+                </div>
+              ) : (
+                <GenericLinkIcon className="h-6 w-6 text-foreground/70 hover:text-primary transition-colors duration-300 ease-in-out transform hover:scale-110" />
+              )}
+            </NextLink>
           ))}
         </div>
       )}
 
+      {/* Main Hero Content */}
       <div className="relative z-10 flex flex-col items-center" style={{ transform: `translateY(${offsetY * 0.15}px)` }}>
         <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold mb-4 mt-8 animate-fadeIn" style={{animationDelay: '0.5s'}}>
           Hi, I'm {mainName}
@@ -157,6 +167,7 @@ export default function HeroSection({ heroContent }: HeroSectionProps) {
         </p>
       </div>
       
+      {/* Scroll Down Arrow */}
       <div 
         className="absolute bottom-10 left-1/2 -translate-x-1/2 z-20 animate-fadeIn" 
         style={{ animationDelay: '1.5s', transform: `translateX(-50%) translateY(${offsetY * 0.05}px)` }}
@@ -168,5 +179,3 @@ export default function HeroSection({ heroContent }: HeroSectionProps) {
     </section>
   );
 }
-
-    

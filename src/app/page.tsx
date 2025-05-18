@@ -21,7 +21,7 @@ async function getHeroContentData(): Promise<HeroContent | null> {
   try {
     const { data, error, status } = await supabase
       .from('hero_content')
-      .select('id, main_name, subtitles, social_media_links, updated_at') // Ensure social_media_links is selected
+      .select('id, main_name, subtitles, social_media_links, updated_at')
       .eq('id', PRIMARY_HERO_CONTENT_ID)
       .maybeSingle();
 
@@ -29,30 +29,50 @@ async function getHeroContentData(): Promise<HeroContent | null> {
       console.error('[HomePage] Supabase error fetching hero_content:', { message: error.message, details: error.details, hint: error.hint, code: error.code, status });
       return null;
     }
-    if (data) {
-      console.log('[HomePage] Successfully fetched hero_content name:', data.main_name);
-    } else {
+    if (!data) {
       console.log('[HomePage] No hero_content found for ID, returning null.');
+      return null;
+    }
+    console.log('[HomePage] Successfully fetched hero_content name:', data.main_name);
+    console.log('[HomePage] Raw hero_content social_media_links from Supabase:', JSON.stringify(data.social_media_links));
+
+
+    let mappedSocialLinks: HeroSocialLinkItem[] | null = null;
+    if (data.social_media_links && Array.isArray(data.social_media_links)) {
+      mappedSocialLinks = data.social_media_links.map((link: StoredHeroSocialLink) => {
+        if (!link || typeof link.label !== 'string' || typeof link.url !== 'string') {
+          console.warn('[HomePage] Malformed social link object in DB:', link);
+          return { // Provide a minimal valid structure if malformed
+            label: 'Error',
+            url: '#',
+            icon_image_url: null, // Changed from icon_name
+            id: crypto.randomUUID(),
+          };
+        }
+        return {
+          ...link,
+          icon_image_url: link.icon_image_url || null, // Ensure it's null if missing/empty
+          id: crypto.randomUUID(),
+        };
+      });
+    } else if (data.social_media_links) {
+      console.warn('[HomePage] hero_content.social_media_links is not an array:', data.social_media_links);
     }
     
-    // Map StoredHeroSocialLink to HeroSocialLinkItem by adding a client-side id
-    const mappedSocialLinks = data?.social_media_links?.map((link: StoredHeroSocialLink) => ({
-        ...link,
-        id: crypto.randomUUID(), // For client-side keying, not part of stored JSON
-    })) || null;
-
-    return data ? {
+    return {
         id: data.id,
         main_name: data.main_name || null,
         subtitles: data.subtitles || null,
-        social_media_links: mappedSocialLinks, // Use the mapped links
+        social_media_links: mappedSocialLinks,
         updated_at: data.updated_at,
-    } : null;
+    };
+
   } catch (e: any) {
     console.error('[HomePage] EXCEPTION fetching hero_content:', e.message, e);
     return null;
   }
 }
+
 
 interface HomePageProps {
   params?: { [key: string]: string | string[] | undefined };
@@ -60,12 +80,16 @@ interface HomePageProps {
 }
 
 export default async function HomePage(props: HomePageProps) {
-  // const resolvedParams = props.params ? use(props.params) : {};
-  // const resolvedSearchParams = props.searchParams ? use(props.searchParams) : {};
+  // const resolvedParams = props.params ? use(props.params) : {}; // Removed to avoid potential error if not used
+  // const resolvedSearchParams = props.searchParams ? use(props.searchParams) : {}; // Removed
 
   console.log('[HomePage] Starting to render HomePage component...');
   const heroContent = await getHeroContentData();
   console.log('[HomePage] Rendering HomePage. Hero content fetched (main_name):', heroContent?.main_name || "Not fetched/available");
+  if (heroContent?.social_media_links) {
+    console.log('[HomePage] Mapped social_media_links for HeroSection:', JSON.stringify(heroContent.social_media_links));
+  }
+
 
   return (
     <>
@@ -80,5 +104,3 @@ export default async function HomePage(props: HomePageProps) {
     </>
   );
 }
-
-    

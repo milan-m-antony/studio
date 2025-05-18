@@ -10,20 +10,18 @@ export type Json =
   | { [key: string]: Json | undefined }
   | Json[]
 
-// Interface for individual social links within HeroContent
-export interface HeroSocialLinkItem {
-  id: string; // Client-side temporary ID for list management, not necessarily stored in DB JSON
-  label: string;
-  url: string;
-  icon_name: string; // Lucide icon name
-}
-
-// Interface for the structure stored in the JSONB column (without client-side id)
+// Interface for the structure stored in the JSONB column for Hero social links
 export interface StoredHeroSocialLink {
   label: string;
   url: string;
-  icon_name: string;
+  icon_image_url: string | null; // Changed from icon_name
 }
+
+// Interface for Hero social links when managed in client-side state (includes temporary id)
+export interface HeroSocialLinkItem extends StoredHeroSocialLink {
+  id: string; // Client-side temporary ID for list management
+}
+
 
 export interface Database {
   public: {
@@ -34,6 +32,7 @@ export interface Database {
           title: string
           description: string | null
           image_url: string | null
+          // image_hint: string | null // Removed
           live_demo_url: string | null
           repo_url: string | null
           tags: string[] | null
@@ -46,6 +45,7 @@ export interface Database {
           title: string
           description?: string | null
           image_url?: string | null
+          // image_hint?: string | null
           live_demo_url?: string | null
           repo_url?: string | null
           tags?: string[] | null
@@ -58,6 +58,7 @@ export interface Database {
           title?: string
           description?: string | null
           image_url?: string | null
+          // image_hint?: string | null
           live_demo_url?: string | null
           repo_url?: string | null
           tags?: string[] | null
@@ -71,7 +72,7 @@ export interface Database {
         Row: {
           id: string
           name: string
-          icon_image_url: string | null
+          icon_image_url: string | null // Changed from icon_name, icon_color removed
           sort_order: number | null
           created_at: string
         }
@@ -95,7 +96,7 @@ export interface Database {
         Row: {
           id: string
           name: string
-          icon_image_url: string | null
+          icon_image_url: string | null // Changed from icon_name
           description: string | null
           category_id: string | null
           created_at: string
@@ -133,6 +134,7 @@ export interface Database {
           date: string
           image_url: string | null
           verify_url: string | null
+          // image_hint: string | null // Removed
           created_at: string
         }
         Insert: {
@@ -142,6 +144,7 @@ export interface Database {
           date: string
           image_url?: string | null
           verify_url?: string | null
+          // image_hint?: string | null
           created_at?: string
         }
         Update: {
@@ -151,6 +154,7 @@ export interface Database {
           date?: string
           image_url?: string | null
           verify_url?: string | null
+          // image_hint?: string | null
           created_at?: string
         }
         Relationships: []
@@ -161,7 +165,7 @@ export interface Database {
           date: string
           title: string
           description: string
-          icon_image_url: string | null
+          icon_image_url: string | null // Changed from icon_name
           type: string
           sort_order: number | null
           created_at: string
@@ -258,7 +262,7 @@ export interface Database {
           company_name: string
           date_range: string | null
           description_points: string[] | null
-          icon_image_url: string | null
+          icon_image_url: string | null // Changed from icon_name
           sort_order: number | null
           created_at: string
         }
@@ -291,7 +295,7 @@ export interface Database {
           institution_name: string
           date_range: string | null
           description: string | null
-          icon_image_url: string | null
+          icon_image_url: string | null // Changed from icon_name
           sort_order: number | null
           created_at: string
         }
@@ -321,7 +325,7 @@ export interface Database {
         Row: {
           id: string
           category_name: string
-          icon_image_url: string | null
+          icon_image_url: string | null // Changed from icon_name
           sort_order: number | null
           created_at: string
         }
@@ -346,6 +350,7 @@ export interface Database {
           id: string
           skill_name: string
           category_id: string | null
+          // created_at was removed from here
         }
         Insert: {
           id?: string
@@ -371,7 +376,7 @@ export interface Database {
           id: string
           language_name: string
           proficiency: string | null
-          icon_image_url: string | null
+          icon_image_url: string | null // Changed from icon_name
           sort_order: number | null
           created_at: string
         }
@@ -393,12 +398,12 @@ export interface Database {
         }
         Relationships: []
       }
-      hero_content: {
+      hero_content: { // Updated for dynamic social links
         Row: {
           id: string;
           main_name: string | null;
           subtitles: string[] | null;
-          social_media_links: StoredHeroSocialLink[] | null; // Changed from individual social urls
+          social_media_links: StoredHeroSocialLink[] | null; // Stores array of objects
           updated_at: string;
         }
         Insert: {
@@ -447,11 +452,11 @@ export interface Database {
         }
         Relationships: [];
       }
-      social_links: { // This table is for general social links (e.g., footer or contact page)
+      social_links: {
         Row: {
           id: string;
           label: string;
-          icon_image_url: string | null; // For image URLs
+          icon_image_url: string | null; // Changed from icon_name
           url: string;
           display_text: string | null;
           sort_order: number | null;
@@ -485,7 +490,7 @@ export interface Database {
           subject: string | null;
           message: string;
           phone_number: string | null;
-          status: string | null; // 'New', 'Replied', 'Archived'
+          status: SubmissionStatus | null; // Using SubmissionStatus type
           is_starred: boolean | null;
           submitted_at: string;
           notes: string | null;
@@ -497,7 +502,7 @@ export interface Database {
           subject?: string | null;
           message: string;
           phone_number?: string | null;
-          status?: string | null;
+          status?: SubmissionStatus | null;
           is_starred?: boolean | null;
           submitted_at?: string;
           notes?: string | null;
@@ -509,14 +514,14 @@ export interface Database {
           subject?: string | null;
           message?: string;
           phone_number?: string | null;
-          status?: string | null;
+          status?: SubmissionStatus | null;
           is_starred?: boolean | null;
           submitted_at?: string;
           notes?: string | null;
         }
         Relationships: [];
       }
-    }
+    } // End Tables
     Views: {
       [_ in never]: never
     }
@@ -538,7 +543,8 @@ export interface Project {
   id: string;
   title: string;
   description: string | null;
-  imageUrl: string | null;
+  imageUrl: string | null; // Camelcase for frontend
+  // imageHint: string | null; // Removed
   liveDemoUrl?: string | null;
   repoUrl?: string | null;
   tags: string[] | null;
@@ -550,7 +556,7 @@ export interface Project {
 export interface Skill {
   id: string;
   name: string;
-  iconImageUrl: string | null;
+  iconImageUrl: string | null; // Changed from iconName
   description: string | null;
   categoryId?: string | null;
   created_at: string;
@@ -559,7 +565,7 @@ export interface Skill {
 export interface SkillCategory {
   id: string;
   name: string;
-  iconImageUrl?: string | null;
+  iconImageUrl?: string | null; // Changed from iconName, iconColor removed
   skills?: Skill[];
   sort_order?: number | null;
   created_at?: string;
@@ -572,7 +578,7 @@ export interface TimelineEvent {
   date: string;
   title: string;
   description: string;
-  icon_image_url: string | null;
+  iconImageUrl: string | null; // Changed from icon_name
   type: TimelineEventType;
   sort_order?: number | null;
   created_at?: string;
@@ -583,8 +589,9 @@ export interface Certification {
   title: string;
   issuer: string;
   date: string;
-  imageUrl: string | null;
+  imageUrl: string | null; // Camelcase for frontend
   verifyUrl?: string | null;
+  // imageHint: string | null; // Removed
   created_at: string;
 }
 
@@ -597,7 +604,7 @@ export interface AboutContent {
   paragraph1: string | null;
   paragraph2: string | null;
   paragraph3: string | null;
-  imageUrl: string | null;
+  imageUrl: string | null; // Camelcase for frontend
   image_tagline: string | null;
   updated_at?: string;
 }
@@ -615,7 +622,7 @@ export interface ResumeExperience {
   company_name: string;
   date_range: string | null;
   description_points: string[] | null;
-  icon_image_url: string | null;
+  icon_image_url: string | null; // Changed from icon_name
   sort_order?: number | null;
   created_at: string;
 }
@@ -626,7 +633,7 @@ export interface ResumeEducation {
   institution_name: string;
   date_range: string | null;
   description: string | null;
-  icon_image_url: string | null;
+  icon_image_url: string | null; // Changed from icon_name
   sort_order?: number | null;
   created_at: string;
 }
@@ -635,12 +642,13 @@ export interface ResumeKeySkill {
   id: string;
   skill_name: string;
   category_id?: string | null;
+  // created_at was removed
 }
 
 export interface ResumeKeySkillCategory {
   id: string;
   category_name: string;
-  icon_image_url: string | null;
+  icon_image_url: string | null; // Changed from icon_name
   skills?: ResumeKeySkill[];
   sort_order?: number | null;
   created_at: string;
@@ -650,7 +658,7 @@ export interface ResumeLanguage {
   id: string;
   language_name: string;
   proficiency: string | null;
-  icon_image_url: string | null;
+  icon_image_url: string | null; // Changed from icon_name
   sort_order?: number | null;
   created_at: string;
 }
@@ -673,10 +681,10 @@ export interface ContactPageDetail {
   updated_at: string;
 }
 
-export interface SocialLink { // This is for general social links (Contact Manager)
+export interface SocialLink {
   id: string;
   label: string;
-  icon_image_url: string | null; // Switched from icon_name to icon_image_url
+  icon_image_url: string | null; // Changed from icon_name
   url: string;
   display_text: string | null;
   sort_order?: number | null;
@@ -697,5 +705,3 @@ export interface ContactSubmission {
   submitted_at: string;
   notes?: string | null;
 }
-
-    

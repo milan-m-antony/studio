@@ -8,35 +8,33 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Users as HeroIcon, PlusCircle, Edit, Trash2, Link as LinkIcon } from 'lucide-react';
+import { Users as HeroIcon, PlusCircle, Edit, Trash2, Link as LinkIconImg } from 'lucide-react'; // Renamed Link to avoid conflict
+import NextImage from 'next/image';
 import { supabase } from '@/lib/supabaseClient';
 import type { HeroContent, HeroSocialLinkItem, StoredHeroSocialLink } from '@/types/supabase';
-import { useForm, type SubmitHandler, Controller, useFieldArray } from "react-hook-form";
+import { useForm, type SubmitHandler, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useToast } from '@/hooks/use-toast';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose,
 } from "@/components/ui/dialog";
-import {
-  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import { cn } from '@/lib/utils';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 const PRIMARY_HERO_CONTENT_ID = '00000000-0000-0000-0000-000000000004';
 
 const heroSocialLinkSchema = z.object({
-  id: z.string().uuid().optional(), // For client-side keying, not stored in JSONB
+  id: z.string().uuid().optional(), // Client-side key
   label: z.string().min(1, "Label is required"),
   url: z.string().url("Must be a valid URL"),
-  icon_name: z.string().min(1, "Lucide icon name is required (e.g., Github, Linkedin)"),
+  icon_image_url: z.string().url("Must be a valid URL if provided.").optional().or(z.literal("")).nullable(), // Changed from icon_name
 });
 type HeroSocialLinkFormData = z.infer<typeof heroSocialLinkSchema>;
 
 const heroContentSchema = z.object({
   id: z.string().uuid().default(PRIMARY_HERO_CONTENT_ID),
   main_name: z.string().min(1, "Main name is required.").optional().nullable(),
-  subtitles_string: z.string().optional().nullable(),
+  subtitles_string: z.string().optional().nullable(), // For comma-separated input
   social_media_links: z.array(heroSocialLinkSchema).optional().default([]),
 });
 type HeroContentFormData = z.infer<typeof heroContentSchema>;
@@ -48,8 +46,10 @@ export default function HeroManager() {
   const [isLoading, setIsLoading] = useState(false);
 
   const [isSocialLinkModalOpen, setIsSocialLinkModalOpen] = useState(false);
-  const [currentSocialLink, setCurrentSocialLink] = useState<HeroSocialLinkItem | null>(null);
+  const [currentSocialLinkForEdit, setCurrentSocialLinkForEdit] = useState<HeroSocialLinkItem | null>(null);
   const [editingSocialLinkIndex, setEditingSocialLinkIndex] = useState<number | null>(null);
+  const [currentIconPreview, setCurrentIconPreview] = useState<string | null>(null);
+
 
   const heroForm = useForm<HeroContentFormData>({
     resolver: zodResolver(heroContentSchema),
@@ -64,13 +64,24 @@ export default function HeroManager() {
   const { fields: socialMediaLinksFields, append: appendSocialLink, remove: removeSocialLink, update: updateSocialLink } = useFieldArray({
     control: heroForm.control,
     name: "social_media_links",
-    keyName: "fieldId" // Use a different key name than default 'id' to avoid conflict with our item's 'id'
+    keyName: "fieldId" 
   });
   
   const socialLinkForm = useForm<HeroSocialLinkFormData>({
     resolver: zodResolver(heroSocialLinkSchema),
-    defaultValues: { label: '', url: '', icon_name: ''}
+    defaultValues: { label: '', url: '', icon_image_url: ''}
   });
+
+  const watchedIconUrl = socialLinkForm.watch("icon_image_url");
+
+  useEffect(() => {
+    if (watchedIconUrl) {
+      setCurrentIconPreview(watchedIconUrl);
+    } else {
+      setCurrentIconPreview(null);
+    }
+  }, [watchedIconUrl]);
+
 
   useEffect(() => {
     fetchHeroContent();
@@ -80,7 +91,7 @@ export default function HeroManager() {
     setIsLoading(true);
     const { data, error } = await supabase
       .from('hero_content')
-      .select('*')
+      .select('id, main_name, subtitles, social_media_links')
       .eq('id', PRIMARY_HERO_CONTENT_ID)
       .maybeSingle();
 
@@ -90,7 +101,8 @@ export default function HeroManager() {
     } else if (data) {
       const fetchedSocialLinks = (data.social_media_links || []).map((link: StoredHeroSocialLink) => ({
         ...link,
-        id: crypto.randomUUID(), // Assign client-side ID for list management
+        icon_image_url: link.icon_image_url || null,
+        id: crypto.randomUUID(), 
       }));
       heroForm.reset({
         id: data.id,
@@ -109,8 +121,10 @@ export default function HeroManager() {
       ? formData.subtitles_string.split(',').map(s => s.trim()).filter(Boolean)
       : null;
 
-    // Prepare social_media_links for storage (remove client-side 'id')
-    const storedSocialLinks = formData.social_media_links?.map(({ id, ...rest }) => rest) || null;
+    const storedSocialLinks = formData.social_media_links?.map(({ id, ...rest }) => ({
+        ...rest,
+        icon_image_url: rest.icon_image_url?.trim() === '' ? null : rest.icon_image_url,
+    })) || null;
 
     const dataToUpsert = {
       id: PRIMARY_HERO_CONTENT_ID,
@@ -129,29 +143,40 @@ export default function HeroManager() {
       toast({ title: "Error", description: `Failed to save Hero content: ${upsertError.message}`, variant: "destructive" });
     } else {
       toast({ title: "Success", description: "Hero content saved successfully." });
-      fetchHeroContent(); // Re-fetch to update form
+      fetchHeroContent(); 
       router.refresh();
     }
     setIsLoading(false);
   };
 
   const handleOpenSocialLinkModal = (link?: HeroSocialLinkItem, index?: number) => {
-    setCurrentSocialLink(link || null);
+    setCurrentSocialLinkForEdit(link || null);
     setEditingSocialLinkIndex(index ?? null);
-    socialLinkForm.reset(link ? { ...link, id: link.id || crypto.randomUUID() } : { label: '', url: '', icon_name: '' });
+    socialLinkForm.reset(link ? { 
+        ...link, 
+        id: link.id || crypto.randomUUID(),
+        icon_image_url: link.icon_image_url || '' 
+    } : { label: '', url: '', icon_image_url: '' });
+    setCurrentIconPreview(link?.icon_image_url || null);
     setIsSocialLinkModalOpen(true);
   };
 
   const onSocialLinkSubmitModal: SubmitHandler<HeroSocialLinkFormData> = (data) => {
-    const newLinkData = { ...data, id: currentSocialLink?.id || data.id || crypto.randomUUID() };
+    const newLinkData = { 
+        ...data, 
+        id: currentSocialLinkForEdit?.id || data.id || crypto.randomUUID(),
+        icon_image_url: data.icon_image_url?.trim() === '' ? null : data.icon_image_url,
+    };
     if (editingSocialLinkIndex !== null) {
       updateSocialLink(editingSocialLinkIndex, newLinkData);
     } else {
       appendSocialLink(newLinkData);
     }
     setIsSocialLinkModalOpen(false);
-    setCurrentSocialLink(null);
+    setCurrentSocialLinkForEdit(null);
     setEditingSocialLinkIndex(null);
+    setCurrentIconPreview(null);
+    socialLinkForm.reset({ label: '', url: '', icon_image_url: '' });
   };
   
   return (
@@ -195,30 +220,37 @@ export default function HeroManager() {
               {socialMediaLinksFields.length === 0 && (
                 <p className="text-sm text-muted-foreground text-center py-2">No social media links added yet.</p>
               )}
-              <div className="space-y-3">
-                {socialMediaLinksFields.map((field, index) => (
-                  <Card key={field.fieldId} className="p-3 bg-muted/50">
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="flex items-center gap-2 flex-grow min-w-0">
-                        <LinkIcon className="h-4 w-4 text-primary flex-shrink-0" />
-                        <div className="min-w-0">
-                           <p className="font-medium text-sm truncate" title={field.label}>{field.label}</p>
-                           <p className="text-xs text-muted-foreground truncate" title={field.url}>{field.url}</p>
-                           <p className="text-xs text-muted-foreground truncate" title={field.icon_name}>Icon: {field.icon_name}</p>
+              <ScrollArea className="h-auto max-h-[250px] pr-3">
+                <div className="space-y-3">
+                  {socialMediaLinksFields.map((field, index) => (
+                    <Card key={field.fieldId} className="p-3 bg-muted/50">
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-3 flex-grow min-w-0">
+                          {field.icon_image_url ? (
+                            <div className="relative h-5 w-5 rounded-sm overflow-hidden border bg-background flex-shrink-0">
+                                <NextImage src={field.icon_image_url} alt={field.label} layout="fill" objectFit="contain" className="dark:filter dark:brightness-0 dark:invert"/>
+                            </div>
+                          ) : (
+                            <LinkIconImg className="h-4 w-4 text-primary flex-shrink-0" />
+                          )}
+                          <div className="min-w-0">
+                            <p className="font-medium text-sm truncate" title={field.label}>{field.label}</p>
+                            <p className="text-xs text-muted-foreground truncate" title={field.url}>{field.url}</p>
+                          </div>
+                        </div>
+                        <div className="flex space-x-1.5 flex-shrink-0">
+                          <Button type="button" variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleOpenSocialLinkModal(field, index)}>
+                            <Edit className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button type="button" variant="ghost" size="icon" className="h-7 w-7 hover:text-destructive" onClick={() => removeSocialLink(index)}>
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
                         </div>
                       </div>
-                      <div className="flex space-x-1.5 flex-shrink-0">
-                        <Button type="button" variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleOpenSocialLinkModal(field, index)}>
-                          <Edit className="h-3.5 w-3.5" />
-                        </Button>
-                        <Button type="button" variant="ghost" size="icon" className="h-7 w-7 hover:text-destructive" onClick={() => removeSocialLink(index)}>
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </Button>
-                      </div>
-                    </div>
-                  </Card>
-                ))}
-              </div>
+                    </Card>
+                  ))}
+                </div>
+              </ScrollArea>
             </div>
 
             <Button type="submit" className="w-full sm:w-auto justify-self-start mt-4" disabled={isLoading}>
@@ -228,11 +260,10 @@ export default function HeroManager() {
         )}
       </CardContent>
 
-      {/* Social Link Modal */}
-      <Dialog open={isSocialLinkModalOpen} onOpenChange={(isOpen) => { if (!isOpen) { setCurrentSocialLink(null); setEditingSocialLinkIndex(null); } setIsSocialLinkModalOpen(isOpen); }}>
+      <Dialog open={isSocialLinkModalOpen} onOpenChange={(isOpen) => { if (!isOpen) { setCurrentSocialLinkForEdit(null); setEditingSocialLinkIndex(null); setCurrentIconPreview(null); socialLinkForm.reset(); } setIsSocialLinkModalOpen(isOpen); }}>
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
-            <DialogTitle>{currentSocialLink ? 'Edit Social Link' : 'Add New Social Link'}</DialogTitle>
+            <DialogTitle>{currentSocialLinkForEdit ? 'Edit Social Link' : 'Add New Social Link'}</DialogTitle>
           </DialogHeader>
           <form onSubmit={socialLinkForm.handleSubmit(onSocialLinkSubmitModal)} className="grid gap-4 py-4">
             <div>
@@ -246,15 +277,18 @@ export default function HeroManager() {
               {socialLinkForm.formState.errors.url && <p className="text-destructive text-sm mt-1">{socialLinkForm.formState.errors.url.message}</p>}
             </div>
             <div>
-              <Label htmlFor="social_icon_name">
-                Icon Name (from <a href="https://lucide.dev/icons/" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">Lucide Icons</a>, e.g., Github, Linkedin)
-              </Label>
-              <Input id="social_icon_name" {...socialLinkForm.register("icon_name")} placeholder="Github" />
-              {socialLinkForm.formState.errors.icon_name && <p className="text-destructive text-sm mt-1">{socialLinkForm.formState.errors.icon_name.message}</p>}
+              <Label htmlFor="social_icon_image_url">Icon Image URL (Optional)</Label>
+              <Input id="social_icon_image_url" {...socialLinkForm.register("icon_image_url")} placeholder="https://example.com/icon.png" />
+              {socialLinkForm.formState.errors.icon_image_url && <p className="text-destructive text-sm mt-1">{socialLinkForm.formState.errors.icon_image_url.message}</p>}
+               {currentIconPreview && (
+                <div className="mt-2 p-1 border rounded-md bg-muted aspect-square relative w-16 h-16">
+                  <NextImage src={currentIconPreview} alt="Icon preview" fill objectFit="contain" className="rounded"/>
+                </div>
+              )}
             </div>
             <DialogFooter>
               <DialogClose asChild><Button type="button" variant="outline">Cancel</Button></DialogClose>
-              <Button type="submit">{currentSocialLink ? 'Save Changes' : 'Add Link'}</Button>
+              <Button type="submit">{currentSocialLinkForEdit ? 'Save Changes' : 'Add Link'}</Button>
             </DialogFooter>
           </form>
         </DialogContent>
@@ -262,5 +296,3 @@ export default function HeroManager() {
     </Card>
   );
 }
-
-    
