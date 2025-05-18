@@ -2,15 +2,19 @@
 "use client";
 
 import Link from 'next/link';
-import Image from 'next/image';
+import Image from 'next/image'; // Keep for potential future logo if needed
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
-import { Home, Users, Briefcase, Wrench, MapPin as JourneyIcon, Award, FileText as ResumeIcon, Mail, Settings, Menu, X, Sun, Moon, LogOut as LogoutIcon, LayoutDashboard } from 'lucide-react';
+import { 
+  Home, Users, Briefcase, Wrench, MapPin as JourneyIcon, Award, 
+  FileText as ResumeIcon, Mail, Settings, Menu, X, Sun, Moon, 
+  LogOut as LogoutIcon, LayoutDashboard, Bell as BellIcon 
+} from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { useTheme } from '@/contexts/ThemeProvider';
 import { cn } from '@/lib/utils';
-import { usePathname } from 'next/navigation'; 
 import React, { useState, useEffect } from 'react';
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"; // Added Avatar imports
 
 export interface AdminNavItem {
   key: string;
@@ -52,6 +56,18 @@ export default function AdminPageLayout({
   }
 
   const toggleTheme = () => setTheme(effectiveTheme === 'dark' ? 'light' : 'dark');
+
+  const getUserInitials = (name: string) => {
+    if (!name) return "A"; // Default to "A" for Admin
+    const parts = name.split(/[\s@.]+/); // Split by space, @, or .
+    if (parts.length > 0 && parts[0]) {
+        if (parts.length > 1 && parts[1]) {
+             return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
+        }
+        return parts[0].substring(0, 2).toUpperCase();
+    }
+    return name.substring(0, 2).toUpperCase();
+  };
 
 
   const SidebarContent = ({ isMobile = false }: { isMobile?: boolean }) => (
@@ -96,7 +112,7 @@ export default function AdminPageLayout({
                 onSelectSection('settings');
                 if (isMobile) setIsMobileMenuOpen(false);
             }}
-            disabled // Settings not implemented yet
+            // disabled // Settings not implemented yet - enable if you want it clickable
         >
           <Settings className="mr-3 h-5 w-5" />
           Settings
@@ -133,11 +149,19 @@ export default function AdminPageLayout({
           <div className="md:hidden"></div> {/* Spacer for mobile to align title when menu button is present */}
           <h1 className="text-xl font-semibold text-foreground">{pageTitle}</h1>
           <div className="flex items-center gap-3">
-            <Button variant="ghost" size="icon" onClick={toggleTheme} aria-label="Toggle theme">
+            <Button variant="ghost" size="icon" onClick={() => { /* Placeholder for notification click */}} aria-label="Notifications" className="hover:text-primary">
+              <BellIcon className="h-5 w-5" />
+            </Button>
+            <Button variant="ghost" size="icon" onClick={toggleTheme} aria-label="Toggle theme" className="hover:text-primary">
               {effectiveTheme === 'dark' ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
             </Button>
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <span>{username}</span>
+            <div className="flex items-center gap-2">
+              <Avatar className="h-8 w-8">
+                {/* You can add a src prop here if you have a user image URL 
+                <AvatarImage src="/path/to/admin-photo.jpg" alt={username} /> 
+                */}
+                <AvatarFallback>{getUserInitials(username)}</AvatarFallback>
+              </Avatar>
               <Button variant="outline" size="sm" onClick={onLogout}>
                 <LogoutIcon className="mr-2 h-4 w-4" />
                 Logout
