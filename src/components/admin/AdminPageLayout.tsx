@@ -2,12 +2,12 @@
 "use client";
 
 import Link from 'next/link';
-import NextImage from 'next/image'; // Renamed to avoid conflict with potential future 'Image' variables
+import NextImage from 'next/image';
 import { Button } from '@/components/ui/button';
-import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
+import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet'; // Added SheetHeader, SheetTitle, SheetDescription
 import { 
   Menu, X, Sun, Moon, 
-  LogOut as LogoutIcon, LayoutDashboard, Bell as BellIcon, UserCircle, Settings, UploadCloud, Trash2
+  LogOut as LogoutIcon, LayoutDashboard, Bell as BellIcon, UserCircle, Settings, UploadCloud, Trash2, History
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { useTheme } from '@/contexts/ThemeProvider';
@@ -27,7 +27,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from '@/lib/supabaseClient';
-import type { AdminProfile } from '@/types/supabase';
+import type { AdminProfile, AdminActivityLog } from '@/types/supabase';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -36,8 +36,11 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { format, parseISO } from 'date-fns';
 
-const ADMIN_PROFILE_ID = '00000000-0000-0000-0000-00000000000A'; // Fixed ID for single admin profile
+
+const ADMIN_PROFILE_ID = '00000000-0000-0000-0000-00000000000A'; 
 
 export interface AdminNavItem {
   key: string;
@@ -77,6 +80,9 @@ export default function AdminPageLayout({
   const [profilePhotoPreview, setProfilePhotoPreview] = useState<string | null>(null);
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
 
+  const [isActivitySheetOpen, setIsActivitySheetOpen] = useState(false);
+  const [activities, setActivities] = useState<AdminActivityLog[]>([]);
+  const [isLoadingActivities, setIsLoadingActivities] = useState(false);
 
   const fetchAdminProfile = async () => {
     const { data, error } = await supabase
@@ -87,7 +93,6 @@ export default function AdminPageLayout({
 
     if (error) {
       console.error("Error fetching admin profile photo:", error);
-      toast({ title: "Error", description: "Could not fetch profile photo.", variant: "destructive" });
     } else if (data && data.profile_photo_url) {
       setProfilePhotoUrl(data.profile_photo_url);
       setCurrentDbProfilePhotoUrl(data.profile_photo_url);
@@ -99,10 +104,36 @@ export default function AdminPageLayout({
     }
   };
 
+  const fetchActivities = async () => {
+    if (!isActivitySheetOpen) return; // Only fetch if sheet is about to open or is open
+    setIsLoadingActivities(true);
+    const { data, error } = await supabase
+      .from('admin_activity_log')
+      .select('*')
+      .order('timestamp', { ascending: false })
+      .limit(20); // Fetch latest 20 activities
+
+    if (error) {
+      console.error("Error fetching admin activities:", error);
+      toast({ title: "Error", description: "Could not fetch recent activities.", variant: "destructive" });
+      setActivities([]);
+    } else {
+      setActivities(data || []);
+    }
+    setIsLoadingActivities(false);
+  };
+
   useEffect(() => {
     setMounted(true);
     fetchAdminProfile();
   }, []);
+
+  useEffect(() => {
+    if (isActivitySheetOpen) {
+      fetchActivities();
+    }
+  }, [isActivitySheetOpen]);
+
 
   useEffect(() => {
     if (profilePhotoFile) {
@@ -150,18 +181,17 @@ export default function AdminPageLayout({
 
   const handleSaveProfilePhoto = async () => {
     setIsUploadingPhoto(true);
-    let newPhotoUrlToSave: string | null = currentDbProfilePhotoUrl; // Keep existing if no new file
+    let newPhotoUrlToSave: string | null = currentDbProfilePhotoUrl; 
 
-    // 1. If a new file is selected, upload it
     if (profilePhotoFile) {
       const fileExt = profilePhotoFile.name.split('.').pop();
       const fileName = `admin_avatar_${Date.now()}.${fileExt}`;
-      const filePath = `${fileName}`; // Path in the bucket
+      const filePath = `${fileName}`; 
 
       toast({ title: "Uploading Profile Photo", description: "Please wait..." });
       const { data: uploadData, error: uploadError } = await supabase.storage
         .from('admin-profile-photos')
-        .upload(filePath, profilePhotoFile, { cacheControl: '3600', upsert: true }); // upsert true to overwrite if same name
+        .upload(filePath, profilePhotoFile, { cacheControl: '3600', upsert: true }); 
 
       if (uploadError) {
         toast({ title: "Upload Error", description: `Failed to upload photo: ${uploadError.message}`, variant: "destructive" });
@@ -171,7 +201,6 @@ export default function AdminPageLayout({
       const { data: publicUrlData } = supabase.storage.from('admin-profile-photos').getPublicUrl(filePath);
       newPhotoUrlToSave = publicUrlData?.publicUrl || null;
 
-      // If there was an old photo and we uploaded a new one, delete the old one from storage
       if (currentDbProfilePhotoUrl && currentDbProfilePhotoUrl !== newPhotoUrlToSave) {
         const oldPathParts = currentDbProfilePhotoUrl.split('/admin-profile-photos/');
         if (oldPathParts.length > 1 && !oldPathParts[1].startsWith('http')) {
@@ -181,7 +210,6 @@ export default function AdminPageLayout({
       }
     }
 
-    // 2. Update the database
     const { error: dbError } = await supabase
       .from('admin_profile')
       .update({ profile_photo_url: newPhotoUrlToSave, updated_at: new Date().toISOString() })
@@ -191,9 +219,9 @@ export default function AdminPageLayout({
       toast({ title: "Database Error", description: `Failed to save profile photo URL: ${dbError.message}`, variant: "destructive" });
     } else {
       toast({ title: "Success", description: "Profile photo updated." });
-      setProfilePhotoUrl(newPhotoUrlToSave); // Update UI immediately
+      setProfilePhotoUrl(newPhotoUrlToSave); 
       setCurrentDbProfilePhotoUrl(newPhotoUrlToSave);
-      setProfilePhotoFile(null); // Clear file input
+      setProfilePhotoFile(null); 
       setIsPhotoModalOpen(false);
     }
     setIsUploadingPhoto(false);
@@ -204,9 +232,8 @@ export default function AdminPageLayout({
         toast({ title: "No Photo", description: "There is no profile photo to delete.", variant: "default" });
         return;
     }
-    setIsUploadingPhoto(true); // Use same loading state
+    setIsUploadingPhoto(true); 
 
-    // 1. Delete from Storage
     const pathParts = currentDbProfilePhotoUrl.split('/admin-profile-photos/');
     if (pathParts.length > 1 && !pathParts[1].startsWith('http')) {
         const { error: deleteStorageError } = await supabase.storage.from('admin-profile-photos').remove([pathParts[1]]);
@@ -219,7 +246,6 @@ export default function AdminPageLayout({
         console.warn("Could not parse storage path for deletion:", currentDbProfilePhotoUrl);
     }
     
-    // 2. Update database to remove URL
     const { error: dbError } = await supabase
       .from('admin_profile')
       .update({ profile_photo_url: null, updated_at: new Date().toISOString() })
@@ -293,14 +319,12 @@ export default function AdminPageLayout({
   return (
     <>
     <div className="flex h-screen bg-background text-foreground">
-      {/* Desktop Sidebar */}
       <aside className="hidden md:flex md:flex-shrink-0">
          <div className="flex flex-col w-64 border-r border-border bg-card h-full">
             <SidebarContent />
          </div>
       </aside>
 
-      {/* Mobile Sidebar (Sheet) */}
        <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
         <SheetTrigger asChild className="md:hidden fixed top-4 left-4 z-50">
           <Button variant="outline" size="icon">
@@ -312,15 +336,48 @@ export default function AdminPageLayout({
         </SheetContent>
       </Sheet>
 
-
       <div className="flex flex-col flex-1 w-full overflow-hidden">
         <header className="sticky top-0 z-40 flex h-16 items-center justify-between border-b border-border bg-card px-4 md:px-6 shrink-0">
-          <div className="md:hidden"></div> {/* Spacer for mobile to align title when menu button is present */}
+          <div className="md:hidden"></div> 
           <h1 className="text-xl font-semibold text-foreground">{pageTitle}</h1>
           <div className="flex items-center gap-3">
-            <Button variant="ghost" size="icon" onClick={() => alert("Notifications clicked - functionality to be implemented.")} aria-label="Notifications" className="hover:text-primary">
-              <BellIcon className="h-5 w-5" />
-            </Button>
+            <Sheet open={isActivitySheetOpen} onOpenChange={setIsActivitySheetOpen}>
+              <SheetTrigger asChild>
+                <Button variant="ghost" size="icon" aria-label="Notifications" className="hover:text-primary">
+                  <BellIcon className="h-5 w-5" />
+                </Button>
+              </SheetTrigger>
+              <SheetContent side="right" className="w-[350px] sm:w-[400px] p-0">
+                <SheetHeader className="p-4 border-b">
+                  <SheetTitle className="flex items-center"><History className="mr-2 h-5 w-5"/>Recent Activity</SheetTitle>
+                  <SheetDescription>Latest updates and actions in the admin panel.</SheetDescription>
+                </SheetHeader>
+                <ScrollArea className="h-[calc(100vh-100px)] p-4"> {/* Adjust height as needed */}
+                  {isLoadingActivities ? (
+                    <p className="text-muted-foreground text-center py-4">Loading activities...</p>
+                  ) : activities.length === 0 ? (
+                    <p className="text-muted-foreground text-center py-4">No recent activity.</p>
+                  ) : (
+                    <ul className="space-y-3">
+                      {activities.map((activity) => (
+                        <li key={activity.id} className="text-sm border-b pb-2 mb-2 last:border-b-0 last:pb-0 last:mb-0">
+                          <p className="font-medium text-foreground">{activity.description}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {format(parseISO(activity.timestamp), "MMM d, yyyy 'at' h:mm a")} by {activity.user_identifier}
+                          </p>
+                          {activity.details && (
+                            <pre className="mt-1 text-xs bg-muted p-2 rounded-md overflow-x-auto">
+                              {JSON.stringify(activity.details, null, 2)}
+                            </pre>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </ScrollArea>
+              </SheetContent>
+            </Sheet>
+
             <Button variant="ghost" size="icon" onClick={toggleTheme} aria-label="Toggle theme" className="hover:text-primary">
               {effectiveTheme === 'dark' ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
             </Button>
@@ -364,7 +421,6 @@ export default function AdminPageLayout({
       </div>
     </div>
 
-    {/* Modal for Managing Profile Photo */}
     <Dialog open={isPhotoModalOpen} onOpenChange={setIsPhotoModalOpen}>
         <DialogContent className="sm:max-w-[480px]">
             <DialogHeader>
@@ -416,7 +472,7 @@ export default function AdminPageLayout({
                     <DialogClose asChild>
                         <Button type="button" variant="outline">Cancel</Button>
                     </DialogClose>
-                    <Button type="button" onClick={handleSaveProfilePhoto} disabled={isUploadingPhoto || !profilePhotoFile}>
+                    <Button type="button" onClick={handleSaveProfilePhoto} disabled={isUploadingPhoto || (!profilePhotoFile && !currentDbProfilePhotoUrl && !profilePhotoPreview) }>
                         {isUploadingPhoto ? "Saving..." : "Save Photo"}
                     </Button>
                 </div>

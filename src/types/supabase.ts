@@ -14,7 +14,7 @@ export type Json =
 export interface StoredHeroSocialLink {
   label: string;
   url: string;
-  icon_image_url: string | null; // Changed from icon_name
+  icon_image_url: string | null; // Changed from icon_name, then to icon_image_url
 }
 
 // Interface for Hero social links when managed in client-side state (includes temporary id)
@@ -23,23 +23,33 @@ export interface HeroSocialLinkItem extends StoredHeroSocialLink {
 }
 
 export interface AdminProfile {
-  id: string; // Should be the fixed UUID
+  id: string;
   profile_photo_url: string | null;
   updated_at: string;
+}
+
+export interface AdminActivityLog {
+  id: string;
+  timestamp: string;
+  user_identifier: string;
+  action_type: string;
+  description: string;
+  details: Json | null;
+  is_read: boolean;
 }
 
 
 export interface Database {
   public: {
     Tables: {
-      admin_profile: { // New table for admin profile photo
+      admin_profile: {
         Row: {
           id: string;
           profile_photo_url: string | null;
           updated_at: string;
         }
         Insert: {
-          id: string; // Must provide the fixed ID on insert/upsert
+          id: string;
           profile_photo_url?: string | null;
           updated_at?: string;
         }
@@ -47,6 +57,36 @@ export interface Database {
           id?: string;
           profile_photo_url?: string | null;
           updated_at?: string;
+        }
+        Relationships: [];
+      }
+      admin_activity_log: { // New table for activity logs
+        Row: {
+          id: string;
+          timestamp: string;
+          user_identifier: string;
+          action_type: string;
+          description: string;
+          details: Json | null;
+          is_read: boolean;
+        }
+        Insert: {
+          id?: string;
+          timestamp?: string;
+          user_identifier?: string;
+          action_type: string;
+          description: string;
+          details?: Json | null;
+          is_read?: boolean;
+        }
+        Update: {
+          id?: string;
+          timestamp?: string;
+          user_identifier?: string;
+          action_type?: string;
+          description?: string;
+          details?: Json | null;
+          is_read?: boolean;
         }
         Relationships: [];
       }
@@ -93,7 +133,7 @@ export interface Database {
         Row: {
           id: string
           name: string
-          icon_image_url: string | null // For uploaded image URL
+          icon_image_url: string | null
           sort_order: number | null
           created_at: string
         }
@@ -117,10 +157,10 @@ export interface Database {
         Row: {
           id: string
           name: string
-          icon_image_url: string | null // For uploaded image URL
+          icon_image_url: string | null
           description: string | null
           category_id: string | null
-          created_at: string; // Added created_at back
+          created_at: string;
         }
         Insert: {
           id?: string
@@ -183,7 +223,7 @@ export interface Database {
           date: string
           title: string
           description: string
-          icon_image_url: string | null // Changed from icon_name
+          icon_image_url: string | null
           type: string
           sort_order: number | null
           created_at: string
@@ -420,7 +460,7 @@ export interface Database {
           id: string;
           main_name: string | null;
           subtitles: string[] | null;
-          social_media_links: StoredHeroSocialLink[] | null; // Stores array of objects
+          social_media_links: StoredHeroSocialLink[] | null;
           updated_at: string;
         }
         Insert: {
@@ -560,7 +600,7 @@ export interface Project {
   id: string;
   title: string;
   description: string | null;
-  imageUrl: string | null; // Camelcase for frontend
+  imageUrl: string | null;
   liveDemoUrl?: string | null;
   repoUrl?: string | null;
   tags: string[] | null;
@@ -572,7 +612,7 @@ export interface Project {
 export interface Skill {
   id: string;
   name: string;
-  iconImageUrl: string | null; // For uploaded image URL
+  iconImageUrl: string | null;
   description: string | null;
   categoryId?: string | null;
   created_at: string;
@@ -581,7 +621,7 @@ export interface Skill {
 export interface SkillCategory {
   id: string;
   name: string;
-  iconImageUrl?: string | null; // For uploaded image URL
+  iconImageUrl?: string | null;
   skills?: Skill[];
   sort_order?: number | null;
   created_at?: string;
@@ -594,7 +634,7 @@ export interface TimelineEvent {
   date: string;
   title: string;
   description: string;
-  iconImageUrl: string | null; // Changed from icon_name
+  iconImageUrl: string | null;
   type: TimelineEventType;
   sort_order?: number | null;
   created_at?: string;
@@ -619,7 +659,7 @@ export interface AboutContent {
   paragraph1: string | null;
   paragraph2: string | null;
   paragraph3: string | null;
-  imageUrl: string | null; // Camelcase for frontend
+  imageUrl: string | null;
   image_tagline: string | null;
   updated_at?: string;
 }
@@ -657,6 +697,7 @@ export interface ResumeKeySkill {
   id: string;
   skill_name: string;
   category_id?: string | null;
+  // No created_at here as per last schema adjustment
 }
 
 export interface ResumeKeySkillCategory {
@@ -681,7 +722,7 @@ export interface HeroContent {
   id: string;
   main_name: string | null;
   subtitles: string[] | null;
-  social_media_links: HeroSocialLinkItem[] | null; // Uses HeroSocialLinkItem for client state
+  social_media_links: StoredHeroSocialLink[] | null;
   updated_at: string;
 }
 
@@ -698,7 +739,7 @@ export interface ContactPageDetail {
 export interface SocialLink {
   id: string;
   label: string;
-  icon_image_url: string | null; // Changed from icon_name
+  icon_image_url: string | null;
   url: string;
   display_text: string | null;
   sort_order?: number | null;
