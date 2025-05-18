@@ -3,7 +3,7 @@
 
 import React, { useEffect, useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button'; // Added buttonVariants
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
@@ -81,10 +81,23 @@ export default function AdminDashboardPage() {
     const trimmedUsername = username.trim();
     const trimmedPassword = password.trim();
 
+    console.log("[Admin Login] Attempting login...");
+    console.log("[Admin Login] Entered Username:", `"${trimmedUsername}"`);
+
     const expectedUsername = process.env.NEXT_PUBLIC_ADMIN_USERNAME;
     const expectedPassword = process.env.NEXT_PUBLIC_ADMIN_PASSWORD;
+    
+    console.log("[Admin Login] Expected Username from env:", `"${expectedUsername}"`);
 
-    if (trimmedUsername === expectedUsername && trimmedPassword === expectedPassword) {
+    const usernameMatch = trimmedUsername === expectedUsername;
+    const passwordMatch = trimmedPassword === expectedPassword;
+
+    console.log("[Admin Login] Username match status:", usernameMatch);
+    console.log("[Admin Login] Password match status (not logging actual passwords):", passwordMatch);
+
+
+    if (usernameMatch && passwordMatch) {
+      console.log("[Admin Login] Login successful.");
       if (typeof window !== 'undefined') {
         localStorage.setItem('isAdminAuthenticated', 'true');
         // localStorage.setItem('adminUsername', trimmedUsername); // Optional: store username
@@ -92,6 +105,7 @@ export default function AdminDashboardPage() {
       }
       setIsAuthenticatedForRender(true);
     } else {
+      console.log("[Admin Login] Login failed.");
       setError("Invalid username or password.");
       setIsAuthenticatedForRender(false);
     }
@@ -181,3 +195,5 @@ export default function AdminDashboardPage() {
     </AdminPageLayout>
   );
 }
+
+    
