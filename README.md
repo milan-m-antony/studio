@@ -32,4 +32,4 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzd
 
 # backup project completely working with limited setup 
 
-backup date=sunday 18 may
+backup date=sunday 18 may =latest backup without dahbosrddesign with backend working
