@@ -32,4 +32,4 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzd
 
 # backup project completely working with limited setup 
 
-backup date=thu-15-may 11:45
+backup date=sunday 18 may
