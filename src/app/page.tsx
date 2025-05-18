@@ -1,4 +1,3 @@
-
 // src/app/page.tsx
 import { use } from 'react';
 import HeroSection from '@/components/sections/HeroSection';
@@ -39,24 +38,27 @@ async function getHeroContentData(): Promise<HeroContent | null> {
 
     let mappedSocialLinks: HeroSocialLinkItem[] | null = null;
     if (data.social_media_links && Array.isArray(data.social_media_links)) {
-      mappedSocialLinks = data.social_media_links.map((link: StoredHeroSocialLink) => {
+      mappedSocialLinks = data.social_media_links.map((link: StoredHeroSocialLink, index: number) => {
+        console.log(`[HomePage] Mapping social link ${index} from DB:`, JSON.stringify(link));
         if (!link || typeof link.label !== 'string' || typeof link.url !== 'string') {
           console.warn('[HomePage] Malformed social link object in DB:', link);
-          return { // Provide a minimal valid structure if malformed
+          return { 
             label: 'Error',
             url: '#',
-            icon_image_url: null, // Changed from icon_name
+            icon_image_url: null, 
             id: crypto.randomUUID(),
           };
         }
         return {
           ...link,
-          icon_image_url: link.icon_image_url || null, // Ensure it's null if missing/empty
+          // Ensure icon_image_url is what we expect; 'icon_name' might still be in old DB data for the JSONB
+          icon_image_url: link.icon_image_url || (link as any).icon_name || null, 
           id: crypto.randomUUID(),
         };
       });
+      console.log('[HomePage] Mapped social_media_links for HeroSection:', JSON.stringify(mappedSocialLinks));
     } else if (data.social_media_links) {
-      console.warn('[HomePage] hero_content.social_media_links is not an array:', data.social_media_links);
+      console.warn('[HomePage] hero_content.social_media_links is not an array or is null:', data.social_media_links);
     }
     
     return {
@@ -80,14 +82,18 @@ interface HomePageProps {
 }
 
 export default async function HomePage(props: HomePageProps) {
-  // const resolvedParams = props.params ? use(props.params) : {}; // Removed to avoid potential error if not used
-  // const resolvedSearchParams = props.searchParams ? use(props.searchParams) : {}; // Removed
+  // The `use` hook is for client components or specific server-side promise unwrapping.
+  // For page props like params/searchParams in Server Components, they are typically already resolved.
+  // If direct enumeration caused issues, it was likely Next.js internals or a misinterpretation.
+  // We'll access them directly if needed, or not at all if this page doesn't use them.
+  // console.log('[HomePage] Resolved params:', props.params);
+  // console.log('[HomePage] Resolved searchParams:', props.searchParams);
 
   console.log('[HomePage] Starting to render HomePage component...');
   const heroContent = await getHeroContentData();
   console.log('[HomePage] Rendering HomePage. Hero content fetched (main_name):', heroContent?.main_name || "Not fetched/available");
   if (heroContent?.social_media_links) {
-    console.log('[HomePage] Mapped social_media_links for HeroSection:', JSON.stringify(heroContent.social_media_links));
+    console.log('[HomePage] Mapped social_media_links for HeroSection (in HomePage render):', JSON.stringify(heroContent.social_media_links));
   }
 
 

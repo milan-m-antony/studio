@@ -1,12 +1,11 @@
-
+// src/components/sections/HeroSection.tsx
 "use client";
 
 import { useEffect, useState, type ComponentType } from 'react';
-import { ChevronDown, Link as GenericLinkIcon } from 'lucide-react'; // Link renamed to GenericLinkIcon
-import NextLink from 'next/link'; // Renamed to avoid conflict with our Link component
-import Image from 'next/image'; // For displaying social icons if URLs are provided
+import { ChevronDown, Link as GenericLinkIcon } from 'lucide-react';
+import NextLink from 'next/link';
+import Image from 'next/image';
 import type { HeroContent, HeroSocialLinkItem } from '@/types/supabase';
-// LucideIcons import is removed as we will use image URLs for icons
 
 const EnhancedTypewriter = ({
   texts,
@@ -28,10 +27,9 @@ const EnhancedTypewriter = ({
 
   useEffect(() => {
     if (!texts || texts.length === 0) {
-        setDisplayedText("— a Developer"); // Default if no texts provided
+        setDisplayedText("— a Developer"); 
         return;
     }
-    // Reset when texts or currentTextIndex changes
     setCharDisplayProgress(0);
     setDisplayedText('');
     setIsDeleting(false);
@@ -44,27 +42,27 @@ const EnhancedTypewriter = ({
     const currentTargetText = texts[currentTextIndex];
     let timer: NodeJS.Timeout;
 
-    if (!isDeleting) { // Typing mode
+    if (!isDeleting) { 
       if (charDisplayProgress < currentTargetText.length) {
         timer = setTimeout(() => {
           setDisplayedText(currentTargetText.substring(0, charDisplayProgress + 1));
           setCharDisplayProgress((prev) => prev + 1);
         }, typingSpeed);
-      } else { // Finished typing current text
+      } else { 
         timer = setTimeout(() => {
           setIsDeleting(true);
         }, pauseAfterTypingDuration);
       }
-    } else { // Deleting mode
+    } else { 
       if (charDisplayProgress > 0) {
         timer = setTimeout(() => {
           setDisplayedText(currentTargetText.substring(0, charDisplayProgress - 1));
           setCharDisplayProgress((prev) => prev - 1);
         }, deletingSpeed);
-      } else { // Finished deleting current text
+      } else { 
         timer = setTimeout(() => {
           setIsDeleting(false);
-          setCurrentTextIndex((prev) => (prev + 1) % texts.length); // Move to next text
+          setCurrentTextIndex((prev) => (prev + 1) % texts.length); 
         }, pauseAfterDeletingDuration);
       }
     }
@@ -80,7 +78,7 @@ const EnhancedTypewriter = ({
     pauseAfterDeletingDuration,
   ]);
 
-  return <span>{displayedText || <>&nbsp;</>}</span>; // Render a space if empty to maintain height
+  return <span>{displayedText || <>&nbsp;</>}</span>;
 };
 
 interface HeroSectionProps {
@@ -97,65 +95,71 @@ export default function HeroSection({ heroContent }: HeroSectionProps) {
   };
 
   useEffect(() => {
+    console.log('[HeroSection] Component mounted/updated. Received heroContent:', JSON.stringify(heroContent, null, 2));
     if (typeof window !== 'undefined') {
       window.addEventListener('scroll', handleScroll);
       return () => window.removeEventListener('scroll', handleScroll);
     }
-  }, []);
+  }, [heroContent]); // Log when heroContent changes too
 
   const mainName = heroContent?.main_name || "Your Name"; 
   const subtitles = (heroContent?.subtitles && heroContent.subtitles.length > 0)
     ? heroContent.subtitles 
-    : ["— a Creative Developer", "— a Full-Stack Engineer", "— a Tech Enthusiast"]; // Default subtitles
+    : ["— a Creative Developer", "— a Full-Stack Engineer", "— a Tech Enthusiast"];
 
-  // Use HeroSocialLinkItem which expects icon_image_url
+  // The prop heroContent.social_media_links should be HeroSocialLinkItem[] | null
+  // which includes icon_image_url (mapped from DB's icon_image_url or icon_name).
   const socialLinksToRender: Array<{ href: string; iconImageUrl: string | null; label: string }> = 
-    heroContent?.social_media_links?.map(link => ({
-      href: link.url,
-      iconImageUrl: link.icon_image_url || null, // Use image URL
-      label: link.label
-    })) || [
-      // Default fallback links if none are provided from DB
-      { href: "https://github.com", iconImageUrl: null, label: "GitHub" }, // No default image, will use GenericLinkIcon
-      { href: "https://linkedin.com", iconImageUrl: null, label: "LinkedIn" },
-    ];
-  console.log('[HeroSection] Rendering with socialLinksToRender:', socialLinksToRender);
+    heroContent?.social_media_links && Array.isArray(heroContent.social_media_links)
+    ? heroContent.social_media_links.map((link, index) => {
+        console.log(`[HeroSection] Processing link ${index} for rendering: label="${link.label}", url="${link.url}", icon_image_url="${link.icon_image_url}"`);
+        return {
+          href: link.url,
+          iconImageUrl: link.icon_image_url || null, // Use the mapped icon_image_url
+          label: link.label
+        };
+      })
+    : [
+        { href: "https://github.com", iconImageUrl: null, label: "GitHub (Default)" },
+        { href: "https://linkedin.com", iconImageUrl: null, label: "LinkedIn (Default)" },
+      ];
+  
+  console.log('[HeroSection] socialLinksToRender:', JSON.stringify(socialLinksToRender));
 
 
   return (
     <section id="hero" className="relative h-screen flex flex-col items-center justify-center overflow-hidden text-center bg-background text-foreground p-4">
-      {/* Parallax Background Elements */}
       <div className="absolute inset-0 z-0" style={{ transform: `translateY(${offsetY * 0.5}px)` }}>
-        {/* Example subtle animated background - can be replaced with Vanta.js or similar if desired */}
         <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-background to-accent/10 opacity-50" />
       </div>
       
-      {/* Social Media Icons - Vertical on Left */}
       {socialLinksToRender.length > 0 && (
         <div 
           className="absolute left-4 md:left-6 lg:left-8 top-1/2 -translate-y-1/2 z-20 flex flex-col space-y-6"
           style={{ transform: `translateY(-50%) translateY(${offsetY * 0.1}px)` }}
         >
-          {socialLinksToRender.map((social) => (
-            <NextLink key={social.label} href={social.href} target="_blank" rel="noopener noreferrer" aria-label={social.label}>
-              {social.iconImageUrl ? (
-                <div className="relative h-6 w-6 transition-transform duration-300 ease-in-out transform hover:scale-125">
-                  <Image 
-                    src={social.iconImageUrl} 
-                    alt={social.label} 
-                    fill 
-                    className="object-contain dark:filter dark:brightness-0 dark:invert" // Invert in dark mode for visibility
-                  />
-                </div>
-              ) : (
-                <GenericLinkIcon className="h-6 w-6 text-foreground/70 hover:text-primary transition-colors duration-300 ease-in-out transform hover:scale-110" />
-              )}
-            </NextLink>
-          ))}
+          {socialLinksToRender.map((social) => {
+            console.log(`[HeroSection] Rendering social link: ${social.label}, Icon URL: ${social.iconImageUrl}`);
+            return (
+              <NextLink key={social.label} href={social.href} target="_blank" rel="noopener noreferrer" aria-label={social.label}>
+                {social.iconImageUrl ? (
+                  <div className="relative h-6 w-6 transition-transform duration-300 ease-in-out transform hover:scale-125">
+                    <Image 
+                      src={social.iconImageUrl} 
+                      alt={social.label} 
+                      fill 
+                      className="object-contain dark:filter dark:brightness-0 dark:invert"
+                    />
+                  </div>
+                ) : (
+                  <GenericLinkIcon className="h-6 w-6 text-foreground/70 hover:text-primary transition-colors duration-300 ease-in-out transform hover:scale-110" />
+                )}
+              </NextLink>
+            );
+          })}
         </div>
       )}
 
-      {/* Main Hero Content */}
       <div className="relative z-10 flex flex-col items-center" style={{ transform: `translateY(${offsetY * 0.15}px)` }}>
         <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold mb-4 mt-8 animate-fadeIn" style={{animationDelay: '0.5s'}}>
           Hi, I'm {mainName}
@@ -167,7 +171,6 @@ export default function HeroSection({ heroContent }: HeroSectionProps) {
         </p>
       </div>
       
-      {/* Scroll Down Arrow */}
       <div 
         className="absolute bottom-10 left-1/2 -translate-x-1/2 z-20 animate-fadeIn" 
         style={{ animationDelay: '1.5s', transform: `translateX(-50%) translateY(${offsetY * 0.05}px)` }}
