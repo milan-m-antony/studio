@@ -22,17 +22,40 @@ export interface HeroSocialLinkItem extends StoredHeroSocialLink {
   id: string; // Client-side temporary ID for list management
 }
 
+export interface AdminProfile {
+  id: string; // Should be the fixed UUID
+  profile_photo_url: string | null;
+  updated_at: string;
+}
+
 
 export interface Database {
   public: {
     Tables: {
+      admin_profile: { // New table for admin profile photo
+        Row: {
+          id: string;
+          profile_photo_url: string | null;
+          updated_at: string;
+        }
+        Insert: {
+          id: string; // Must provide the fixed ID on insert/upsert
+          profile_photo_url?: string | null;
+          updated_at?: string;
+        }
+        Update: {
+          id?: string;
+          profile_photo_url?: string | null;
+          updated_at?: string;
+        }
+        Relationships: [];
+      }
       projects: {
         Row: {
           id: string
           title: string
           description: string | null
           image_url: string | null
-          // image_hint: string | null // Removed
           live_demo_url: string | null
           repo_url: string | null
           tags: string[] | null
@@ -45,7 +68,6 @@ export interface Database {
           title: string
           description?: string | null
           image_url?: string | null
-          // image_hint?: string | null
           live_demo_url?: string | null
           repo_url?: string | null
           tags?: string[] | null
@@ -58,7 +80,6 @@ export interface Database {
           title?: string
           description?: string | null
           image_url?: string | null
-          // image_hint?: string | null
           live_demo_url?: string | null
           repo_url?: string | null
           tags?: string[] | null
@@ -72,7 +93,7 @@ export interface Database {
         Row: {
           id: string
           name: string
-          icon_image_url: string | null // Changed from icon_name, icon_color removed
+          icon_image_url: string | null // For uploaded image URL
           sort_order: number | null
           created_at: string
         }
@@ -96,10 +117,10 @@ export interface Database {
         Row: {
           id: string
           name: string
-          icon_image_url: string | null // Changed from icon_name
+          icon_image_url: string | null // For uploaded image URL
           description: string | null
           category_id: string | null
-          created_at: string
+          created_at: string; // Added created_at back
         }
         Insert: {
           id?: string
@@ -107,7 +128,7 @@ export interface Database {
           icon_image_url?: string | null
           description?: string | null
           category_id?: string | null
-          created_at?: string
+          created_at?: string;
         }
         Update: {
           id?: string
@@ -115,7 +136,7 @@ export interface Database {
           icon_image_url?: string | null
           description?: string | null
           category_id?: string | null
-          created_at?: string
+          created_at?: string;
         }
         Relationships: [
           {
@@ -134,7 +155,6 @@ export interface Database {
           date: string
           image_url: string | null
           verify_url: string | null
-          // image_hint: string | null // Removed
           created_at: string
         }
         Insert: {
@@ -144,7 +164,6 @@ export interface Database {
           date: string
           image_url?: string | null
           verify_url?: string | null
-          // image_hint?: string | null
           created_at?: string
         }
         Update: {
@@ -154,7 +173,6 @@ export interface Database {
           date?: string
           image_url?: string | null
           verify_url?: string | null
-          // image_hint?: string | null
           created_at?: string
         }
         Relationships: []
@@ -262,8 +280,8 @@ export interface Database {
           company_name: string
           date_range: string | null
           description_points: string[] | null
-          icon_image_url: string | null // Changed from icon_name
-          sort_order: number | null
+          icon_image_url: string | null
+          sort_order?: number | null
           created_at: string
         }
         Insert: {
@@ -295,8 +313,8 @@ export interface Database {
           institution_name: string
           date_range: string | null
           description: string | null
-          icon_image_url: string | null // Changed from icon_name
-          sort_order: number | null
+          icon_image_url: string | null
+          sort_order?: number | null
           created_at: string
         }
         Insert: {
@@ -325,8 +343,8 @@ export interface Database {
         Row: {
           id: string
           category_name: string
-          icon_image_url: string | null // Changed from icon_name
-          sort_order: number | null
+          icon_image_url: string | null
+          sort_order?: number | null
           created_at: string
         }
         Insert: {
@@ -350,7 +368,6 @@ export interface Database {
           id: string
           skill_name: string
           category_id: string | null
-          // created_at was removed from here
         }
         Insert: {
           id?: string
@@ -376,8 +393,8 @@ export interface Database {
           id: string
           language_name: string
           proficiency: string | null
-          icon_image_url: string | null // Changed from icon_name
-          sort_order: number | null
+          icon_image_url: string | null
+          sort_order?: number | null
           created_at: string
         }
         Insert: {
@@ -398,7 +415,7 @@ export interface Database {
         }
         Relationships: []
       }
-      hero_content: { // Updated for dynamic social links
+      hero_content: {
         Row: {
           id: string;
           main_name: string | null;
@@ -490,7 +507,7 @@ export interface Database {
           subject: string | null;
           message: string;
           phone_number: string | null;
-          status: SubmissionStatus | null; // Using SubmissionStatus type
+          status: SubmissionStatus | null;
           is_starred: boolean | null;
           submitted_at: string;
           notes: string | null;
@@ -544,7 +561,6 @@ export interface Project {
   title: string;
   description: string | null;
   imageUrl: string | null; // Camelcase for frontend
-  // imageHint: string | null; // Removed
   liveDemoUrl?: string | null;
   repoUrl?: string | null;
   tags: string[] | null;
@@ -556,7 +572,7 @@ export interface Project {
 export interface Skill {
   id: string;
   name: string;
-  iconImageUrl: string | null; // Changed from iconName
+  iconImageUrl: string | null; // For uploaded image URL
   description: string | null;
   categoryId?: string | null;
   created_at: string;
@@ -565,7 +581,7 @@ export interface Skill {
 export interface SkillCategory {
   id: string;
   name: string;
-  iconImageUrl?: string | null; // Changed from iconName, iconColor removed
+  iconImageUrl?: string | null; // For uploaded image URL
   skills?: Skill[];
   sort_order?: number | null;
   created_at?: string;
@@ -589,9 +605,8 @@ export interface Certification {
   title: string;
   issuer: string;
   date: string;
-  imageUrl: string | null; // Camelcase for frontend
+  imageUrl: string | null;
   verifyUrl?: string | null;
-  // imageHint: string | null; // Removed
   created_at: string;
 }
 
@@ -622,7 +637,7 @@ export interface ResumeExperience {
   company_name: string;
   date_range: string | null;
   description_points: string[] | null;
-  icon_image_url: string | null; // Changed from icon_name
+  icon_image_url: string | null;
   sort_order?: number | null;
   created_at: string;
 }
@@ -633,7 +648,7 @@ export interface ResumeEducation {
   institution_name: string;
   date_range: string | null;
   description: string | null;
-  icon_image_url: string | null; // Changed from icon_name
+  icon_image_url: string | null;
   sort_order?: number | null;
   created_at: string;
 }
@@ -642,13 +657,12 @@ export interface ResumeKeySkill {
   id: string;
   skill_name: string;
   category_id?: string | null;
-  // created_at was removed
 }
 
 export interface ResumeKeySkillCategory {
   id: string;
   category_name: string;
-  icon_image_url: string | null; // Changed from icon_name
+  icon_image_url: string | null;
   skills?: ResumeKeySkill[];
   sort_order?: number | null;
   created_at: string;
@@ -658,7 +672,7 @@ export interface ResumeLanguage {
   id: string;
   language_name: string;
   proficiency: string | null;
-  icon_image_url: string | null; // Changed from icon_name
+  icon_image_url: string | null;
   sort_order?: number | null;
   created_at: string;
 }
@@ -667,7 +681,7 @@ export interface HeroContent {
   id: string;
   main_name: string | null;
   subtitles: string[] | null;
-  social_media_links: StoredHeroSocialLink[] | null; // Uses StoredHeroSocialLink for DB structure
+  social_media_links: HeroSocialLinkItem[] | null; // Uses HeroSocialLinkItem for client state
   updated_at: string;
 }
 
