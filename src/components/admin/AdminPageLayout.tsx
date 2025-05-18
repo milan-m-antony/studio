@@ -2,19 +2,26 @@
 "use client";
 
 import Link from 'next/link';
-import Image from 'next/image'; // Keep for potential future logo if needed
+import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { 
-  Home, Users, Briefcase, Wrench, MapPin as JourneyIcon, Award, 
-  FileText as ResumeIcon, Mail, Settings, Menu, X, Sun, Moon, 
-  LogOut as LogoutIcon, LayoutDashboard, Bell as BellIcon 
+  Menu, X, Sun, Moon, 
+  LogOut as LogoutIcon, LayoutDashboard, Bell as BellIcon, UserCircle, Settings
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { useTheme } from '@/contexts/ThemeProvider';
 import { cn } from '@/lib/utils';
 import React, { useState, useEffect } from 'react';
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"; // Added Avatar imports
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 export interface AdminNavItem {
   key: string;
@@ -28,7 +35,7 @@ interface AdminPageLayoutProps {
   activeSection: string;
   onSelectSection: (sectionKey: string) => void;
   onLogout: () => void;
-  username: string;
+  username: string; // Assuming this is the admin's display name or email
   children: React.ReactNode;
   pageTitle: string;
 }
@@ -58,8 +65,8 @@ export default function AdminPageLayout({
   const toggleTheme = () => setTheme(effectiveTheme === 'dark' ? 'light' : 'dark');
 
   const getUserInitials = (name: string) => {
-    if (!name) return "A"; // Default to "A" for Admin
-    const parts = name.split(/[\s@.]+/); // Split by space, @, or .
+    if (!name) return "A"; 
+    const parts = name.split(/[\s@.]+/); 
     if (parts.length > 0 && parts[0]) {
         if (parts.length > 1 && parts[1]) {
              return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
@@ -112,7 +119,6 @@ export default function AdminPageLayout({
                 onSelectSection('settings');
                 if (isMobile) setIsMobileMenuOpen(false);
             }}
-            // disabled // Settings not implemented yet - enable if you want it clickable
         >
           <Settings className="mr-3 h-5 w-5" />
           Settings
@@ -155,18 +161,38 @@ export default function AdminPageLayout({
             <Button variant="ghost" size="icon" onClick={toggleTheme} aria-label="Toggle theme" className="hover:text-primary">
               {effectiveTheme === 'dark' ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
             </Button>
-            <div className="flex items-center gap-2">
-              <Avatar className="h-8 w-8">
-                {/* You can add a src prop here if you have a user image URL 
-                <AvatarImage src="/path/to/admin-photo.jpg" alt={username} /> 
-                */}
-                <AvatarFallback>{getUserInitials(username)}</AvatarFallback>
-              </Avatar>
-              <Button variant="outline" size="sm" onClick={onLogout}>
-                <LogoutIcon className="mr-2 h-4 w-4" />
-                Logout
-              </Button>
-            </div>
+            
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" className="relative h-8 w-8 rounded-full p-0">
+                  <Avatar className="h-8 w-8">
+                    {/* <AvatarImage src="/path-to-admin-photo.jpg" alt={username} /> */}
+                    <AvatarFallback>{getUserInitials(username)}</AvatarFallback>
+                  </Avatar>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent className="w-56" align="end" forceMount>
+                <DropdownMenuLabel className="font-normal">
+                  <div className="flex flex-col space-y-1">
+                    <p className="text-sm font-medium leading-none">{username}</p>
+                    <p className="text-xs leading-none text-muted-foreground">
+                      Administrator
+                    </p>
+                  </div>
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => alert("Manage Profile Photo clicked - functionality to be implemented.")}>
+                  <UserCircle className="mr-2 h-4 w-4" />
+                  <span>Manage Profile Photo</span>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={onLogout}>
+                  <LogoutIcon className="mr-2 h-4 w-4" />
+                  <span>Log out</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+
           </div>
         </header>
 
@@ -177,3 +203,4 @@ export default function AdminPageLayout({
     </div>
   );
 }
+
