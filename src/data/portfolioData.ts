@@ -1,83 +1,13 @@
-
-// This file is now largely superseded by data fetched from Supabase.
-// We'll keep type definitions here or move them to a dedicated types file (e.g., src/types/supabase.ts)
-// For now, we'll keep existing types and add Supabase-specific ones in src/types/supabase.ts
-// The actual data arrays (projectsData, skillsData, etc.) will be removed or commented out
-// as data will be fetched from Supabase.
+// This file is now primarily for static navigation links and potentially the IconMap
+// for default icons if image URLs are not provided from Supabase.
+// Most data and types are now fetched from Supabase and defined in src/types/supabase.ts.
 
 import type { LucideIcon } from 'lucide-react';
 import {
   Lightbulb, Briefcase, Award, GraduationCap, Laptop, Star,
-  // Skill icons (will be mapped from names)
 } from 'lucide-react';
 
-
-// Original types - can be aligned with Supabase table structures
-// export type ProjectStatus = 'Deployed' | 'In Progress' | 'Prototype' | 'Archived' | 'Concept' | 'Completed';
-
-// export interface Project {
-//   id: string;
-//   title: string;
-//   description: string;
-//   imageUrl: string;
-//   imageHint: string;
-//   liveDemoUrl?: string;
-//   repoUrl?: string;
-//   tags: string[];
-//   status: ProjectStatus;
-//   progress?: number;
-// }
-
-// export interface Skill {
-//   name: string;
-//   icon: LucideIcon; // Will become iconName: string when fetched from DB
-//   description: string;
-// }
-
-// export interface SkillCategory {
-//   name: string;
-//   icon: LucideIcon; // Will become iconName: string
-//   iconColor?: string;
-//   skills: Skill[];
-// }
-
-
-// export interface TimelineEvent {
-//   id: string;
-//   date: string;
-//   title: string;
-//   description: string;
-//   iconName: keyof typeof IconMap; 
-//   type: 'work' | 'education' | 'certification' | 'milestone';
-// }
-
-// const IconMap = {
-//   Lightbulb,
-//   Briefcase,
-//   Award,
-//   GraduationCap,
-//   Laptop,
-//   Star,
-// };
-
-
-// export interface Certification {
-//   id: string;
-//   title: string;
-//   issuer: string;
-//   date: string;
-//   imageUrl: string;
-//   imageHint: string;
-//   verifyUrl?: string;
-// }
-
-// Data arrays are now commented out or removed as data comes from Supabase
-// export const projectsData: Project[] = [ /* ... */ ];
-// export const skillsData: SkillCategory[] = [ /* ... */ ];
-// export const timelineData: TimelineEvent[] = [ /* ... */ ];
-// export const certificationsData: Certification[] = [ /* ... */ ];
-
-
+// navLinks remains as it's used by Header.tsx
 export const navLinks = [
   { href: "#hero", label: "Home" },
   { href: "#about", label: "About" },
@@ -89,17 +19,30 @@ export const navLinks = [
   { href: "#contact", label: "Contact" },
 ];
 
-// Keep IconMap for TimelineItem for now, or adapt TimelineItem to accept iconName string
-export const IconMap = {
+// IconMap is potentially still used by TimelineItem.tsx for default icons
+// if icon_image_url is not provided from Supabase.
+export const IconMap: Record<string, LucideIcon> = {
   Lightbulb,
   Briefcase,
   Award,
   GraduationCap,
   Laptop,
   Star,
+  // Add other Lucide icons here by name if needed as fallbacks
+  // e.g. Code: CodeSquare, // Assuming CodeSquare is imported
 };
 
-// Placeholder for where all Lucide icons could be exported for dynamic use
-// This is useful if icon names are stored in the DB for SkillCard/CategoryCard
-import * as LucideIcons from 'lucide-react';
-export { LucideIcons };
+// Removed unused data arrays:
+// - projectsData
+// - skillsData
+// - timelineData (static version)
+// - certificationsData (static version)
+
+// Removed unused type definitions, they are now in src/types/supabase.ts:
+// - Project
+// - Skill
+// - SkillCategory
+// - TimelineEvent (original static type)
+// - Certification (original static type)
+
+// Removed re-export of LucideIcons, components should import directly.
