@@ -25,6 +25,7 @@ export const metadata: Metadata = {
 };
 
 async function getLegalDocument(id: string): Promise<LegalDocument | null> {
+  console.log(`[RootLayout] Fetching legal document with ID: ${id}`);
   const { data, error } = await supabase
     .from('legal_documents')
     .select('id, title, content, updated_at')
@@ -32,8 +33,13 @@ async function getLegalDocument(id: string): Promise<LegalDocument | null> {
     .maybeSingle();
 
   if (error) {
-    console.error(`Error fetching legal document ${id}:`, error);
+    console.error(`[RootLayout] Error fetching legal document ${id}:`, JSON.stringify(error, null, 2));
     return null;
+  }
+  if (data) {
+    console.log(`[RootLayout] Successfully fetched document: ${data.title} (updated: ${data.updated_at})`);
+  } else {
+    console.log(`[RootLayout] No document found for ID: ${id}`);
   }
   return data;
 }
@@ -45,6 +51,8 @@ export default async function RootLayout({
 }>) {
   const termsDoc = await getLegalDocument('terms-and-conditions');
   const privacyDoc = await getLegalDocument('privacy-policy');
+
+  console.log('[RootLayout] Rendering with termsDoc title:', termsDoc?.title, 'and privacyDoc title:', privacyDoc?.title);
 
   return (
     <html lang="en" suppressHydrationWarning>

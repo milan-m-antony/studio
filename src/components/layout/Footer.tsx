@@ -21,6 +21,11 @@ export default function Footer({ termsContentData, privacyPolicyData }: FooterPr
   const [openModal, setOpenModal] = useState<ModalContentType>(null);
   const [modalContent, setModalContent] = useState<{ title: string, content: string, lastUpdated: string | null }>({ title: '', content: '', lastUpdated: null });
 
+  // Log when props change to see if new data is arriving
+  useEffect(() => {
+    console.log('[Footer] Props received: termsContentData updated_at:', termsContentData?.updated_at, 'privacyPolicyData updated_at:', privacyPolicyData?.updated_at);
+  }, [termsContentData, privacyPolicyData]);
+
   useEffect(() => {
     setCurrentYear(new Date().getFullYear());
   }, []);
@@ -31,32 +36,39 @@ export default function Footer({ termsContentData, privacyPolicyData }: FooterPr
       const date = parseISO(dateString);
       return isValid(date) ? format(date, "MMMM d, yyyy 'at' h:mm a") : "Date unavailable";
     } catch (error) {
-      console.error("Error formatting date:", error);
+      console.error("[Footer] Error formatting date:", error);
       return "Date unavailable";
     }
   };
 
   const handleOpenModal = (type: ModalContentType) => {
-    if (type === 'terms' && termsContentData) {
-      setModalContent({
-        title: termsContentData.title || 'Terms & Conditions',
-        content: termsContentData.content || '<p>Terms and Conditions content not available.</p>',
-        lastUpdated: formatLastUpdated(termsContentData.updated_at)
-      });
-    } else if (type === 'privacy' && privacyPolicyData) {
-      setModalContent({
-        title: privacyPolicyData.title || 'Privacy Policy',
-        content: privacyPolicyData.content || '<p>Privacy Policy content not available.</p>',
-        lastUpdated: formatLastUpdated(privacyPolicyData.updated_at)
-      });
-    } else {
-      // Fallback if data is null
-      setModalContent({
-        title: type === 'terms' ? 'Terms & Conditions' : 'Privacy Policy',
-        content: `<p>Content currently unavailable. Please check back later.</p>`,
-        lastUpdated: null
-      });
+    console.log(`[Footer] handleOpenModal called for type: ${type}`);
+    let newModalContent = { title: '', content: '<p>Content currently unavailable. Please check back later.</p>', lastUpdated: null };
+
+    if (type === 'terms') {
+      if (termsContentData) {
+        console.log('[Footer] Using termsContentData for modal:', termsContentData.title, termsContentData.updated_at);
+        newModalContent = {
+          title: termsContentData.title || 'Terms & Conditions',
+          content: termsContentData.content || '<p>Terms and Conditions content not available.</p>',
+          lastUpdated: formatLastUpdated(termsContentData.updated_at)
+        };
+      } else {
+        console.log('[Footer] termsContentData is null for modal.');
+      }
+    } else if (type === 'privacy') {
+      if (privacyPolicyData) {
+        console.log('[Footer] Using privacyPolicyData for modal:', privacyPolicyData.title, privacyPolicyData.updated_at);
+        newModalContent = {
+          title: privacyPolicyData.title || 'Privacy Policy',
+          content: privacyPolicyData.content || '<p>Privacy Policy content not available.</p>',
+          lastUpdated: formatLastUpdated(privacyPolicyData.updated_at)
+        };
+      } else {
+        console.log('[Footer] privacyPolicyData is null for modal.');
+      }
     }
+    setModalContent(newModalContent);
     setOpenModal(type);
   };
 
