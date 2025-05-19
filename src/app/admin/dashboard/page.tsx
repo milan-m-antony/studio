@@ -8,9 +8,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { ShieldCheck, LogOut, AlertTriangle, LogIn, Home as HomeIcon, Users, Briefcase, Wrench, MapPin as JourneyIcon, Award, FileText as ResumeIcon, Mail, Settings as SettingsIcon, LayoutDashboard, Gavel as LegalIcon } from 'lucide-react'; // Added LegalIcon
+import { ShieldCheck, LogOut, AlertTriangle, LogIn, Home as HomeIcon, Users, Briefcase, Wrench, MapPin as JourneyIcon, Award, FileText as ResumeIcon, Mail, Settings as SettingsIcon, LayoutDashboard, Gavel as LegalIcon } from 'lucide-react';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
+import { supabase } from '@/lib/supabaseClient'; // Added Supabase import
 
 // Import Admin Managers
 import HeroManager from '@/components/admin/HeroManager';
@@ -21,7 +22,7 @@ import TimelineManager from '@/components/admin/TimelineManager';
 import CertificationsManager from '@/components/admin/CertificationsManager';
 import ResumeManager from '@/components/admin/ResumeManager';
 import ContactManager from '@/components/admin/ContactManager';
-import LegalManager from '@/components/admin/LegalManager'; // New import
+import LegalManager from '@/components/admin/LegalManager';
 import AdminPageLayout, { type AdminNavItem } from '@/components/admin/AdminPageLayout';
 
 
@@ -35,7 +36,7 @@ const adminNavItems: AdminNavItem[] = [
   { key: 'certifications', label: 'Certifications', icon: Award },
   { key: 'resume', label: 'Resume', icon: ResumeIcon },
   { key: 'contact', label: 'Contact & Submissions', icon: Mail },
-  { key: 'legal', label: 'Legal Pages', icon: LegalIcon }, // New nav item
+  { key: 'legal', label: 'Legal Pages', icon: LegalIcon },
   // { key: 'settings', label: 'Settings', icon: SettingsIcon }, // Future
 ];
 
@@ -132,9 +133,8 @@ export default function AdminDashboardPage() {
     setIsAuthenticatedForRender(false);
     setUsername('');
     setPassword('');
-    setActiveSection('dashboard');
-    router.push('/admin/dashboard');
-     // Log logout
+    setActiveSection('dashboard'); // Reset to dashboard view on logout
+    // Log logout
     try {
       const { error: logError } = await supabase
         .from('admin_activity_log')
@@ -147,6 +147,7 @@ export default function AdminDashboardPage() {
     } catch (e) {
       console.error("Exception during admin logout logging:", e);
     }
+    router.push('/admin/dashboard'); // Ensure redirect to login view
   };
 
   if (!isMounted) {
@@ -220,5 +221,3 @@ export default function AdminDashboardPage() {
     </AdminPageLayout>
   );
 }
-
-    
