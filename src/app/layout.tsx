@@ -1,12 +1,13 @@
 
 import type { Metadata } from 'next';
-import { Inter } from 'next/font/google'; // Using Inter as a fallback or primary, Geist is specified in CSS
 import './globals.css';
 import { ThemeProvider } from '@/contexts/ThemeProvider';
 import Header from '@/components/layout/Header';
 import Footer from '@/components/layout/Footer';
 import { Toaster } from "@/components/ui/toaster";
 import { Geist, Geist_Mono } from 'next/font/google';
+import { supabase } from '@/lib/supabaseClient'; // Import Supabase client
+import type { LegalDocument } from '@/types/supabase'; // Import LegalDocument type
 
 const geistSans = Geist({
   variable: '--font-geist-sans',
@@ -18,17 +19,33 @@ const geistMono = Geist_Mono({
   subsets: ['latin'],
 });
 
-
 export const metadata: Metadata = {
-  title: "Milan M Antony | Portfolio",
-  description: 'Personal portfolio website',
+  title: "Milan's Portfolio - Creative Developer",
+  description: 'Personal portfolio of Milan, a creative developer showcasing projects, skills, and journey.',
 };
 
-export default function RootLayout({
+async function getLegalDocument(id: string): Promise<LegalDocument | null> {
+  const { data, error } = await supabase
+    .from('legal_documents')
+    .select('id, title, content, updated_at')
+    .eq('id', id)
+    .maybeSingle();
+
+  if (error) {
+    console.error(`Error fetching legal document ${id}:`, error);
+    return null;
+  }
+  return data;
+}
+
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const termsDoc = await getLegalDocument('terms-and-conditions');
+  const privacyDoc = await getLegalDocument('privacy-policy');
+
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
@@ -44,7 +61,7 @@ export default function RootLayout({
           <div className="flex flex-col min-h-screen">
             <Header />
             <main className="flex-grow">{children}</main>
-            <Footer />
+            <Footer termsContentData={termsDoc} privacyPolicyData={privacyDoc} />
           </div>
           <Toaster />
         </ThemeProvider>
