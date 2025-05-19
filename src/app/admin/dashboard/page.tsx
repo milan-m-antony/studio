@@ -3,12 +3,12 @@
 
 import React, { useEffect, useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
-import { Button, buttonVariants } from '@/components/ui/button'; // Added buttonVariants
+import { Button, buttonVariants } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { ShieldCheck, LogOut, AlertTriangle, LogIn, Home as HomeIcon, Users, Briefcase, Wrench, MapPin as JourneyIcon, Award, FileText as ResumeIcon, Mail, Settings as SettingsIcon, LayoutDashboard } from 'lucide-react';
+import { ShieldCheck, LogOut, AlertTriangle, LogIn, Home as HomeIcon, Users, Briefcase, Wrench, MapPin as JourneyIcon, Award, FileText as ResumeIcon, Mail, Settings as SettingsIcon, LayoutDashboard, Gavel as LegalIcon } from 'lucide-react'; // Added LegalIcon
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
 
@@ -21,6 +21,7 @@ import TimelineManager from '@/components/admin/TimelineManager';
 import CertificationsManager from '@/components/admin/CertificationsManager';
 import ResumeManager from '@/components/admin/ResumeManager';
 import ContactManager from '@/components/admin/ContactManager';
+import LegalManager from '@/components/admin/LegalManager'; // New import
 import AdminPageLayout, { type AdminNavItem } from '@/components/admin/AdminPageLayout';
 
 
@@ -34,6 +35,7 @@ const adminNavItems: AdminNavItem[] = [
   { key: 'certifications', label: 'Certifications', icon: Award },
   { key: 'resume', label: 'Resume', icon: ResumeIcon },
   { key: 'contact', label: 'Contact & Submissions', icon: Mail },
+  { key: 'legal', label: 'Legal Pages', icon: LegalIcon }, // New nav item
   // { key: 'settings', label: 'Settings', icon: SettingsIcon }, // Future
 ];
 
@@ -49,7 +51,7 @@ const DashboardOverview = () => (
             <CardDescription>Select a section from the sidebar to manage your portfolio content.</CardDescription>
         </CardHeader>
         <CardContent>
-            <p>This is the main overview page. More widgets and summaries can be added here in the future.</p>
+            <p>This is the main overview page. Use the sidebar to navigate to different content management sections.</p>
         </CardContent>
     </Card>
 );
@@ -69,13 +71,10 @@ export default function AdminDashboardPage() {
     if (typeof window !== 'undefined') {
       const authStatus = localStorage.getItem('isAdminAuthenticated') === 'true';
       setIsAuthenticatedForRender(authStatus);
-      // Restore username if needed for display, or if you implement "remember me"
-      // const storedUsername = localStorage.getItem('adminUsername');
-      // if (authStatus && storedUsername) setUsername(storedUsername);
     }
   }, []);
 
-  const handleLoginSubmit = (e: FormEvent) => {
+  const handleLoginSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setError('');
     const trimmedUsername = username.trim();
@@ -100,10 +99,23 @@ export default function AdminDashboardPage() {
       console.log("[Admin Login] Login successful.");
       if (typeof window !== 'undefined') {
         localStorage.setItem('isAdminAuthenticated', 'true');
-        // localStorage.setItem('adminUsername', trimmedUsername); // Optional: store username
         window.dispatchEvent(new CustomEvent('authChange'));
       }
       setIsAuthenticatedForRender(true);
+      // Log login success
+      try {
+        const { error: logError } = await supabase
+          .from('admin_activity_log')
+          .insert({ 
+            action_type: 'ADMIN_LOGIN_SUCCESS', 
+            description: `Admin "${trimmedUsername}" logged in successfully.`,
+            user_identifier: trimmedUsername
+          });
+        if (logError) console.error("Error logging admin login:", logError);
+      } catch (e) {
+        console.error("Exception during admin login logging:", e);
+      }
+
     } else {
       console.log("[Admin Login] Login failed.");
       setError("Invalid username or password.");
@@ -111,17 +123,30 @@ export default function AdminDashboardPage() {
     }
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    const adminUsername = process.env.NEXT_PUBLIC_ADMIN_USERNAME || "Admin";
     if (typeof window !== 'undefined') {
       localStorage.removeItem('isAdminAuthenticated');
-      // localStorage.removeItem('adminUsername'); // Optional: clear stored username
       window.dispatchEvent(new CustomEvent('authChange'));
     }
     setIsAuthenticatedForRender(false);
     setUsername('');
     setPassword('');
-    setActiveSection('dashboard'); // Reset to dashboard view on logout
-    router.push('/admin/dashboard'); // Ensure user is on the login view
+    setActiveSection('dashboard');
+    router.push('/admin/dashboard');
+     // Log logout
+    try {
+      const { error: logError } = await supabase
+        .from('admin_activity_log')
+        .insert({ 
+          action_type: 'ADMIN_LOGOUT', 
+          description: `Admin "${adminUsername}" logged out.`,
+          user_identifier: adminUsername
+        });
+      if (logError) console.error("Error logging admin logout:", logError);
+    } catch (e) {
+      console.error("Exception during admin logout logging:", e);
+    }
   };
 
   if (!isMounted) {
@@ -173,7 +198,7 @@ export default function AdminDashboardPage() {
       activeSection={activeSection}
       onSelectSection={setActiveSection}
       onLogout={handleLogout}
-      username={process.env.NEXT_PUBLIC_ADMIN_USERNAME || "Admin"} // Display logged-in username
+      username={process.env.NEXT_PUBLIC_ADMIN_USERNAME || "Admin"}
       pageTitle={getPageTitle(activeSection)}
     >
       {activeSection === 'dashboard' && <DashboardOverview />}
@@ -185,7 +210,7 @@ export default function AdminDashboardPage() {
       {activeSection === 'certifications' && <CertificationsManager />}
       {activeSection === 'resume' && <ResumeManager />}
       {activeSection === 'contact' && <ContactManager />}
-      {/* Add other sections here */}
+      {activeSection === 'legal' && <LegalManager />} 
       {activeSection === 'settings' && (
         <Card>
           <CardHeader><CardTitle>Settings</CardTitle><CardDescription>Site settings and account actions.</CardDescription></CardHeader>

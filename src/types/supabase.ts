@@ -14,7 +14,7 @@ export type Json =
 export interface StoredHeroSocialLink {
   label: string;
   url: string;
-  icon_image_url: string | null; // Changed from icon_name, then to icon_image_url
+  icon_image_url: string | null; // Changed from icon_name to icon_image_url
 }
 
 // Interface for Hero social links when managed in client-side state (includes temporary id)
@@ -36,6 +36,13 @@ export interface AdminActivityLog {
   description: string;
   details: Json | null;
   is_read: boolean;
+}
+
+export interface LegalDocument {
+  id: string; // 'terms-and-conditions' or 'privacy-policy'
+  title: string;
+  content: string | null;
+  updated_at: string;
 }
 
 
@@ -60,34 +67,16 @@ export interface Database {
         }
         Relationships: [];
       }
-      admin_activity_log: { // New table for activity logs
-        Row: {
-          id: string;
-          timestamp: string;
-          user_identifier: string;
-          action_type: string;
-          description: string;
-          details: Json | null;
-          is_read: boolean;
-        }
-        Insert: {
-          id?: string;
-          timestamp?: string;
-          user_identifier?: string;
-          action_type: string;
-          description: string;
-          details?: Json | null;
-          is_read?: boolean;
-        }
-        Update: {
-          id?: string;
-          timestamp?: string;
-          user_identifier?: string;
-          action_type?: string;
-          description?: string;
-          details?: Json | null;
-          is_read?: boolean;
-        }
+      admin_activity_log: {
+        Row: AdminActivityLog
+        Insert: Omit<AdminActivityLog, 'id' | 'timestamp' | 'is_read'> & { id?: string; timestamp?: string; is_read?: boolean; }
+        Update: Partial<AdminActivityLog>
+        Relationships: [];
+      }
+      legal_documents: { // New table for legal documents
+        Row: LegalDocument
+        Insert: Omit<LegalDocument, 'updated_at'> & { updated_at?: string; }
+        Update: Partial<LegalDocument>
         Relationships: [];
       }
       projects: {
@@ -133,7 +122,7 @@ export interface Database {
         Row: {
           id: string
           name: string
-          icon_image_url: string | null
+          icon_image_url: string | null // Changed from icon_name
           sort_order: number | null
           created_at: string
         }
@@ -157,7 +146,7 @@ export interface Database {
         Row: {
           id: string
           name: string
-          icon_image_url: string | null
+          icon_image_url: string | null // Changed from icon_name
           description: string | null
           category_id: string | null
           created_at: string;
@@ -223,7 +212,7 @@ export interface Database {
           date: string
           title: string
           description: string
-          icon_image_url: string | null
+          icon_image_url: string | null // Changed from icon_name
           type: string
           sort_order: number | null
           created_at: string
@@ -460,7 +449,7 @@ export interface Database {
           id: string;
           main_name: string | null;
           subtitles: string[] | null;
-          social_media_links: StoredHeroSocialLink[] | null;
+          social_media_links: StoredHeroSocialLink[] | null; // Changed from individual social urls
           updated_at: string;
         }
         Insert: {
@@ -600,9 +589,9 @@ export interface Project {
   id: string;
   title: string;
   description: string | null;
-  imageUrl: string | null;
-  liveDemoUrl?: string | null;
-  repoUrl?: string | null;
+  imageUrl: string | null; // Mapped from image_url
+  liveDemoUrl?: string | null; // Mapped from live_demo_url
+  repoUrl?: string | null; // Mapped from repo_url
   tags: string[] | null;
   status: ProjectStatus | null;
   progress?: number | null;
@@ -612,7 +601,7 @@ export interface Project {
 export interface Skill {
   id: string;
   name: string;
-  iconImageUrl: string | null;
+  iconImageUrl: string | null; // Changed from iconName
   description: string | null;
   categoryId?: string | null;
   created_at: string;
@@ -621,7 +610,7 @@ export interface Skill {
 export interface SkillCategory {
   id: string;
   name: string;
-  iconImageUrl?: string | null;
+  iconImageUrl?: string | null; // Changed from iconName, iconColor removed
   skills?: Skill[];
   sort_order?: number | null;
   created_at?: string;
@@ -634,7 +623,7 @@ export interface TimelineEvent {
   date: string;
   title: string;
   description: string;
-  iconImageUrl: string | null;
+  iconImageUrl: string | null; // Changed from iconName
   type: TimelineEventType;
   sort_order?: number | null;
   created_at?: string;
@@ -645,8 +634,8 @@ export interface Certification {
   title: string;
   issuer: string;
   date: string;
-  imageUrl: string | null;
-  verifyUrl?: string | null;
+  imageUrl: string | null; // Mapped from image_url
+  verifyUrl?: string | null; // Mapped from verify_url
   created_at: string;
 }
 
@@ -659,7 +648,7 @@ export interface AboutContent {
   paragraph1: string | null;
   paragraph2: string | null;
   paragraph3: string | null;
-  imageUrl: string | null;
+  imageUrl: string | null; // Mapped from image_url
   image_tagline: string | null;
   updated_at?: string;
 }
@@ -677,7 +666,7 @@ export interface ResumeExperience {
   company_name: string;
   date_range: string | null;
   description_points: string[] | null;
-  icon_image_url: string | null;
+  icon_image_url: string | null; // Changed from icon_name
   sort_order?: number | null;
   created_at: string;
 }
@@ -688,7 +677,7 @@ export interface ResumeEducation {
   institution_name: string;
   date_range: string | null;
   description: string | null;
-  icon_image_url: string | null;
+  icon_image_url: string | null; // Changed from icon_name
   sort_order?: number | null;
   created_at: string;
 }
@@ -697,13 +686,13 @@ export interface ResumeKeySkill {
   id: string;
   skill_name: string;
   category_id?: string | null;
-  // No created_at here as per last schema adjustment
+  // No created_at as per schema
 }
 
 export interface ResumeKeySkillCategory {
   id: string;
   category_name: string;
-  icon_image_url: string | null;
+  icon_image_url: string | null; // Changed from icon_name
   skills?: ResumeKeySkill[];
   sort_order?: number | null;
   created_at: string;
@@ -713,7 +702,7 @@ export interface ResumeLanguage {
   id: string;
   language_name: string;
   proficiency: string | null;
-  icon_image_url: string | null;
+  icon_image_url: string | null; // Changed from icon_name
   sort_order?: number | null;
   created_at: string;
 }
@@ -739,7 +728,7 @@ export interface ContactPageDetail {
 export interface SocialLink {
   id: string;
   label: string;
-  icon_image_url: string | null;
+  icon_image_url: string | null; // Changed from icon_name
   url: string;
   display_text: string | null;
   sort_order?: number | null;
@@ -760,3 +749,5 @@ export interface ContactSubmission {
   submitted_at: string;
   notes?: string | null;
 }
+
+    
