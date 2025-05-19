@@ -10,6 +10,7 @@ export default function Preloader() {
   const [progress, setProgress] = useState(1); // Start count from 1
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const fallbackTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const fadingOutRef = useRef(false); // Ref to prevent multiple fade-out triggers
 
   const clearAllTimers = useCallback(() => {
     if (intervalRef.current) {
@@ -23,36 +24,30 @@ export default function Preloader() {
   }, []);
 
   const startFadeOut = useCallback(() => {
-    if (fadingOutRef.current) return; // Prevent multiple calls to startFadeOut
-    fadingOutRef.current = true; // Signal that fadeOut has started
+    if (fadingOutRef.current) return;
+    fadingOutRef.current = true;
 
     clearAllTimers();
     setProgress(100); // Ensure it shows 100 before fading
-    setFadingOut(true); // Triggers CSS opacity transition
+    setFadingOut(true);
     
     setTimeout(() => {
-      setLoading(false); // Remove from DOM after transition
-    }, 500); // Must match CSS transition duration
-  }, [clearAllTimers]); // Removed fadingOut from deps as we use a ref
-
-  // Ref to track if fadingOut has already been initiated to prevent race conditions
-  const fadingOutRef = useRef(false);
+      setLoading(false);
+    }, 500); // Match CSS transition duration for opacity
+  }, [clearAllTimers]);
 
   useEffect(() => {
-    fadingOutRef.current = false; // Reset on mount/change that might re-evaluate this
+    fadingOutRef.current = false; // Reset on mount
     
     const handleWindowLoad = () => {
-      console.log("[Preloader] window.onload triggered");
       startFadeOut();
     };
 
     fallbackTimeoutRef.current = setTimeout(() => {
-      console.warn("[Preloader] Fallback timeout triggered.");
       startFadeOut();
     }, 7000); // Fallback after 7 seconds
 
     if (document.readyState === 'complete') {
-      console.log("[Preloader] Document already complete on mount.");
       startFadeOut();
     } else {
       window.addEventListener('load', handleWindowLoad);
@@ -65,7 +60,7 @@ export default function Preloader() {
   }, [startFadeOut, clearAllTimers]);
 
   useEffect(() => {
-    if (fadingOutRef.current || !loading) { // If already fading or not loading, don't start interval
+    if (fadingOutRef.current || !loading) {
       if(intervalRef.current) clearInterval(intervalRef.current);
       return;
     }
@@ -76,14 +71,17 @@ export default function Preloader() {
           const nextProgress = prev + 1;
           if (nextProgress >= 100) {
             if (intervalRef.current) clearInterval(intervalRef.current);
-            startFadeOut(); // Start fade out when counter hits 100
+            // startFadeOut() will be called by window.onload or fallback,
+            // or if the counter naturally hits 100 before those.
+            // If it hits 100 naturally, call startFadeOut.
+            startFadeOut();
             return 100;
           }
           return nextProgress;
         });
-      }, 30); // 30ms * 100 = ~3 seconds to count to 100
+      }, 30); // Approx 3 seconds to count to 100
     } else if (progress >= 100 && loading && !fadingOutRef.current) {
-      // If progress somehow got to 100 but fadeout didn't start
+      // This ensures if progress somehow gets to 100 but fadeout didn't start, it will.
       if (intervalRef.current) clearInterval(intervalRef.current);
       startFadeOut();
     }
@@ -112,12 +110,11 @@ export default function Preloader() {
       <div className="text-center mb-8">
         <span
           key={progress} // Re-trigger animation on progress change
-          className="text-7xl md:text-8xl lg:text-9xl font-bold tabular-nums animate-textGlowPopIn inline-block"
-          style={{ animationDelay: '0s', animationDuration: '0.2s' }} // Ensure pop-in is quick for each number
+          className="text-7xl md:text-8xl lg:text-9xl font-bold tabular-nums animate-preloaderPulse inline-block"
+          style={{ animationDelay: '0s', animationDuration: '0.2s' }} 
         >
           {progress}
         </span>
-        {/* Percentage sign removed */}
       </div>
       
       <p className="text-md text-white/80 mb-4">Loading Portfolio...</p>
