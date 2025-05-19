@@ -7,7 +7,7 @@ import { Loader2 } from 'lucide-react';
 export default function Preloader() {
   const [loading, setLoading] = useState(true);
   const [fadingOut, setFadingOut] = useState(false);
-  const [progress, setProgress] = useState(0);
+  const [progress, setProgress] = useState(1); // Start count from 1
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const fallbackTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -35,7 +35,7 @@ export default function Preloader() {
     // Start counter animation
     intervalRef.current = setInterval(() => {
       setProgress(prev => {
-        if (prev < 99) {
+        if (prev < 99) { // Count up to 99 via interval
           return prev + 1;
         }
         // Once it reaches 99, stop the interval, but don't hide yet
@@ -68,7 +68,7 @@ export default function Preloader() {
       window.removeEventListener('load', handleLoad);
       clearTimeoutsAndIntervals();
     };
-  }, []); // Empty dependency array, runs once on mount and cleans up on unmount
+  }, [fadingOut, loading]); // Added fadingOut and loading to dependencies for robust cleanup logic
 
   // Effect to stop counter if component unmounts while interval is active
   useEffect(() => {
@@ -91,11 +91,18 @@ export default function Preloader() {
       role="status"
       aria-live="polite"
     >
-      <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />
-      <div className="text-2xl font-semibold text-primary">
-        {progress}%
+      <div className="text-center mb-8">
+        <span
+          key={progress} // Add key to trigger re-render and animation on number change
+          className="text-7xl md:text-8xl lg:text-9xl font-bold text-primary tabular-nums animate-textPopIn inline-block"
+        >
+          {progress}
+        </span>
+        <span className="text-4xl md:text-5xl lg:text-6xl font-light text-primary/80">%</span>
       </div>
-      <p className="mt-2 text-sm text-muted-foreground">Loading Portfolio...</p>
+      
+      <p className="text-md text-muted-foreground mb-4">Loading Portfolio...</p>
+      <Loader2 className="h-6 w-6 animate-spin text-primary/70" />
     </div>
   );
 }
