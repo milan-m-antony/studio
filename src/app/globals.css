@@ -35,15 +35,18 @@ body {
     --chart-4: 43 74% 66%;
     --chart-5: 27 87% 67%;
     --radius: 0.5rem;
-    --sidebar-background: 0 0% 98%;
-    --sidebar-foreground: 240 5.3% 26.1%;
-    --sidebar-primary: 240 5.9% 10%;
-    --sidebar-primary-foreground: 0 0% 98%;
-    --sidebar-accent: 240 4.8% 95.9%;
-    --sidebar-accent-foreground: 240 5.9% 10%;
-    --sidebar-border: 220 13% 91%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
+
+    /* Light Theme Sidebar Variables */
+    --sidebar-background: 0 0% 98%; /* Very light gray, almost white */
+    --sidebar-foreground: 240 5.3% 26.1%; /* Dark gray text */
+    --sidebar-primary: 220 85% 55%; /* Professional Blue for active item background */
+    --sidebar-primary-foreground: 0 0% 98%; /* Almost white text on active item */
+    --sidebar-accent: 240 4.8% 92.9%; /* Slightly darker gray for hover */
+    --sidebar-accent-foreground: 240 5.9% 10%; /* Dark gray text on hover */
+    --sidebar-border: 220 13% 91%; /* Light border */
+    --sidebar-ring: 217.2 91.2% 59.8%; /* Blue for focus rings */
   }
+
   .dark {
     --background: 240 10% 3.9%; /* Dark Gray */
     --foreground: 0 0% 98%; /* Almost White */
@@ -71,14 +74,16 @@ body {
     --chart-3: 30 80% 55%;
     --chart-4: 280 65% 60%;
     --chart-5: 340 75% 55%;
-    --sidebar-background: 240 5.9% 10%;
-    --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 224.3 76.3% 48%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 3.7% 15.9%;
-    --sidebar-accent-foreground: 240 4.8% 95.9%;
-    --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
+
+    /* Dark Theme Sidebar Variables */
+    --sidebar-background: 0 0% 0%; /* Solid Black */
+    --sidebar-foreground: 0 0% 95.9%; /* Light gray text, almost white */
+    --sidebar-primary: 220 75% 65%; /* Brighter Professional Blue for active item background */
+    --sidebar-primary-foreground: 240 5.9% 10%; /* Dark gray text on active item */
+    --sidebar-accent: 240 3.7% 10.9%; /* Slightly lighter black for hover */
+    --sidebar-accent-foreground: 0 0% 98%; /* Almost white text on hover */
+    --sidebar-border: 240 3.7% 15.9%; /* Dark border */
+    --sidebar-ring: 217.2 91.2% 59.8%; /* Blue for focus rings */
   }
 }
 
