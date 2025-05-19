@@ -6,8 +6,9 @@ import Header from '@/components/layout/Header';
 import Footer from '@/components/layout/Footer';
 import { Toaster } from "@/components/ui/toaster";
 import { Geist, Geist_Mono } from 'next/font/google';
-import { supabase } from '@/lib/supabaseClient'; // Import Supabase client
-import type { LegalDocument } from '@/types/supabase'; // Import LegalDocument type
+import { supabase } from '@/lib/supabaseClient';
+import type { LegalDocument } from '@/types/supabase';
+import Preloader from '@/components/layout/Preloader'; // Import the Preloader
 
 const geistSans = Geist({
   variable: '--font-geist-sans',
@@ -49,8 +50,11 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const termsDoc = await getLegalDocument('terms-and-conditions');
-  const privacyDoc = await getLegalDocument('privacy-policy');
+  const termsDocPromise = getLegalDocument('terms-and-conditions');
+  const privacyDocPromise = getLegalDocument('privacy-policy');
+
+  // Await promises here if needed, or pass them down if Footer can handle promises (not typical for client components)
+  const [termsDoc, privacyDoc] = await Promise.all([termsDocPromise, privacyDocPromise]);
 
   console.log('[RootLayout] Rendering with termsDoc title:', termsDoc?.title, 'and privacyDoc title:', privacyDoc?.title);
 
@@ -66,6 +70,7 @@ export default async function RootLayout({
       </head>
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+          <Preloader /> {/* Add Preloader here */}
           <div className="flex flex-col min-h-screen">
             <Header />
             <main className="flex-grow">{children}</main>
