@@ -125,15 +125,27 @@ body {
   animation: fadeIn 0.8s ease-out forwards;
 }
 
-/* Animation for preloader text pop-in */
-@keyframes textPopIn {
-  0% { transform: scale(0.7); opacity: 0; }
-  80% { transform: scale(1.05); opacity: 1; }
-  100% { transform: scale(1); opacity: 1; }
+/* Animation for preloader text pop-in with glow */
+@keyframes textGlowPopIn {
+  0% {
+    transform: scale(0.7);
+    opacity: 0;
+    text-shadow: none;
+  }
+  70% { /* Peak of the pop and glow */
+    transform: scale(1.05);
+    opacity: 1;
+    text-shadow: 0 0 8px currentColor, 0 0 15px currentColor; /* Subtle white glow */
+  }
+  100% { /* Settle down */
+    transform: scale(1);
+    opacity: 1;
+    text-shadow: none;
+  }
 }
 
-.animate-textPopIn {
-  animation: textPopIn 0.2s ease-out forwards; /* Faster animation for each number */
+.animate-textGlowPopIn {
+  animation: textGlowPopIn 0.2s ease-out forwards; /* Faster animation for each number */
 }
 
 

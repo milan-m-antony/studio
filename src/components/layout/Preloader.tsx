@@ -23,38 +23,34 @@ export default function Preloader() {
   };
 
   const handleLoad = () => {
-    clearTimeoutsAndIntervals(); // Clear everything once load is handled
-    setProgress(100); // Jump to 100%
+    clearTimeoutsAndIntervals(); 
+    setProgress(100); 
     setFadingOut(true);
     setTimeout(() => {
       setLoading(false);
-    }, 500); // This duration should match your CSS transition duration
+    }, 500); 
   };
 
   useEffect(() => {
-    // Start counter animation
     intervalRef.current = setInterval(() => {
       setProgress(prev => {
-        if (prev < 99) { // Count up to 99 via interval
+        if (prev < 99) { 
           return prev + 1;
         }
-        // Once it reaches 99, stop the interval, but don't hide yet
-        // The window.onload or fallback will push it to 100
         if (intervalRef.current) {
             clearInterval(intervalRef.current);
             intervalRef.current = null;
         }
         return 99;
       });
-    }, 30); // Adjust interval for speed (e.g., 30ms for ~3s to 99%)
+    }, 30); 
 
-    // Fallback timeout in case window.onload is very slow
     fallbackTimeoutRef.current = setTimeout(() => {
       console.warn("Preloader: Fallback timeout triggered to hide preloader.");
-      if (!fadingOut && loading) { // Only if not already handled
+      if (!fadingOut && loading) { 
         handleLoad();
       }
-    }, 7000); // Hide after 7 seconds regardless
+    }, 7000); 
 
     if (document.readyState === 'complete') {
       if (!fadingOut && loading) {
@@ -68,9 +64,8 @@ export default function Preloader() {
       window.removeEventListener('load', handleLoad);
       clearTimeoutsAndIntervals();
     };
-  }, [fadingOut, loading]); // Added fadingOut and loading to dependencies for robust cleanup logic
+  }, [fadingOut, loading]);
 
-  // Effect to stop counter if component unmounts while interval is active
   useEffect(() => {
     return () => {
       clearTimeoutsAndIntervals();
@@ -84,7 +79,7 @@ export default function Preloader() {
 
   return (
     <div
-      className={`fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-background transition-opacity duration-500 ease-in-out ${
+      className={`fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-black text-white transition-opacity duration-500 ease-in-out ${
         fadingOut ? 'opacity-0' : 'opacity-100'
       }`}
       aria-hidden={!loading}
@@ -93,16 +88,16 @@ export default function Preloader() {
     >
       <div className="text-center mb-8">
         <span
-          key={progress} // Add key to trigger re-render and animation on number change
-          className="text-7xl md:text-8xl lg:text-9xl font-bold text-primary tabular-nums animate-textPopIn inline-block"
+          key={progress} 
+          className="text-7xl md:text-8xl lg:text-9xl font-bold tabular-nums animate-textGlowPopIn inline-block" // Changed animation class
         >
           {progress}
         </span>
-        <span className="text-4xl md:text-5xl lg:text-6xl font-light text-primary/80">%</span>
+        <span className="text-4xl md:text-5xl lg:text-6xl font-light text-white/80">%</span>
       </div>
       
-      <p className="text-md text-muted-foreground mb-4">Loading Portfolio...</p>
-      <Loader2 className="h-6 w-6 animate-spin text-primary/70" />
+      <p className="text-md text-white/80 mb-4">Loading Portfolio...</p>
+      <Loader2 className="h-6 w-6 animate-spin text-white/70" />
     </div>
   );
 }
