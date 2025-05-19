@@ -41,32 +41,38 @@ export default function Preloader() {
             clearInterval(intervalRef.current);
             intervalRef.current = null;
         }
-        return 99;
+        return 99; // Stay at 99 until handleLoad sets to 100
       });
-    }, 30); 
+    }, 30); // Adjust interval for desired speed (e.g., 30ms for ~3s to 99)
 
     fallbackTimeoutRef.current = setTimeout(() => {
       console.warn("Preloader: Fallback timeout triggered to hide preloader.");
       if (!fadingOut && loading) { 
         handleLoad();
       }
-    }, 7000); 
+    }, 7000); // Fallback after 7 seconds
 
-    if (document.readyState === 'complete') {
-      if (!fadingOut && loading) {
-        handleLoad();
-      }
-    } else {
-      window.addEventListener('load', handleLoad);
+    if (typeof window !== 'undefined') {
+        if (document.readyState === 'complete') {
+          if (!fadingOut && loading) {
+            handleLoad();
+          }
+        } else {
+          window.addEventListener('load', handleLoad);
+        }
     }
 
+
     return () => {
-      window.removeEventListener('load', handleLoad);
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('load', handleLoad);
+      }
       clearTimeoutsAndIntervals();
     };
-  }, [fadingOut, loading]);
+  }, [fadingOut, loading]); // Rerun if fadingOut or loading changes (e.g. if load is called early)
 
   useEffect(() => {
+    // Ensure cleanup on unmount, just in case
     return () => {
       clearTimeoutsAndIntervals();
     }
@@ -89,11 +95,11 @@ export default function Preloader() {
       <div className="text-center mb-8">
         <span
           key={progress} 
-          className="text-7xl md:text-8xl lg:text-9xl font-bold tabular-nums animate-textGlowPopIn inline-block" // Changed animation class
+          className="text-7xl md:text-8xl lg:text-9xl font-bold tabular-nums animate-textGlowPopIn inline-block"
         >
           {progress}
         </span>
-        <span className="text-4xl md:text-5xl lg:text-6xl font-light text-white/80">%</span>
+        {/* Percentage sign removed */}
       </div>
       
       <p className="text-md text-white/80 mb-4">Loading Portfolio...</p>
