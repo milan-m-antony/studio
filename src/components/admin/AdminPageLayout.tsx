@@ -4,7 +4,7 @@
 import Link from 'next/link';
 import NextImage from 'next/image';
 import { Button } from '@/components/ui/button';
-import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet'; // Added SheetHeader, SheetTitle, SheetDescription
+import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
 import { 
   Menu, X, Sun, Moon, 
   LogOut as LogoutIcon, LayoutDashboard, Bell as BellIcon, UserCircle, Settings, UploadCloud, Trash2, History
@@ -105,13 +105,13 @@ export default function AdminPageLayout({
   };
 
   const fetchActivities = async () => {
-    if (!isActivitySheetOpen) return; // Only fetch if sheet is about to open or is open
+    if (!isActivitySheetOpen) return; 
     setIsLoadingActivities(true);
     const { data, error } = await supabase
       .from('admin_activity_log')
       .select('*')
       .order('timestamp', { ascending: false })
-      .limit(20); // Fetch latest 20 activities
+      .limit(20); 
 
     if (error) {
       console.error("Error fetching admin activities:", error);
@@ -266,11 +266,11 @@ export default function AdminPageLayout({
 
 
   const SidebarContent = ({ isMobile = false }: { isMobile?: boolean }) => (
-    <div className={cn("flex flex-col h-full", isMobile ? "w-full" : "w-64")}>
-      <div className="p-4 border-b border-border">
+    <div className={cn("flex flex-col h-full text-sidebar-foreground", isMobile ? "w-full" : "w-64")}>
+      <div className="p-4 border-b border-sidebar-border">
         <Link href="/admin/dashboard" className="flex items-center gap-2" onClick={() => { onSelectSection('dashboard'); if(isMobile) setIsMobileMenuOpen(false);}}>
-          <LayoutDashboard className="h-7 w-7 text-primary" />
-          <span className="font-bold text-xl text-foreground">Admin</span>
+          <LayoutDashboard className="h-7 w-7 text-primary" /> {/* Using primary color for logo icon consistent with theme */}
+          <span className="font-bold text-xl">Admin</span>
         </Link>
       </div>
       <nav className="flex-grow p-2 space-y-1 overflow-y-auto">
@@ -280,35 +280,39 @@ export default function AdminPageLayout({
           return (
             <Button
               key={item.key}
-              variant={isActive ? "secondary" : "ghost"}
+              variant="ghost" // Base variant is ghost for all
               className={cn(
-                "w-full justify-start text-sm",
-                isActive ? "bg-primary/10 text-primary font-semibold" : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                "w-full justify-start text-sm py-2.5 px-3",
+                isActive 
+                  ? "bg-sidebar-primary text-sidebar-primary-foreground font-semibold rounded-lg" 
+                  : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground rounded-lg"
               )}
               onClick={() => {
                 onSelectSection(item.key);
                 if (isMobile) setIsMobileMenuOpen(false);
               }}
             >
-              <Icon className="mr-3 h-5 w-5" />
+              <Icon className={cn("mr-3 h-5 w-5", isActive ? "text-sidebar-primary-foreground" : "text-sidebar-foreground/70 group-hover:text-sidebar-accent-foreground")} />
               {item.label}
             </Button>
           );
         })}
       </nav>
-      <div className="p-2 border-t border-border mt-auto">
+      <div className="p-2 border-t border-sidebar-border mt-auto">
         <Button
-            variant={activeSection === 'settings' ? "secondary" : "ghost"}
+            variant="ghost"
             className={cn(
-                "w-full justify-start text-sm",
-                activeSection === 'settings' ? "bg-primary/10 text-primary font-semibold" : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                "w-full justify-start text-sm py-2.5 px-3",
+                 activeSection === 'settings' 
+                   ? "bg-sidebar-primary text-sidebar-primary-foreground font-semibold rounded-lg" 
+                   : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground rounded-lg"
             )}
             onClick={() => {
                 onSelectSection('settings');
                 if (isMobile) setIsMobileMenuOpen(false);
             }}
         >
-          <Settings className="mr-3 h-5 w-5" />
+          <Settings className={cn("mr-3 h-5 w-5", activeSection === 'settings' ? "text-sidebar-primary-foreground" : "text-sidebar-foreground/70 group-hover:text-sidebar-accent-foreground")} />
           Settings
         </Button>
       </div>
@@ -320,7 +324,7 @@ export default function AdminPageLayout({
     <>
     <div className="flex h-screen bg-background text-foreground">
       <aside className="hidden md:flex md:flex-shrink-0">
-         <div className="flex flex-col w-64 border-r border-border bg-card h-full">
+         <div className="flex flex-col w-64 border-r border-sidebar-border bg-sidebar h-full"> {/* Changed bg-card to bg-sidebar, border-border to border-sidebar-border */}
             <SidebarContent />
          </div>
       </aside>
@@ -331,7 +335,7 @@ export default function AdminPageLayout({
             <Menu className="h-6 w-6" />
           </Button>
         </SheetTrigger>
-        <SheetContent side="left" className="p-0 w-72 bg-card border-r border-border">
+        <SheetContent side="left" className="p-0 w-72 bg-sidebar border-r border-sidebar-border"> {/* Changed bg-card to bg-sidebar, border-border to border-sidebar-border */}
           <SidebarContent isMobile />
         </SheetContent>
       </Sheet>
@@ -352,7 +356,7 @@ export default function AdminPageLayout({
                   <SheetTitle className="flex items-center"><History className="mr-2 h-5 w-5"/>Recent Activity</SheetTitle>
                   <SheetDescription>Latest updates and actions in the admin panel.</SheetDescription>
                 </SheetHeader>
-                <ScrollArea className="h-[calc(100vh-100px)] p-4"> {/* Adjust height as needed */}
+                <ScrollArea className="h-[calc(100vh-100px)] p-4"> 
                   {isLoadingActivities ? (
                     <p className="text-muted-foreground text-center py-4">Loading activities...</p>
                   ) : activities.length === 0 ? (
@@ -482,3 +486,6 @@ export default function AdminPageLayout({
     </>
   );
 }
+
+
+      
