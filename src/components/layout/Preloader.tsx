@@ -1,7 +1,7 @@
 // src/components/layout/Preloader.tsx
 "use client";
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { Loader2 } from 'lucide-react';
 
 export default function Preloader() {
@@ -11,7 +11,7 @@ export default function Preloader() {
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const fallbackTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  const clearTimeoutsAndIntervals = () => {
+  const clearAllTimers = useCallback(() => {
     if (intervalRef.current) {
       clearInterval(intervalRef.current);
       intervalRef.current = null;
@@ -20,63 +20,80 @@ export default function Preloader() {
       clearTimeout(fallbackTimeoutRef.current);
       fallbackTimeoutRef.current = null;
     }
-  };
+  }, []);
 
-  const handleLoad = () => {
-    clearTimeoutsAndIntervals(); 
-    setProgress(100); 
-    setFadingOut(true);
+  const startFadeOut = useCallback(() => {
+    if (fadingOutRef.current) return; // Prevent multiple calls to startFadeOut
+    fadingOutRef.current = true; // Signal that fadeOut has started
+
+    clearAllTimers();
+    setProgress(100); // Ensure it shows 100 before fading
+    setFadingOut(true); // Triggers CSS opacity transition
+    
     setTimeout(() => {
-      setLoading(false);
-    }, 500); 
-  };
+      setLoading(false); // Remove from DOM after transition
+    }, 500); // Must match CSS transition duration
+  }, [clearAllTimers]); // Removed fadingOut from deps as we use a ref
+
+  // Ref to track if fadingOut has already been initiated to prevent race conditions
+  const fadingOutRef = useRef(false);
 
   useEffect(() => {
-    intervalRef.current = setInterval(() => {
-      setProgress(prev => {
-        if (prev < 99) { 
-          return prev + 1;
-        }
-        if (intervalRef.current) {
-            clearInterval(intervalRef.current);
-            intervalRef.current = null;
-        }
-        return 99; // Stay at 99 until handleLoad sets to 100
-      });
-    }, 30); // Adjust interval for desired speed (e.g., 30ms for ~3s to 99)
+    fadingOutRef.current = false; // Reset on mount/change that might re-evaluate this
+    
+    const handleWindowLoad = () => {
+      console.log("[Preloader] window.onload triggered");
+      startFadeOut();
+    };
 
     fallbackTimeoutRef.current = setTimeout(() => {
-      console.warn("Preloader: Fallback timeout triggered to hide preloader.");
-      if (!fadingOut && loading) { 
-        handleLoad();
-      }
+      console.warn("[Preloader] Fallback timeout triggered.");
+      startFadeOut();
     }, 7000); // Fallback after 7 seconds
 
-    if (typeof window !== 'undefined') {
-        if (document.readyState === 'complete') {
-          if (!fadingOut && loading) {
-            handleLoad();
-          }
-        } else {
-          window.addEventListener('load', handleLoad);
-        }
+    if (document.readyState === 'complete') {
+      console.log("[Preloader] Document already complete on mount.");
+      startFadeOut();
+    } else {
+      window.addEventListener('load', handleWindowLoad);
     }
 
-
     return () => {
-      if (typeof window !== 'undefined') {
-        window.removeEventListener('load', handleLoad);
-      }
-      clearTimeoutsAndIntervals();
+      window.removeEventListener('load', handleWindowLoad);
+      clearAllTimers();
     };
-  }, [fadingOut, loading]); // Rerun if fadingOut or loading changes (e.g. if load is called early)
+  }, [startFadeOut, clearAllTimers]);
 
   useEffect(() => {
-    // Ensure cleanup on unmount, just in case
-    return () => {
-      clearTimeoutsAndIntervals();
+    if (fadingOutRef.current || !loading) { // If already fading or not loading, don't start interval
+      if(intervalRef.current) clearInterval(intervalRef.current);
+      return;
     }
-  }, []);
+
+    if (progress < 100) {
+      intervalRef.current = setInterval(() => {
+        setProgress(prev => {
+          const nextProgress = prev + 1;
+          if (nextProgress >= 100) {
+            if (intervalRef.current) clearInterval(intervalRef.current);
+            startFadeOut(); // Start fade out when counter hits 100
+            return 100;
+          }
+          return nextProgress;
+        });
+      }, 30); // 30ms * 100 = ~3 seconds to count to 100
+    } else if (progress >= 100 && loading && !fadingOutRef.current) {
+      // If progress somehow got to 100 but fadeout didn't start
+      if (intervalRef.current) clearInterval(intervalRef.current);
+      startFadeOut();
+    }
+
+    return () => {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+      }
+    };
+  }, [progress, loading, startFadeOut]);
 
 
   if (!loading) {
@@ -94,8 +111,9 @@ export default function Preloader() {
     >
       <div className="text-center mb-8">
         <span
-          key={progress} 
+          key={progress} // Re-trigger animation on progress change
           className="text-7xl md:text-8xl lg:text-9xl font-bold tabular-nums animate-textGlowPopIn inline-block"
+          style={{ animationDelay: '0s', animationDuration: '0.2s' }} // Ensure pop-in is quick for each number
         >
           {progress}
         </span>
