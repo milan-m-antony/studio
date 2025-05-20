@@ -87,12 +87,12 @@ const SidebarContent = ({
   navItems: AdminNavItem[],
   activeSection: string,
   onSelectSection: (sectionKey: string) => void,
-  toggleSidebarCollapse?: () => void // Make optional as mobile doesn't use it
+  toggleSidebarCollapse?: () => void
  }) => (
     <div className={cn("flex flex-col h-full bg-sidebar text-sidebar-foreground", isMobile ? "w-full" : "")}>
       <div className={cn(
-        "px-4 border-b border-sidebar-border flex items-center h-16",
-        isCollapsed && !isMobile ? "justify-center" : "justify-between"
+        "border-b border-sidebar-border flex items-center h-16",
+        isCollapsed && !isMobile ? "px-4 justify-center" : "px-4 justify-between" // Ensure px-4 when collapsed
       )}>
         <Link
           href="/admin/dashboard"
@@ -115,7 +115,7 @@ const SidebarContent = ({
             />
           </div>
         </Link>
-        {!isMobile && toggleSidebarCollapse && ( // Check if toggleSidebarCollapse exists
+        {!isMobile && toggleSidebarCollapse && (
            <Button variant="ghost" size="icon" onClick={toggleSidebarCollapse} className="h-8 w-8 text-sidebar-foreground/70 hover:text-sidebar-foreground">
             {isCollapsed ? <ChevronRight className="h-5 w-5" /> : <ChevronLeft className="h-5 w-5" />}
           </Button>
@@ -125,7 +125,7 @@ const SidebarContent = ({
       <ScrollArea className="flex-grow">
         <nav className={cn(
           "space-y-1", 
-          isCollapsed && !isMobile ? "px-2 py-2 flex flex-col" : "p-2" // Adjusted padding for collapsed
+          isCollapsed && !isMobile ? "px-4 py-2 flex flex-col" : "p-2" // px-4 when collapsed
         )}>
           {navItems.filter(item => item.key !== 'settings').map((item) => {
             const Icon = item.icon;
@@ -140,7 +140,7 @@ const SidebarContent = ({
                     ? "bg-sidebar-primary text-sidebar-primary-foreground font-semibold"
                     : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
                   isCollapsed && !isMobile
-                    ? "justify-center py-2.5 px-0" // Adjusted padding: no horizontal padding
+                    ? "justify-center py-2.5 px-0" // Remove horizontal padding for button itself
                     : "justify-start py-2.5 px-3"
                 )}
                 onClick={() => {
@@ -163,10 +163,9 @@ const SidebarContent = ({
         </nav>
       </ScrollArea>
       
-      {/* Settings Link at the bottom */}
       <div className={cn(
           "mt-auto border-t border-sidebar-border",
-          isCollapsed && !isMobile ? "px-2 py-2 flex flex-col" : "p-2" // Adjusted padding for collapsed
+          isCollapsed && !isMobile ? "px-4 py-2 flex flex-col" : "p-2" // px-4 when collapsed
       )}>
         {navItems.find(item => item.key === 'settings') && (() => {
           const settingsItem = navItems.find(item => item.key === 'settings')!;
@@ -181,7 +180,7 @@ const SidebarContent = ({
                   ? "bg-sidebar-primary text-sidebar-primary-foreground font-semibold"
                   : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
                 isCollapsed && !isMobile
-                  ? "justify-center py-2.5 px-0" // Adjusted padding: no horizontal padding
+                  ? "justify-center py-2.5 px-0" // Remove horizontal padding for button itself
                   : "justify-start py-2.5 px-3"
               )}
               onClick={() => {
@@ -240,7 +239,7 @@ export default function AdminPageLayout({
   
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
 
-  const { toast } = useToast(); // Moved toast hook here
+  const { toast } = useToast();
 
   useEffect(() => {
     const savedState = localStorage.getItem('sidebarCollapsed');
@@ -340,7 +339,7 @@ export default function AdminPageLayout({
     if (isActivitySheetOpen) { 
       fetchActivities();
     }
-  }, [isActivitySheetOpen]); // Removed isLoadingActivities from deps to avoid re-fetch loop
+  }, [isActivitySheetOpen]);
 
 
   useEffect(() => {
@@ -477,7 +476,7 @@ export default function AdminPageLayout({
 
   return (
     <>
-    <div className="flex h-screen bg-background text-foreground">
+    <div className="flex h-screen bg-sidebar text-sidebar-foreground"> {/* Changed parent background to sidebar */}
       <aside className={cn(
         "hidden md:flex md:flex-shrink-0 transition-all duration-300 ease-in-out",
         isSidebarCollapsed ? "w-20" : "w-64"
@@ -510,10 +509,12 @@ export default function AdminPageLayout({
       </Sheet>
 
       <div className={cn(
-        "flex flex-col flex-1 overflow-hidden transition-all duration-300 ease-in-out min-w-0" // Removed md:ml-* classes
+        "flex flex-col flex-1 overflow-hidden transition-all duration-300 ease-in-out min-w-0",
+        "bg-sidebar text-sidebar-foreground" // Apply sidebar background to main content area as well
       )}>
         <header className="sticky top-0 z-40 flex h-16 items-center justify-between border-b border-border bg-card px-4 md:px-6 shrink-0">
           <div className="md:hidden">
+            {/* Spacer for mobile menu trigger, or put trigger here if preferred */}
           </div> 
           <h1 className="text-xl font-semibold text-foreground">{pageTitle}</h1>
           <div className="flex items-center gap-3">
@@ -660,7 +661,7 @@ export default function AdminPageLayout({
                         <Trash2 className="mr-2 h-4 w-4" /> Remove Current Photo
                     </Button>
                 )}
-                {!currentDbProfilePhotoUrl && <div className="sm:hidden" /> } {/* Spacer for layout consistency */}
+                {!currentDbProfilePhotoUrl && <div className="sm:hidden" /> } 
                 <div className="flex gap-2 justify-end"> 
                     <DialogClose asChild>
                         <Button type="button" variant="outline">Cancel</Button>
@@ -701,3 +702,6 @@ export default function AdminPageLayout({
     </>
   );
 }
+
+
+    
