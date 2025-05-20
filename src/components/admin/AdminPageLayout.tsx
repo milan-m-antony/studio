@@ -136,22 +136,24 @@ export default function AdminPageLayout({
 
   const handleClearActivityLog = async () => {
     setIsLoadingActivities(true);
-    // Delete all rows. A common way is to use a filter that always evaluates to true for all relevant rows.
-    // Supabase client allows deleting without a filter to delete all.
     const { error } = await supabase
       .from('admin_activity_log')
       .delete()
-      .neq('id', '00000000-0000-0000-0000-000000000000'); // A non-existent UUID to target all rows
+      .neq('id', '00000000-0000-0000-0000-000000000000'); 
 
     if (error) {
       console.error("Error clearing activity log:", error);
       toast({ title: "Error", description: "Failed to clear activity log.", variant: "destructive" });
     } else {
       toast({ title: "Success", description: "Activity log cleared." });
-      setActivities([]); // Clear local state
-      // Optionally, log this specific action if desired, though it might seem counter-intuitive
-      // await supabase.from('admin_activity_log').insert({ action_type: 'ACTIVITY_LOG_CLEARED', description: 'Admin cleared the activity log.', user_identifier: username });
-      // fetchActivities(); // Re-fetch, which should show an empty list or the new "cleared" log
+      setActivities([]); 
+      // Log this action
+      await supabase.from('admin_activity_log').insert({ 
+        action_type: 'ACTIVITY_LOG_CLEARED', 
+        description: 'Admin cleared the activity log.',
+        user_identifier: username 
+      });
+      fetchActivities(); // Re-fetch to show the "cleared" log action if desired, or an empty list
     }
     setShowClearLogConfirm(false);
     setIsLoadingActivities(false);
@@ -305,14 +307,17 @@ export default function AdminPageLayout({
     <div className={cn("flex flex-col h-full bg-sidebar text-sidebar-foreground", isMobile ? "w-full" : "w-64")}>
       <div className="p-4 border-b border-sidebar-border flex items-center justify-between">
         <Link href="/admin/dashboard" className="flex items-center gap-2" onClick={() => { onSelectSection('dashboard'); if(isMobile) setIsMobileMenuOpen(false);}}>
-          <LayoutDashboard className="h-7 w-7 text-primary" />
-          <span className="font-bold text-xl">Admin</span>
+          <NextImage 
+            src="/logo.png" 
+            alt="Portfolio Logo" 
+            width={100} // Adjust width as needed
+            height={30} // Adjust height for aspect ratio
+            className="object-contain" // Ensures image scales nicely
+          />
         </Link>
-        {/* Placeholder for future sidebar collapse button - only show on desktop */}
-        {/* {!isMobile && <Button variant="ghost" size="icon" className="h-7 w-7 text-sidebar-foreground/70 hover:text-sidebar-foreground"><ChevronRight className="h-5 w-5" /></Button>} */}
       </div>
       <nav className="flex-grow p-2 space-y-1 overflow-y-auto">
-        {navItems.filter(item => item.key !== 'settings').map((item) => { // Filter out 'settings'
+        {navItems.filter(item => item.key !== 'settings').map((item) => {
           const Icon = item.icon;
           const isActive = activeSection === item.key;
           return (
@@ -396,7 +401,7 @@ export default function AdminPageLayout({
                   <SheetTitle className="flex items-center"><History className="mr-2 h-5 w-5"/>Recent Activity</SheetTitle>
                   <SheetDescription>Latest updates and actions in the admin panel.</SheetDescription>
                 </SheetHeader>
-                <ScrollArea className="flex-grow p-4"> {/* flex-grow to take available space */}
+                <ScrollArea className="flex-grow p-4">
                   {isLoadingActivities ? (
                     <p className="text-muted-foreground text-center py-4">Loading activities...</p>
                   ) : activities.length === 0 ? (
@@ -559,3 +564,6 @@ export default function AdminPageLayout({
     </>
   );
 }
+
+
+    
