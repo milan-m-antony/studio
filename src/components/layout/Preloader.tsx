@@ -4,133 +4,86 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { cn } from '@/lib/utils';
 
-const COUNTDOWN_MAX = 100;
-const COUNTDOWN_INTERVAL = 30; // ms, for ~3 second countdown (30ms * 100 = 3000ms)
 const FALLBACK_TIMEOUT = 7000; // 7 seconds
-const FADE_DURATION = 500; // ms, for main overlay fade
-
-type PreloaderStage = 'counting' | 'covering' | 'uncovering' | 'fadingOutOverlay' | 'hidden';
+const FADE_OUT_DURATION = 500; // ms, for main overlay fade
 
 export default function Preloader() {
-  const [stage, setStage] = useState<PreloaderStage>('counting');
-  const [progress, setProgress] = useState(1);
-  const [mainOverlayOpacity, setMainOverlayOpacity] = useState(1);
-
-  const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isFadingOut, setIsFadingOut] = useState(false);
   const fallbackTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const revealPaneRef = useRef<HTMLDivElement>(null);
 
-  const clearTimers = useCallback(() => {
-    if (intervalRef.current) clearInterval(intervalRef.current);
-    if (fallbackTimerRef.current) clearTimeout(fallbackTimerRef.current);
-  }, []);
+  const startFadeOut = useCallback(() => {
+    if (isFadingOut || !isLoading) return; // Prevent multiple calls or if already hidden
 
-  const startRevealSequence = useCallback(() => {
-    clearTimers();
-    setProgress(COUNTDOWN_MAX); // Ensure counter shows 100
-    if (stage === 'counting') {
-      setStage('covering');
-    }
-  }, [stage, clearTimers]);
+    console.log("[Preloader] Starting fade out sequence.");
+    setIsFadingOut(true);
+    setTimeout(() => {
+      console.log("[Preloader] Fade out complete, hiding preloader.");
+      setIsLoading(false);
+    }, FADE_OUT_DURATION);
+  }, [isLoading, isFadingOut]);
 
-  // Effect for the countdown
   useEffect(() => {
-    if (stage === 'counting') {
-      intervalRef.current = setInterval(() => {
-        setProgress((prev) => {
-          if (prev < COUNTDOWN_MAX) {
-            return prev + 1;
-          }
-          clearInterval(intervalRef.current!);
-          // The startRevealSequence will be called by onload or fallback
-          return COUNTDOWN_MAX;
-        });
-      }, COUNTDOWN_INTERVAL);
-    }
-    return () => {
-      if (intervalRef.current) clearInterval(intervalRef.current);
-    };
-  }, [stage]);
+    // Ensure fade-out starts if component is still loading after fallback
+    fallbackTimerRef.current = setTimeout(() => {
+      console.log("[Preloader] Fallback timeout reached.");
+      startFadeOut();
+    }, FALLBACK_TIMEOUT);
 
-  // Effect for window.onload and fallback timeout
-  useEffect(() => {
-    if (stage !== 'counting') return;
-
+    // Listener for window.load
     const handleWindowLoad = () => {
-      console.log("[Preloader] Window loaded, starting reveal sequence.");
-      startRevealSequence();
+      console.log("[Preloader] Window loaded.");
+      if (fallbackTimerRef.current) {
+        clearTimeout(fallbackTimerRef.current);
+      }
+      startFadeOut();
     };
 
     if (document.readyState === 'complete') {
       handleWindowLoad();
     } else {
       window.addEventListener('load', handleWindowLoad);
-      fallbackTimerRef.current = setTimeout(() => {
-        console.log("[Preloader] Fallback timeout, starting reveal sequence.");
-        handleWindowLoad(); // Also call handleWindowLoad to ensure sequence starts
-      }, FALLBACK_TIMEOUT);
     }
 
     return () => {
       window.removeEventListener('load', handleWindowLoad);
-      if (fallbackTimerRef.current) clearTimeout(fallbackTimerRef.current);
+      if (fallbackTimerRef.current) {
+        clearTimeout(fallbackTimerRef.current);
+      }
     };
-  }, [stage, startRevealSequence]);
+  }, [startFadeOut]); // Add startFadeOut to dependencies
 
-
-  const handleRevealPaneAnimationEnd = () => {
-    if (stage === 'covering') {
-      setStage('uncovering');
-    } else if (stage === 'uncovering') {
-      // After uncover animation, start fading out the main overlay
-      setStage('fadingOutOverlay');
-      setMainOverlayOpacity(0);
-      setTimeout(() => {
-        setStage('hidden');
-      }, FADE_DURATION); // Match CSS transition duration
-    }
-  };
-
-  if (stage === 'hidden') {
+  if (!isLoading) {
     return null;
   }
 
   return (
-    <>
-      {/* Main dark overlay - present during counting, gets faded at the end */}
-      {(stage === 'counting' || stage === 'covering' || stage === 'uncovering' || stage === 'fadingOutOverlay') && (
-        <div
-          id="preloader-main-overlay"
-          style={{ opacity: mainOverlayOpacity, transition: `opacity ${FADE_DURATION}ms ease-in-out` }}
-          className="fixed inset-0 z-[9998] flex items-end justify-end p-4 bg-black text-white"
-          aria-hidden={stage === 'hidden'}
-          role="status"
-        >
-          {stage === 'counting' && (
-            <div className="absolute bottom-4 right-4 p-2 bg-black/50 rounded">
-              <span className="text-5xl font-bold text-white">
-                {progress}
-              </span>
-            </div>
-          )}
-        </div>
+    <div
+      id="preloader-overlay"
+      className={cn(
+        "fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-black transition-opacity duration-500 ease-in-out",
+        isFadingOut ? "opacity-0" : "opacity-100"
       )}
-
-      {/* Reveal Pane - this is what animates to cover and then uncover */}
-      {(stage === 'covering' || stage === 'uncovering') && (
-        <div
-          ref={revealPaneRef}
-          id="reveal-pane"
-          onAnimationEnd={handleRevealPaneAnimationEnd}
-          className={cn(
-            "fixed inset-x-0 bg-black z-[9999]", // Higher z-index than main overlay
-            {
-              'animate-cover-screen bottom-0': stage === 'covering',
-              'animate-uncover-screen top-0 h-full': stage === 'uncovering', // Start full height, anchored top
-            }
-          )}
-        />
-      )}
-    </>
+      aria-hidden={!isLoading || isFadingOut}
+      role="status"
+    >
+      <div className="relative flex h-24 w-24 items-center justify-center">
+        {/* Pulsing Circles */}
+        {[0, 1, 2].map((i) => (
+          <div
+            key={i}
+            className={cn(
+              "absolute h-full w-full rounded-full bg-primary opacity-60",
+              "animate-pulseCircle"
+            )}
+            style={{
+              animationDelay: `${i * 0.3}s`,
+              // Note: Tailwind's animate-pulse is different. We use custom animate-pulseCircle.
+            }}
+          />
+        ))}
+      </div>
+      <p className="mt-8 text-lg font-medium text-white/80">Loading Portfolio...</p>
+    </div>
   );
 }
