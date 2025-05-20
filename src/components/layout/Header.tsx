@@ -70,21 +70,10 @@ export default function Header() {
   const { theme, setTheme } = useTheme();
   const [activeLink, setActiveLink] = useState<string>('#hero');
   const pathname = usePathname();
-  const [themeIconNode, setThemeIconNode] = useState<ReactNode>(<div className="h-5 w-5" />); // Placeholder
 
   useEffect(() => {
-    setIsClient(true);
+    setIsClient(true); // Set to true once component mounts on client
   }, []);
-
-  useEffect(() => {
-    if (!isClient) return;
-
-    let currentEffectiveTheme = theme;
-    if (theme === 'system') {
-      currentEffectiveTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-    }
-    setThemeIconNode(currentEffectiveTheme === 'dark' ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />);
-  }, [isClient, theme]);
 
   useEffect(() => {
     const determineActiveLink = () => {
@@ -166,15 +155,17 @@ export default function Header() {
   };
   
   if (isClient && pathname.startsWith('/admin')) {
-    return null; // Don't render header on admin paths after client mount
+    return null; // Don't render header on admin paths after client mount and path check
   }
-  if (!isClient && pathname.startsWith('/admin')) {
-    // During SSR or initial client render for an admin path,
-    // we could return null or a minimal placeholder if truly nothing should be there.
-    // However, to avoid hydration issues, it's often better to let the `if (isClient && ...)` handle it.
-    // For now, let's ensure it renders its structure for SSR to match potential client initial render.
+  
+  let themeIconContent: ReactNode = <div className="h-5 w-5" />; // Placeholder
+  if (isClient) {
+    let effectiveTheme = theme;
+    if (theme === 'system') {
+      effectiveTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    }
+    themeIconContent = effectiveTheme === 'dark' ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />;
   }
-
 
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -183,8 +174,8 @@ export default function Header() {
           <NextImage 
             src="/logo.png" 
             alt="MLN Logo" 
-            width={60} // Adjust as needed
-            height={32} // Adjust as needed
+            width={50} // Reduced width
+            height={26} // Reduced height (adjust to maintain aspect ratio)
             priority 
           />
         </Link>
@@ -199,9 +190,9 @@ export default function Header() {
             size="icon"
             onClick={toggleTheme}
             aria-label="Toggle theme"
-            disabled={!isClient} // Disable button until client is mounted
+            disabled={!isClient}
           >
-            {themeIconNode}
+            {themeIconContent}
           </Button>
 
           <div className="md:hidden">
@@ -225,8 +216,8 @@ export default function Header() {
                       <NextImage 
                         src="/logo.png" 
                         alt="MLN Logo" 
-                        width={60} // Adjust as needed
-                        height={32} // Adjust as needed
+                        width={50} // Reduced width
+                        height={26} // Reduced height
                         priority
                       />
                     </Link>
