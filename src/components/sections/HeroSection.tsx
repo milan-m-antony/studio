@@ -4,7 +4,7 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { ChevronDown, Link as GenericLinkIcon } from 'lucide-react';
 import NextLink from 'next/link';
-import NextImage from 'next/image'; // Ensure NextImage is imported
+import NextImage from 'next/image';
 import type { HeroContent, HeroSocialLinkItem } from '@/types/supabase';
 import { cn } from '@/lib/utils';
 
@@ -28,11 +28,11 @@ const EnhancedTypewriter = ({
 
   useEffect(() => {
     if (!texts || texts.length === 0) {
-        setDisplayedText("— a Developer");
+        setDisplayedText("— a Developer"); 
         return;
     }
     setCharDisplayProgress(0);
-    setDisplayedText('');
+    setDisplayedText(''); 
     setIsDeleting(false);
   }, [texts, currentTextIndex]);
 
@@ -43,27 +43,27 @@ const EnhancedTypewriter = ({
     const currentTargetText = texts[currentTextIndex];
     let timer: NodeJS.Timeout;
 
-    if (!isDeleting) {
+    if (!isDeleting) { 
       if (charDisplayProgress < currentTargetText.length) {
         timer = setTimeout(() => {
           setDisplayedText(currentTargetText.substring(0, charDisplayProgress + 1));
           setCharDisplayProgress((prev) => prev + 1);
         }, typingSpeed);
-      } else {
+      } else { 
         timer = setTimeout(() => {
-          setIsDeleting(true);
+          setIsDeleting(true); 
         }, pauseAfterTypingDuration);
       }
-    } else {
+    } else { 
       if (charDisplayProgress > 0) {
         timer = setTimeout(() => {
           setDisplayedText(currentTargetText.substring(0, charDisplayProgress - 1));
           setCharDisplayProgress((prev) => prev - 1);
         }, deletingSpeed);
-      } else {
+      } else { 
         timer = setTimeout(() => {
-          setIsDeleting(false);
-          setCurrentTextIndex((prev) => (prev + 1) % texts.length);
+          setIsDeleting(false); 
+          setCurrentTextIndex((prev) => (prev + 1) % texts.length); 
         }, pauseAfterDeletingDuration);
       }
     }
@@ -79,7 +79,7 @@ const EnhancedTypewriter = ({
     pauseAfterDeletingDuration,
   ]);
 
-  return <span>{displayedText || <>&nbsp;</>}</span>;
+  return <span>{displayedText || <>&nbsp;</>}</span>; 
 };
 
 interface HeroSectionProps {
@@ -96,43 +96,34 @@ export default function HeroSection({ heroContent }: HeroSectionProps) {
   };
 
   useEffect(() => {
-    console.log('[HeroSection] Received heroContent prop:', JSON.stringify(heroContent, null, 2));
+    // console.log('[HeroSection] Received heroContent:', JSON.stringify(heroContent, null, 2));
     if (typeof window !== 'undefined') {
       window.addEventListener('scroll', handleScroll);
       return () => window.removeEventListener('scroll', handleScroll);
     }
-  }, [heroContent]); // Added heroContent to dependency array for logging
+  }, [heroContent]);
 
   const mainName = heroContent?.main_name || "Your Name";
   const subtitles = (heroContent?.subtitles && heroContent.subtitles.length > 0)
     ? heroContent.subtitles
     : ["— a Creative Developer", "— a Full-Stack Engineer", "— a Tech Enthusiast"];
 
-  // Ensure heroContent.social_media_links is treated as an array of HeroSocialLinkItem
   const socialLinksToRender: HeroSocialLinkItem[] =
     heroContent?.social_media_links && Array.isArray(heroContent.social_media_links)
-    ? heroContent.social_media_links.map((link: any, index: number): HeroSocialLinkItem => { // Added explicit type for link
-        console.log(`[HeroSection] Processing link ${index} for rendering: label="${link.label}", url="${link.url}", icon_image_url="${link.icon_image_url}"`);
-        return {
-          id: link.id || `client-social-${index}`, // Ensure an ID for client-side key
-          href: link.url,
-          iconImageUrl: link.icon_image_url || null,
-          label: link.label,
-          url: link.url, // Ensure url is part of the mapped object
-        };
-      })
-    : [
-        { id: 'default-github', href: "https://github.com", iconImageUrl: null, label: "GitHub (Default)", url: "https://github.com"},
-        { id: 'default-linkedin', href: "https://linkedin.com", iconImageUrl: null, label: "LinkedIn (Default)", url: "https://linkedin.com"},
-      ];
-  
-  console.log('[HeroSection] socialLinksToRender:', JSON.stringify(socialLinksToRender.map(l => ({label: l.label, url: l.href, icon: l.iconImageUrl ? 'image' : 'component'}))));
+    ? heroContent.social_media_links.map((link, index): HeroSocialLinkItem => ({
+        id: link.id || `client-social-${index}`, 
+        label: link.label,
+        url: link.url,
+        iconImageUrl: link.icon_image_url || null,
+      }))
+    : []; 
+
+  // console.log('[HeroSection] socialLinksToRender for public page:', JSON.stringify(socialLinksToRender.map(l => ({label: l.label, url: l.url, iconImageUrl: l.iconImageUrl ? 'Image Provided' : 'No Image'}))));
 
 
   return (
     <section id="hero" className="relative h-screen flex flex-col items-center justify-center overflow-hidden text-center bg-background text-foreground p-4">
       <div className="absolute inset-0 z-0" style={{ transform: `translateY(${offsetY * 0.5}px)` }}>
-        {/* Optional: Add subtle background elements if needed */}
       </div>
 
       {socialLinksToRender.length > 0 && (
@@ -140,18 +131,19 @@ export default function HeroSection({ heroContent }: HeroSectionProps) {
           className="absolute left-3 sm:left-4 md:left-6 lg:left-8 top-1/2 -translate-y-1/2 z-20 flex flex-col space-y-4 sm:space-y-5 md:space-y-6"
           style={{ transform: `translateY(-50%) translateY(${offsetY * 0.1}px)` }}
         >
-          {socialLinksToRender.map((social) => {
-            console.log(`[HeroSection] Rendering social link: ${social.label}, Icon URL: ${social.iconImageUrl}`);
+          {socialLinksToRender.map((social, index) => {
+             // More detailed log for debugging
+             console.log(`[HeroSection] Rendering social link: Label="${social.label}", URL="${social.url}", IconImageURL="${social.iconImageUrl}"`);
             return (
-              <NextLink key={social.id} href={social.url || '#'} target="_blank" rel="noopener noreferrer" aria-label={social.label}>
-                {social.iconImageUrl ? (
+              <NextLink key={social.id || `social-link-${index}`} href={social.url || '#'} target="_blank" rel="noopener noreferrer" aria-label={social.label || 'Social link'}>
+                {social.iconImageUrl && typeof social.iconImageUrl === 'string' && social.iconImageUrl.trim() !== '' ? (
                   <div className="relative h-5 w-5 sm:h-6 sm:w-6 transition-transform duration-300 ease-in-out transform hover:scale-125">
                     <NextImage
-                      src={social.iconImageUrl}
+                      src={social.iconImageUrl} 
                       alt={social.label || 'Social icon'}
-                      fill
-                      className="object-contain" 
-                      // Removed dark mode filter: dark:filter dark:brightness-0 dark:invert
+                      width={24} 
+                      height={24} 
+                      className="object-contain" // Ensure this doesn't have dark mode filters
                     />
                   </div>
                 ) : (
