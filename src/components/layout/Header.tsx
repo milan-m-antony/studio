@@ -70,10 +70,22 @@ export default function Header() {
   const { theme, setTheme } = useTheme();
   const [activeLink, setActiveLink] = useState<string>('#hero');
   const pathname = usePathname();
+  const [themeIconContent, setThemeIconContent] = useState<ReactNode>(<div className="h-5 w-5" />); // Placeholder
 
   useEffect(() => {
-    setIsClient(true); // Set to true once component mounts on client
+    setIsClient(true);
   }, []);
+
+  useEffect(() => {
+    if (!isClient) return;
+
+    let currentEffectiveTheme = theme;
+    if (theme === 'system') {
+      currentEffectiveTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    }
+    setThemeIconContent(currentEffectiveTheme === 'dark' ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />);
+  }, [isClient, theme]);
+
 
   useEffect(() => {
     const determineActiveLink = () => {
@@ -129,7 +141,7 @@ export default function Header() {
     };
     
     if (isClient) {
-      determineActiveLink();
+      determineActiveLink(); // Initial check
       window.addEventListener('scroll', determineActiveLink, { passive: true });
       window.addEventListener('hashchange', determineActiveLink);
       window.addEventListener('resize', determineActiveLink);
@@ -145,7 +157,7 @@ export default function Header() {
   }, [pathname, isClient, activeLink]); 
 
   const toggleTheme = () => {
-    if (!isClient) return;
+    if (!isClient) return; // Should not happen if button is enabled only on client
     let currentEffectiveTheme = theme;
     if (theme === 'system' && typeof window !== 'undefined') {
         currentEffectiveTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
@@ -158,26 +170,15 @@ export default function Header() {
     return null;
   }
 
-  let themeIconNode: ReactNode = <div className="h-5 w-5" />; // Placeholder for SSR and initial client render
-  if (isClient) {
-    let effectiveTheme = theme;
-    if (theme === 'system') {
-      effectiveTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-    }
-    themeIconNode = effectiveTheme === 'dark' ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />;
-  }
-
-
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container mx-auto flex h-16 max-w-screen-2xl items-center justify-between px-4 sm:px-6 lg:px-8">
         <Link href="/" className="flex items-center gap-2">
-          {/* Replaced text logo with Image component */}
           <NextImage 
             src="/logo.png" 
             alt="MLN Logo" 
-            width={60} // Adjust width as needed
-            height={32} // Adjust height as needed
+            width={60} 
+            height={32} 
             priority 
           />
         </Link>
@@ -192,9 +193,9 @@ export default function Header() {
             size="icon"
             onClick={toggleTheme}
             aria-label="Toggle theme"
-            disabled={!isClient} 
+            disabled={!isClient}
           >
-            {themeIconNode}
+            {themeIconContent}
           </Button>
 
           <div className="md:hidden">
@@ -218,8 +219,8 @@ export default function Header() {
                       <NextImage 
                         src="/logo.png" 
                         alt="MLN Logo" 
-                        width={60} // Adjust width as needed for mobile sheet
-                        height={32} // Adjust height as needed for mobile sheet
+                        width={60} 
+                        height={32} 
                         priority
                       />
                     </Link>
@@ -238,5 +239,3 @@ export default function Header() {
     </header>
   );
 }
-
-    
