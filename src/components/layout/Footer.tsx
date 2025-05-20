@@ -3,8 +3,9 @@
 
 import { FileText, ShieldCheck } from 'lucide-react';
 import { useState, useEffect } from 'react';
+import { usePathname } from 'next/navigation'; // Import usePathname
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogClose } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import type { LegalDocument } from '@/types/supabase'; // Import LegalDocument type
 import { format, parseISO, isValid } from 'date-fns'; // For date formatting
@@ -17,11 +18,11 @@ interface FooterProps {
 }
 
 export default function Footer({ termsContentData, privacyPolicyData }: FooterProps) {
+  const pathname = usePathname(); // Get the current path
   const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
   const [openModal, setOpenModal] = useState<ModalContentType>(null);
   const [modalContent, setModalContent] = useState<{ title: string, content: string, lastUpdated: string | null }>({ title: '', content: '', lastUpdated: null });
 
-  // Log when props change to see if new data is arriving
   useEffect(() => {
     console.log('[Footer] Props received: termsContentData updated_at:', termsContentData?.updated_at, 'privacyPolicyData updated_at:', privacyPolicyData?.updated_at);
   }, [termsContentData, privacyPolicyData]);
@@ -76,6 +77,11 @@ export default function Footer({ termsContentData, privacyPolicyData }: FooterPr
     setOpenModal(null);
   };
 
+  // Do not render the footer on admin pages
+  if (pathname.startsWith('/admin')) {
+    return null;
+  }
+
   return (
     <>
       <footer className="border-t border-border/40 bg-background">
@@ -117,7 +123,7 @@ export default function Footer({ termsContentData, privacyPolicyData }: FooterPr
             </DialogDescription>
           </DialogHeader>
           <ScrollArea className="max-h-[65vh] pr-6">
-            <article 
+            <article
               className="prose dark:prose-invert max-w-none text-sm text-foreground/80 py-4"
               dangerouslySetInnerHTML={{ __html: modalContent.content }}
             />
@@ -127,7 +133,6 @@ export default function Footer({ termsContentData, privacyPolicyData }: FooterPr
               </p>
             )}
           </ScrollArea>
-          {/* DialogClose is handled by the 'X' button in DialogContent or onOpenChange */}
         </DialogContent>
       </Dialog>
     </>
