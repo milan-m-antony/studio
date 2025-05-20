@@ -19,7 +19,7 @@ import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/lib/supabaseClient'; 
 import type { SiteSettings } from '@/types/supabase';
-import { useToast } from "@/hooks/use-toast"; // Import useToast
+import { useToast } from "@/hooks/use-toast";
 
 // Import Admin Managers
 import HeroManager from '@/components/admin/HeroManager';
@@ -69,7 +69,7 @@ const DashboardOverview = () => (
 
 export default function AdminDashboardPage() {
   const router = useRouter();
-  const { toast } = useToast(); // Initialize useToast
+  const { toast } = useToast();
   const [isMounted, setIsMounted] = useState(false);
   const [isAuthenticatedForRender, setIsAuthenticatedForRender] = useState(false);
   const [username, setUsername] = useState('');
@@ -80,18 +80,18 @@ export default function AdminDashboardPage() {
   // State for Site Settings / Maintenance Mode
   const [isMaintenanceMode, setIsMaintenanceMode] = useState(false);
   const [isLoadingSettings, setIsLoadingSettings] = useState(false);
-  const [maintenanceMessageInput, setMaintenanceMessageInput] = useState(''); // For editing message
+  const [maintenanceMessageInput, setMaintenanceMessageInput] = useState('');
 
   useEffect(() => {
     setIsMounted(true);
     if (typeof window !== 'undefined') {
       const authStatus = localStorage.getItem('isAdminAuthenticated') === 'true';
       setIsAuthenticatedForRender(authStatus);
-      if (authStatus && activeSection === 'settings') {
+      if (authStatus && activeSection === 'settings') { // Also fetch if settings tab is active
         fetchSiteSettings();
       }
     }
-  }, [activeSection]); // Re-fetch settings if settings tab becomes active
+  }, [activeSection]); // Re-check auth and fetch settings if activeSection changes
 
   const fetchSiteSettings = async () => {
     setIsLoadingSettings(true);
@@ -124,7 +124,6 @@ export default function AdminDashboardPage() {
     } else {
       setIsMaintenanceMode(checked);
       toast({ title: "Success", description: `Maintenance mode ${checked ? 'enabled' : 'disabled'}.` });
-      // Log activity
       await supabase.from('admin_activity_log').insert({
         action_type: checked ? 'MAINTENANCE_MODE_ENABLED' : 'MAINTENANCE_MODE_DISABLED',
         description: `Admin ${checked ? 'enabled' : 'disabled'} site maintenance mode.`,
@@ -146,7 +145,6 @@ export default function AdminDashboardPage() {
       toast({ title: "Error", description: "Failed to save maintenance message.", variant: "destructive" });
     } else {
       toast({ title: "Success", description: "Maintenance message saved." });
-      // Log activity
       await supabase.from('admin_activity_log').insert({
         action_type: 'MAINTENANCE_MESSAGE_UPDATED',
         description: `Admin updated the site maintenance message.`,
@@ -166,15 +164,24 @@ export default function AdminDashboardPage() {
     const expectedUsername = process.env.NEXT_PUBLIC_ADMIN_USERNAME;
     const expectedPassword = process.env.NEXT_PUBLIC_ADMIN_PASSWORD;
     
+    console.log("[Admin Login] Attempting login...");
+    console.log("[Admin Login] Entered Username:", `"${trimmedUsername}"`);
+    console.log("[Admin Login] Expected Username from env:", `"${expectedUsername}"`);
+
     const usernameMatch = trimmedUsername === expectedUsername;
     const passwordMatch = trimmedPassword === expectedPassword;
+
+    console.log("[Admin Login] Username match status:", usernameMatch);
+    console.log("[Admin Login] Password match status (not logging actual passwords):", passwordMatch);
+
 
     if (usernameMatch && passwordMatch) {
       if (typeof window !== 'undefined') {
         localStorage.setItem('isAdminAuthenticated', 'true');
-        window.dispatchEvent(new CustomEvent('authChange'));
+        window.dispatchEvent(new CustomEvent('authChange')); // For header link
       }
       setIsAuthenticatedForRender(true);
+      console.log("[Admin Login] Login successful.");
       toast({ title: "Login Successful", description: "Welcome to the admin dashboard." });
       try {
         await supabase.from('admin_activity_log').insert({ 
@@ -187,6 +194,7 @@ export default function AdminDashboardPage() {
       }
     } else {
       setError("Invalid username or password.");
+      console.log("[Admin Login] Login failed.");
       toast({ title: "Login Failed", description: "Invalid username or password.", variant: "destructive" });
       setIsAuthenticatedForRender(false);
     }
@@ -196,7 +204,7 @@ export default function AdminDashboardPage() {
     const adminUsername = process.env.NEXT_PUBLIC_ADMIN_USERNAME || "Admin";
     if (typeof window !== 'undefined') {
       localStorage.removeItem('isAdminAuthenticated');
-      window.dispatchEvent(new CustomEvent('authChange'));
+      window.dispatchEvent(new CustomEvent('authChange')); // For header link
     }
     setIsAuthenticatedForRender(false);
     setUsername('');
@@ -344,3 +352,4 @@ export default function AdminDashboardPage() {
     </AdminPageLayout>
   );
 }
+
