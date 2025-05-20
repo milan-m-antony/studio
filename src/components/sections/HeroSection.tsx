@@ -82,6 +82,7 @@ const EnhancedTypewriter = ({
   return <span>{displayedText || <>&nbsp;</>}</span>; 
 };
 
+
 interface HeroSectionProps {
   heroContent: HeroContent | null;
 }
@@ -96,12 +97,12 @@ export default function HeroSection({ heroContent }: HeroSectionProps) {
   };
 
   useEffect(() => {
-    // console.log('[HeroSection] Received heroContent:', JSON.stringify(heroContent, null, 2));
+    // console.log('[HeroSection] Received heroContent prop:', JSON.stringify(heroContent, null, 2));
     if (typeof window !== 'undefined') {
       window.addEventListener('scroll', handleScroll);
       return () => window.removeEventListener('scroll', handleScroll);
     }
-  }, [heroContent]);
+  }, []);
 
   const mainName = heroContent?.main_name || "Your Name";
   const subtitles = (heroContent?.subtitles && heroContent.subtitles.length > 0)
@@ -110,45 +111,45 @@ export default function HeroSection({ heroContent }: HeroSectionProps) {
 
   const socialLinksToRender: HeroSocialLinkItem[] =
     heroContent?.social_media_links && Array.isArray(heroContent.social_media_links)
-    ? heroContent.social_media_links.map((link, index): HeroSocialLinkItem => ({
-        id: link.id || `client-social-${index}`, 
-        label: link.label,
-        url: link.url,
-        iconImageUrl: link.icon_image_url || null,
-      }))
-    : []; 
-
-  // console.log('[HeroSection] socialLinksToRender for public page:', JSON.stringify(socialLinksToRender.map(l => ({label: l.label, url: l.url, iconImageUrl: l.iconImageUrl ? 'Image Provided' : 'No Image'}))));
-
-
+    ? heroContent.social_media_links.map((link, index): HeroSocialLinkItem => {
+        // console.log(`[HeroSection] Processing link ${index} for rendering: label="${link.label}", url="${link.url}", icon_image_url="${link.icon_image_url}"`);
+        return {
+          id: link.id || `client-social-${index}`, 
+          label: link.label,
+          url: link.url,
+          iconImageUrl: link.icon_image_url || null,
+        }
+      })
+    : [
+        { id: 'default-github', label: 'GitHub', url: '#', iconImageUrl: null },
+        { id: 'default-linkedin', label: 'LinkedIn', url: '#', iconImageUrl: null },
+      ];
+  
   return (
     <section id="hero" className="relative h-screen flex flex-col items-center justify-center overflow-hidden text-center bg-background text-foreground p-4">
-      <div className="absolute inset-0 z-0" style={{ transform: `translateY(${offsetY * 0.5}px)` }}>
-      </div>
-
+      
       {socialLinksToRender.length > 0 && (
         <div
           className="absolute left-3 sm:left-4 md:left-6 lg:left-8 top-1/2 -translate-y-1/2 z-20 flex flex-col space-y-4 sm:space-y-5 md:space-y-6"
           style={{ transform: `translateY(-50%) translateY(${offsetY * 0.1}px)` }}
         >
           {socialLinksToRender.map((social, index) => {
-             // More detailed log for debugging
-             console.log(`[HeroSection] Rendering social link: Label="${social.label}", URL="${social.url}", IconImageURL="${social.iconImageUrl}"`);
+            // console.log(`[HeroSection] Rendering social link: ${social.label}, Icon URL: ${social.iconImageUrl}`);
             return (
               <NextLink key={social.id || `social-link-${index}`} href={social.url || '#'} target="_blank" rel="noopener noreferrer" aria-label={social.label || 'Social link'}>
-                {social.iconImageUrl && typeof social.iconImageUrl === 'string' && social.iconImageUrl.trim() !== '' ? (
-                  <div className="relative h-5 w-5 sm:h-6 sm:w-6 transition-transform duration-300 ease-in-out transform hover:scale-125">
+                <div className="relative h-5 w-5 sm:h-6 sm:w-6 transition-transform duration-300 ease-in-out transform hover:scale-125">
+                  {social.iconImageUrl && typeof social.iconImageUrl === 'string' && social.iconImageUrl.trim() !== '' ? (
                     <NextImage
                       src={social.iconImageUrl} 
                       alt={social.label || 'Social icon'}
                       width={24} 
                       height={24} 
-                      className="object-contain" // Ensure this doesn't have dark mode filters
+                      className="object-contain" // Ensuring no dark mode filters here
                     />
-                  </div>
-                ) : (
-                  <GenericLinkIcon className="h-5 w-5 sm:h-6 sm:w-6 text-foreground/70 hover:text-primary transition-colors duration-300 ease-in-out transform hover:scale-110" />
-                )}
+                  ) : (
+                    <GenericLinkIcon className="h-full w-full text-foreground/70 hover:text-primary transition-colors" />
+                  )}
+                </div>
               </NextLink>
             );
           })}
@@ -185,3 +186,4 @@ export default function HeroSection({ heroContent }: HeroSectionProps) {
     </section>
   );
 }
+
