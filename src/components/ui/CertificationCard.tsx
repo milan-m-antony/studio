@@ -1,10 +1,9 @@
-
-import Image from 'next/image';
+import NextImage from 'next/image';
 import Link from 'next/link';
 import { ExternalLink } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import type { Certification } from '@/types/supabase'; // Updated to Supabase type
+import type { Certification } from '@/types/supabase'; 
 import { cn } from '@/lib/utils';
 
 interface CertificationCardProps {
@@ -27,13 +26,13 @@ export default function CertificationCard({ certification, onClick }: Certificat
     >
       <div className="relative w-full h-40">
         {certification.imageUrl ? (
-          <Image
+          <NextImage
             src={certification.imageUrl}
             alt={certification.title || 'Certification image'}
             layout="fill"
             objectFit="cover"
-            className="transition-transform duration-300 group-hover/cert-card:scale-105" // Removed dark mode invert
-            data-ai-hint={certification.imageHint || 'certificate badge'}
+            className="transition-transform duration-300 group-hover/cert-card:scale-105" // Removed dark mode inversion
+            data-ai-hint={certification.title || 'certificate badge'}
           />
         ) : (
           <div className="flex items-center justify-center h-full bg-muted rounded-md">

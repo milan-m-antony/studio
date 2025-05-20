@@ -1,17 +1,12 @@
-
 // src/components/ui/SkillCard.tsx
-import Image from 'next/image';
-import * as LucideIcons from 'lucide-react';
+import NextImage from 'next/image';
 import { Card, CardContent } from '@/components/ui/card';
 import type { Skill } from '@/types/supabase';
 import { cn } from '@/lib/utils';
-import React from 'react';
+import React from 'react'; // For React.ElementType
+import * as LucideIcons from 'lucide-react'; // For dynamic primary icon fallback
 
-interface SkillCardProps {
-  skill: Skill;
-}
-
-// A very simple hardcoded SVG to use as an ultimate fallback for skills.
+// Default inline SVG placeholder for skills
 const DefaultSkillSvgFallback = (props: React.SVGProps<SVGSVGElement>) => (
   <svg
     xmlns="http://www.w3.org/2000/svg"
@@ -26,7 +21,6 @@ const DefaultSkillSvgFallback = (props: React.SVGProps<SVGSVGElement>) => (
     {...props}
   >
     <rect x="4" y="4" width="16" height="16" rx="2" ry="2" />
-    <rect x="9" y="9" width="6" height="6" />
     <line x1="9" y1="1" x2="9" y2="4" /><line x1="15" y1="1" x2="15" y2="4" />
     <line x1="9" y1="20" x2="9" y2="23" /><line x1="15" y1="20" x2="15" y2="23" />
     <line x1="20" y1="9" x2="23" y2="9" /><line x1="20" y1="14" x2="23" y2="14" />
@@ -34,6 +28,9 @@ const DefaultSkillSvgFallback = (props: React.SVGProps<SVGSVGElement>) => (
   </svg>
 );
 
+interface SkillCardProps {
+  skill: Skill;
+}
 
 export default function SkillCard({ skill }: SkillCardProps) {
   let IconContent: React.ReactNode;
@@ -41,21 +38,21 @@ export default function SkillCard({ skill }: SkillCardProps) {
   if (skill.iconImageUrl) {
     IconContent = (
       <div className="relative h-12 w-12 mb-1 rounded-md overflow-hidden">
-        <Image
+        <NextImage
           src={skill.iconImageUrl}
           alt={`${skill.name} icon`}
           layout="fill"
           objectFit="contain"
-          className="transition-transform group-hover:scale-110 dark:filter dark:brightness-0 dark:invert"
+          className="transition-transform group-hover:scale-110" // Removed dark mode inversion
           data-ai-hint="skill icon"
         />
       </div>
     );
   } else {
     // Fallback to default SVG if no image URL is provided
-    IconContent = <DefaultSkillSvgFallback className="h-10 w-10 sm:h-12 sm:w-12 text-muted-foreground mb-1 transition-transform group-hover:scale-110" />;
+    IconContent = <DefaultSkillSvgFallback className="h-10 w-10 sm:h-12 sm:w-12 text-primary mb-1 transition-transform group-hover:scale-110" />;
   }
-  
+
   return (
     <Card className={cn(
       "text-center p-4 hover:shadow-xl transition-all duration-300 h-full flex flex-col items-center group transform hover:scale-105",

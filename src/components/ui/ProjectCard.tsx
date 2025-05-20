@@ -1,5 +1,4 @@
-
-import Image from 'next/image';
+import NextImage from 'next/image';
 import Link from 'next/link';
 import { ExternalLink, Github, Rocket, Wrench, FlaskConical, CheckCircle2, Archive, ClipboardList, type LucideIcon } from 'lucide-react';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -75,7 +74,7 @@ export default function ProjectCard({ project }: ProjectCardProps) {
   let sourceCodeButton = null;
   if (project.repoUrl) {
      sourceCodeButton = ( 
-        <Button asChild variant="outline" className="flex-1 group/button hover:border-primary min-w-0" disabled={!isActionable}>
+        <Button asChild variant="outline" className="flex-1 group/button hover:border-primary min-w-0">
           <Link href={isActionable && project.repoUrl ? project.repoUrl : '#'} target={isActionable && project.repoUrl ? "_blank" : undefined} rel={isActionable && project.repoUrl ? "noopener noreferrer" : undefined} aria-disabled={!isActionable}>
             <Github className="mr-2 h-4 w-4 group-hover/button:text-primary transition-colors" />
             <span className="group-hover/button:text-primary transition-colors">Source Code</span>
@@ -119,12 +118,12 @@ export default function ProjectCard({ project }: ProjectCardProps) {
   return (
     <Card className="flex flex-col h-full overflow-hidden shadow-lg bg-card transition-all duration-300 ease-in-out hover:shadow-xl hover:-translate-y-1 hover:scale-[1.015]">
       <div className="relative w-full h-48 md:h-56 group">
-        <Image
+        <NextImage
           src={project.imageUrl || `https://placehold.co/600x400.png`}
           alt={project.title || 'Project image'}
           layout="fill"
           objectFit="cover"
-          className="transition-transform duration-300 group-hover:scale-105"
+          className="transition-transform duration-300 group-hover:scale-105" // Removed dark mode inversion
           data-ai-hint={project.title || 'project abstract'}
         />
       </div>

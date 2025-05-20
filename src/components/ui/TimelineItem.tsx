@@ -1,12 +1,12 @@
-
 "use client";
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import type { TimelineEvent as SupabaseTimelineEvent } from '@/types/supabase';
 import { cn } from '@/lib/utils';
 import { useEffect, useRef, useState } from 'react';
-import Image from 'next/image'; // For displaying image icons
-import React from 'react'; // For React.ElementType
+import NextImage from 'next/image';
+import React from 'react';
+import { HelpCircle as DefaultFallbackIcon } from 'lucide-react'; // Import a default
 
 // Default inline SVG placeholder
 const DefaultTimelineSvgFallback = (props: React.SVGProps<SVGSVGElement>) => (
@@ -26,8 +26,9 @@ const DefaultTimelineSvgFallback = (props: React.SVGProps<SVGSVGElement>) => (
   </svg>
 );
 
+
 interface TimelineItemProps {
-  event: SupabaseTimelineEvent; // Now expects iconImageUrl
+  event: SupabaseTimelineEvent;
   isLeft: boolean;
 }
 
@@ -44,7 +45,7 @@ export default function TimelineItem({ event, isLeft }: TimelineItemProps) {
         }
       },
       {
-        threshold: 0.1, // Make it trigger a bit earlier
+        threshold: 0.1,
       }
     );
 
@@ -65,12 +66,12 @@ export default function TimelineItem({ event, isLeft }: TimelineItemProps) {
   if (event.iconImageUrl) {
     IconContent = (
       <div className="relative h-6 w-6 rounded-sm overflow-hidden">
-        <Image
+        <NextImage
           src={event.iconImageUrl}
           alt={`${event.title} icon`}
           layout="fill"
           objectFit="contain"
-          className="dark:filter dark:brightness-0 dark:invert"
+          className="" // Removed dark mode inversion
         />
       </div>
     );

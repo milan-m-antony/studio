@@ -1,19 +1,12 @@
-
 // src/components/ui/CategoryCard.tsx
-import Image from 'next/image';
-import { Package as DefaultPackageIconImport, ArrowRight } from 'lucide-react';
+import NextImage from 'next/image';
+import { ArrowRight } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import React from 'react';
+import * as LucideIcons from 'lucide-react'; // For dynamic primary icon fallback
 
-interface CategoryCardProps {
-  name: string;
-  iconImageUrl: string | null | undefined;
-  skillCount: number;
-  onClick: () => void;
-}
-
-// A very simple hardcoded SVG to use as an ultimate fallback for categories.
+// Default inline SVG placeholder for categories.
 const DefaultCategorySvgFallback = (props: React.SVGProps<SVGSVGElement>) => (
   <svg
     xmlns="http://www.w3.org/2000/svg"
@@ -33,18 +26,25 @@ const DefaultCategorySvgFallback = (props: React.SVGProps<SVGSVGElement>) => (
   </svg>
 );
 
+interface CategoryCardProps {
+  name: string;
+  iconImageUrl: string | null | undefined; // Expecting URL now
+  skillCount: number;
+  onClick: () => void;
+}
+
 export default function CategoryCard({ name, iconImageUrl, skillCount, onClick }: CategoryCardProps) {
   let IconContent: React.ReactNode;
 
   if (iconImageUrl) {
     IconContent = (
       <div className="relative h-12 w-12 mb-3 rounded-md overflow-hidden">
-        <Image
+        <NextImage
           src={iconImageUrl}
           alt={`${name} category icon`}
           layout="fill"
           objectFit="contain"
-          className="transition-transform group-hover:scale-110" // Removed dark mode invert
+          className="transition-transform group-hover:scale-110" // Removed dark mode inversion
           data-ai-hint="category icon"
         />
       </div>
