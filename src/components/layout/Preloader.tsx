@@ -4,32 +4,28 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { cn } from '@/lib/utils';
 
-const NUMBER_DISPLAY_DURATION_MS = 500; // How long each number (1, 2, 3) is shown (including its animation)
-const REVEAL_ANIMATION_DURATION_MS = 500; // Duration for the cover and uncover animations each
-const FALLBACK_TIMEOUT_MS = 7000; // Max time preloader stays if window.load fails
-
-type PreloaderStage = 'counting' | 'covering' | 'uncovering' | 'hidden';
+const NUMBER_DISPLAY_DURATION_MS = 700; // How long each number (1, 2, 3) animation is shown
+const PRELOADER_ANIMATION_DURATION_MS = NUMBER_DISPLAY_DURATION_MS * 0.8; // Animation slightly shorter than display duration
+const FALLBACK_TIMEOUT_MS = 5000; // Max time preloader stays if window.load fails
 
 export default function Preloader() {
-  const [isLoading, setIsLoading] = useState(true); // Controls if the component renders at all
-  const [stage, setStage] = useState<PreloaderStage>('counting');
+  const [isLoading, setIsLoading] = useState(true);
   const [currentNumber, setCurrentNumber] = useState<number>(1);
-  const fadeOutInitiated = useRef(false);
-  const revealPaneRef = useRef<HTMLDivElement>(null);
+  const loadHandlerCalled = useRef(false);
 
-  const startRevealSequence = useCallback(() => {
-    if (fadeOutInitiated.current) return;
-    fadeOutInitiated.current = true;
-    console.log("[Preloader] Starting reveal sequence. Stage: covering.");
-    setStage('covering');
+  const handleLoadSequenceEnd = useCallback(() => {
+    if (loadHandlerCalled.current) return;
+    loadHandlerCalled.current = true;
+    console.log("[Preloader] Load sequence end triggered. Hiding preloader.");
+    setIsLoading(false);
   }, []);
 
   // Effect for the 1, 2, 3 counting sequence
   useEffect(() => {
-    if (stage !== 'counting') return;
+    if (!isLoading) return; // Stop counting if preloader is already set to hide
 
     if (currentNumber > 3) {
-      startRevealSequence();
+      handleLoadSequenceEnd();
       return;
     }
 
@@ -38,23 +34,28 @@ export default function Preloader() {
     }, NUMBER_DISPLAY_DURATION_MS);
 
     return () => clearTimeout(timer);
-  }, [currentNumber, stage, startRevealSequence]);
+  }, [currentNumber, isLoading, handleLoadSequenceEnd]);
 
   // Effect for window.onload and fallback timeout
   useEffect(() => {
     const fallbackTimer = setTimeout(() => {
       console.log("[Preloader] Fallback timeout reached.");
-      if (!fadeOutInitiated.current) startRevealSequence();
+      if (isLoading) { // Check if still loading before forcing hide
+        handleLoadSequenceEnd();
+      }
     }, FALLBACK_TIMEOUT_MS);
 
     const handleWindowLoad = () => {
       console.log("[Preloader] Window loaded.");
       clearTimeout(fallbackTimer);
-      if (!fadeOutInitiated.current) startRevealSequence();
+      if (isLoading) { // Check if still loading before forcing hide
+         handleLoadSequenceEnd();
+      }
     };
 
     if (document.readyState === 'complete') {
-      setTimeout(handleWindowLoad, 100); // Short delay if already loaded
+      // If already loaded, trigger after a very short delay to allow initial render
+      setTimeout(handleWindowLoad, 50);
     } else {
       window.addEventListener('load', handleWindowLoad);
     }
@@ -63,30 +64,7 @@ export default function Preloader() {
       window.removeEventListener('load', handleWindowLoad);
       clearTimeout(fallbackTimer);
     };
-  }, [startRevealSequence]);
-
-  // Effect to handle animation end of reveal panes
-  useEffect(() => {
-    const pane = revealPaneRef.current;
-    if (!pane) return;
-
-    const handleAnimationEnd = () => {
-      console.log(`[Preloader] Animation ended for stage: ${stage}`);
-      if (stage === 'covering') {
-        setStage('uncovering');
-      } else if (stage === 'uncovering') {
-        // After uncover, hide the entire preloader component
-        setIsLoading(false);
-        setStage('hidden');
-         console.log("[Preloader] Preloader sequence complete, hiding.");
-      }
-    };
-
-    pane.addEventListener('animationend', handleAnimationEnd);
-    return () => {
-      pane.removeEventListener('animationend', handleAnimationEnd);
-    };
-  }, [stage]);
+  }, [isLoading, handleLoadSequenceEnd]);
 
 
   if (!isLoading) {
@@ -95,46 +73,28 @@ export default function Preloader() {
 
   return (
     <>
-      {/* Main dark overlay, always present until the very end */}
+      {/* Main dark overlay */}
       <div
         id="preloader-main-overlay"
         className={cn(
-          "fixed inset-0 z-[9998] flex items-center justify-center bg-black text-white",
+          "fixed inset-0 z-[9999] flex items-center justify-center bg-black text-white",
           // This overlay will just pop out when isLoading becomes false
         )}
         aria-hidden={!isLoading}
         role="status"
       >
-        {stage === 'counting' && (
+        {currentNumber <= 3 && (
           <div className="text-7xl md:text-8xl lg:text-9xl font-bold text-white" style={{ minHeight: '1.2em', minWidth: '1.2em', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            {currentNumber <= 3 && (
-              <span
-                key={currentNumber} // Re-trigger animation for each number
-                className="inline-block animate-zoomInOutNumber" // Uses existing zoom animation
-                style={{ animationDuration: `${NUMBER_DISPLAY_DURATION_MS * 0.8}ms` }} // Animation slightly shorter than display duration
-              >
-                {currentNumber}
-              </span>
-            )}
+            <span
+              key={currentNumber} // Re-trigger animation for each number
+              className="inline-block animate-zoomInOutNumber" // Uses existing zoom animation
+              style={{ animationDuration: `${PRELOADER_ANIMATION_DURATION_MS}ms` }}
+            >
+              {currentNumber}
+            </span>
           </div>
         )}
       </div>
-
-      {/* Reveal Pane - only active during covering and uncovering stages */}
-      {(stage === 'covering' || stage === 'uncovering') && (
-        <div
-          ref={revealPaneRef}
-          id="reveal-pane"
-          className={cn(
-            "fixed inset-x-0 bottom-0 z-[9999] h-0 bg-primary", // Use primary color for reveal
-            {
-              'animate-cover-screen': stage === 'covering',
-              'animate-uncover-screen': stage === 'uncovering',
-            }
-          )}
-          style={{ animationDuration: `${REVEAL_ANIMATION_DURATION_MS}ms` }}
-        />
-      )}
     </>
   );
 }

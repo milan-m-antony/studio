@@ -145,7 +145,8 @@ body {
   animation: zoomInOutNumber ease-in-out forwards; /* Duration set by inline style */
 }
 
-/* Animations for block reveal effect */
+/* Animations for block reveal effect - REMOVED as per user request */
+/*
 @keyframes coverScreenFromBottom {
   from { height: 0%; bottom: 0; top: auto; }
   to { height: 100%; bottom: 0; top: auto; }
@@ -163,7 +164,7 @@ body {
 .animate-uncover-screen {
   animation: uncoverScreenToTop ease-in-out forwards;
 }
-
+*/
 
 /* Scrollbar hiding utilities */
 @layer utilities {
