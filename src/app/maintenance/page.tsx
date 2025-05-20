@@ -2,14 +2,8 @@
 // src/app/maintenance/page.tsx
 import { createClient } from '@supabase/supabase-js';
 import { type Metadata } from 'next';
-import { Geist } from 'next/font/google';
+import { AlertTriangle } from 'lucide-react'; // For a visual cue
 
-const geistSans = Geist({
-  variable: '--font-geist-sans',
-  subsets: ['latin'],
-});
-
-// These should be available as they are NEXT_PUBLIC_
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 const ADMIN_SITE_SETTINGS_ID = 'global_settings';
@@ -17,6 +11,20 @@ const ADMIN_SITE_SETTINGS_ID = 'global_settings';
 export const metadata: Metadata = {
   title: 'Under Maintenance',
   description: 'Our site is currently undergoing scheduled maintenance.',
+  // Prevent indexing of the maintenance page
+  robots: {
+    index: false,
+    follow: false,
+    nocache: true,
+    googleBot: {
+      index: false,
+      follow: false,
+      noimageindex: true,
+      'max-video-preview': -1,
+      'max-image-preview': 'large',
+      'max-snippet': -1,
+    },
+  },
 };
 
 async function getMaintenanceMessage(): Promise<string> {
@@ -25,6 +33,7 @@ async function getMaintenanceMessage(): Promise<string> {
     return 'We are currently performing scheduled maintenance. Please check back soon.';
   }
 
+  // Create a new Supabase client instance for server-side fetching
   const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
   try {
     const { data, error } = await supabase
@@ -38,8 +47,8 @@ async function getMaintenanceMessage(): Promise<string> {
       return 'We are currently performing scheduled maintenance. We will be back online shortly.';
     }
     return data?.maintenance_message || 'The site is currently undergoing maintenance. We appreciate your patience.';
-  } catch (e) {
-    console.error('Maintenance Page: Exception fetching maintenance message:', e);
+  } catch (e: any) {
+    console.error('Maintenance Page: Exception fetching maintenance message:', e.message);
     return 'An error occurred while fetching the maintenance status. Please try again later.';
   }
 }
@@ -48,30 +57,21 @@ export default async function MaintenancePage() {
   const message = await getMaintenanceMessage();
 
   return (
-    <html lang="en" className={geistSans.variable}>
-      <head>
-        <meta charSet="utf-8" />
-        <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <title>Under Maintenance</title>
-        <style>{`
-          body { margin: 0; font-family: var(--font-geist-sans), Arial, sans-serif; background-color: #111827; color: #e5e7eb; display: flex; justify-content: center; align-items: center; min-height: 100vh; text-align: center; padding: 20px; box-sizing: border-box; }
-          .container { max-width: 600px; }
-          h1 { font-size: 2.5rem; margin-bottom: 1rem; color: #f9fafb; }
-          p { font-size: 1.125rem; line-height: 1.75; color: #d1d5db; }
-          svg { width: 80px; height: 80px; margin-bottom: 1.5rem; color: #60a5fa; }
-        `}</style>
-      </head>
-      <body>
-        <div className="container">
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <circle cx="12" cy="12" r="10"></circle>
-            <line x1="12" y1="8" x2="12" y2="12"></line>
-            <line x1="12" y1="16" x2="12.01" y2="16"></line>
-          </svg>
-          <h1>Under Maintenance</h1>
-          <p>{message}</p>
+    <div className="flex flex-col items-center justify-center min-h-screen bg-gray-900 text-gray-200 p-4 text-center selection:bg-primary/70 selection:text-white">
+      <div className="max-w-lg w-full bg-gray-800 p-8 rounded-xl shadow-2xl">
+        <div className="mb-6">
+          <AlertTriangle className="h-20 w-20 text-primary mx-auto animate-pulse" />
         </div>
-      </body>
-    </html>
+        <h1 className="text-4xl font-bold text-gray-50 mb-4">
+          Site Under Maintenance
+        </h1>
+        <p className="text-lg text-gray-300 leading-relaxed">
+          {message}
+        </p>
+        <p className="mt-8 text-sm text-gray-500">
+          We appreciate your patience and understanding.
+        </p>
+      </div>
+    </div>
   );
 }
