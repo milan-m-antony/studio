@@ -2,11 +2,11 @@
 "use client";
 
 import Link from 'next/link';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, type ReactNode, type ComponentType } from 'react'; // Added ComponentType
 import { usePathname } from 'next/navigation';
-import { Menu, X, Sun, Moon, Code2, Home, User, Briefcase, Wrench, Map as MapIcon, Award, FileText, Mail, LayoutDashboard } from 'lucide-react';
+import { Menu, X, Sun, Moon, Code2, Home, User, Briefcase, Wrench, Map as MapIcon, Award, FileText, Mail } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { useTheme } from '@/contexts/ThemeProvider';
 import { cn } from '@/lib/utils';
 
@@ -65,30 +65,31 @@ const NavLinks = ({ onClick, activeHref }: { onClick?: () => void; activeHref: s
 
 export default function Header() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [mounted, setMounted] = useState(false);
+  const [headerIsMounted, setHeaderIsMounted] = useState(false); // Renamed from mounted
   const { theme, setTheme } = useTheme();
   const [activeLink, setActiveLink] = useState<string>('#hero');
   const pathname = usePathname();
   const [shouldRenderHeader, setShouldRenderHeader] = useState(true);
+  const [ThemeIcon, setThemeIcon] = useState<ReactNode | null>(null); // State for the icon component
 
   useEffect(() => {
-    setMounted(true);
+    setHeaderIsMounted(true);
   }, []);
 
   useEffect(() => {
-    if (mounted) {
+    if (headerIsMounted) { // Only check pathname after mount
       if (pathname.startsWith('/admin')) {
         setShouldRenderHeader(false);
       } else {
         setShouldRenderHeader(true);
       }
     }
-  }, [pathname, mounted]);
+  }, [pathname, headerIsMounted]);
   
   useEffect(() => {
     const determineActiveLink = () => {
-      if (!mounted || pathname.startsWith('/admin')) {
-        setActiveLink(''); // No active link for admin pages in public header
+      if (!headerIsMounted || !shouldRenderHeader || pathname.startsWith('/admin')) {
+        // No active link logic needed if header isn't shown or on admin pages
         return;
       }
       
@@ -137,9 +138,9 @@ export default function Header() {
       }
     };
 
-    const currentPath = pathname; // Capture pathname for use in determineActiveLink
+    const currentPath = pathname;
 
-    if (mounted) {
+    if (headerIsMounted && shouldRenderHeader) {
       determineActiveLink(); 
       window.addEventListener('scroll', determineActiveLink, { passive: true });
       window.addEventListener('hashchange', determineActiveLink);
@@ -147,33 +148,77 @@ export default function Header() {
     }
 
     return () => {
-      if (mounted) {
+      if (headerIsMounted && shouldRenderHeader) {
         window.removeEventListener('scroll', determineActiveLink);
         window.removeEventListener('hashchange', determineActiveLink);
         window.removeEventListener('resize', determineActiveLink);
       }
     };
-  }, [pathname, mounted]); 
+  }, [pathname, headerIsMounted, shouldRenderHeader]); 
 
+  // Effect to set the theme icon only after mount and theme is known
+  useEffect(() => {
+    if (headerIsMounted) {
+      let effectiveTheme = theme;
+      if (theme === 'system') {
+        effectiveTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+      }
+      setThemeIcon(effectiveTheme === 'dark' ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />);
+    }
+  }, [theme, headerIsMounted]);
 
-  if (!mounted) {
-    // To prevent hydration mismatch, render a basic structure that the server might also render,
-    // or nothing if it's truly client-side only logic determining visibility.
-    // Given RootLayout always includes <Header />, we should render the header structure
-    // and let the `shouldRenderHeader` state hide it after mount if needed.
+  if (!headerIsMounted || !shouldRenderHeader) {
+    // Return a minimal structure or null if header shouldn't render.
+    // This initial render must match what the server would render for this component
+    // (which is effectively the header structure or nothing if hidden by path).
+    // To ensure no mismatch, if it's an admin path, this should be null.
+    // Otherwise, it can render the header structure but with a placeholder for the icon.
+    if (pathname.startsWith('/admin')) return null;
+    
+    // For non-admin paths, render the header but with a placeholder for the theme icon
+    // to avoid hydration issues with the icon itself before mount.
+    return (
+      <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+        <div className="container mx-auto flex h-16 max-w-screen-2xl items-center justify-between px-4 sm:px-6 lg:px-8">
+          <Link href="/" className="flex items-center gap-2">
+            <Code2 className="h-7 w-7 text-primary" />
+            <span className="font-bold text-xl">Milan.dev</span>
+          </Link>
+          <nav className="hidden md:flex items-center space-x-1">
+            <NavLinks activeHref={activeLink} />
+          </nav>
+          <div className="flex items-center gap-2">
+            <Button variant="ghost" size="icon" aria-label="Toggle theme">
+              <div className="h-5 w-5" /> {/* Placeholder for icon before mount */}
+            </Button>
+            <div className="md:hidden">
+              {/* Mobile menu SheetTrigger remains, content will also handle icon display after mount */}
+              <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
+                <SheetTrigger asChild>
+                  <Button variant="ghost" size="icon" aria-label="Open menu" className="transition-transform duration-300 ease-in-out hover:rotate-90">
+                    {isMobileMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
+                  </Button>
+                </SheetTrigger>
+                <SheetContent /* ... */ >
+                   {/* ... Sheet Content ... */}
+                </SheetContent>
+              </Sheet>
+            </div>
+          </div>
+        </div>
+      </header>
+    );
   }
-  
-  if (!shouldRenderHeader && mounted) {
-    return null;
-  }
 
-  let effectiveTheme = theme;
-  if (theme === 'system' && typeof window !== 'undefined') {
-    effectiveTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-  }
-
+  // This is rendered after headerIsMounted is true
   const toggleTheme = () => {
-    setTheme(effectiveTheme === 'dark' ? 'light' : 'dark');
+    // Recalculate effectiveTheme for toggle, as ThemeIcon state might not be instant
+    let currentEffectiveTheme = theme;
+    if (theme === 'system') {
+        currentEffectiveTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    }
+    const newThemeToSet = currentEffectiveTheme === 'dark' ? 'light' : 'dark';
+    setTheme(newThemeToSet);
   };
 
   return (
@@ -190,7 +235,7 @@ export default function Header() {
 
         <div className="flex items-center gap-2">
           <Button variant="ghost" size="icon" onClick={toggleTheme} aria-label="Toggle theme">
-            {effectiveTheme === 'dark' ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
+            {ThemeIcon || <div className="h-5 w-5" />} {/* Render stored icon or placeholder */}
           </Button>
 
           <div className="md:hidden">
