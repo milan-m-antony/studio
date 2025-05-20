@@ -65,25 +65,14 @@ const NavLinks = ({ onClick, activeHref }: { onClick?: () => void; activeHref: s
 
 export default function Header() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [isClient, setIsClient] = useState(false); // Used to delay client-specific rendering
+  const [isClient, setIsClient] = useState(false);
   const { theme, setTheme } = useTheme();
   const [activeLink, setActiveLink] = useState<string>('#hero');
   const pathname = usePathname();
-  const [CurrentThemeIcon, setCurrentThemeIcon] = useState<ReactNode>(<div className="h-5 w-5" />); // Default placeholder
 
   useEffect(() => {
-    setIsClient(true); // Set to true once component mounts on client
+    setIsClient(true);
   }, []);
-
-  useEffect(() => {
-    if (isClient) { // Only update theme icon after mount
-      let effectiveTheme = theme;
-      if (theme === 'system') {
-        effectiveTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-      }
-      setCurrentThemeIcon(effectiveTheme === 'dark' ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />);
-    }
-  }, [theme, isClient]);
 
   useEffect(() => {
     const determineActiveLink = () => {
@@ -157,20 +146,27 @@ export default function Header() {
   const toggleTheme = () => {
     if (!isClient) return;
     let currentEffectiveTheme = theme;
-    if (theme === 'system') {
+    if (theme === 'system' && typeof window !== 'undefined') {
         currentEffectiveTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
     }
     const newThemeToSet = currentEffectiveTheme === 'dark' ? 'light' : 'dark';
     setTheme(newThemeToSet);
   };
 
+  let themeIconNode: ReactNode = <div className="h-5 w-5" />; // Placeholder for SSR and initial client render
+
+  if (isClient) {
+    let effectiveTheme = theme;
+    if (theme === 'system' && typeof window !== 'undefined') {
+      effectiveTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    }
+    themeIconNode = effectiveTheme === 'dark' ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />;
+  }
+  
   if (isClient && pathname.startsWith('/admin')) {
-    // On the client, if it's an admin path, render nothing for the header.
     return null;
   }
 
-  // For SSR, or for client-side initial render (before isClient is true),
-  // or for non-admin paths on the client, render the header.
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container mx-auto flex h-16 max-w-screen-2xl items-center justify-between px-4 sm:px-6 lg:px-8">
@@ -185,7 +181,7 @@ export default function Header() {
 
         <div className="flex items-center gap-2">
           <Button variant="ghost" size="icon" onClick={toggleTheme} aria-label="Toggle theme" disabled={!isClient}>
-            {CurrentThemeIcon}
+            {themeIconNode}
           </Button>
 
           <div className="md:hidden">
