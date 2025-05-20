@@ -100,12 +100,12 @@ const SidebarContent = ({
             "flex items-center", 
             isCollapsed && !isMobile ? "justify-center w-full" : ""
           )}
-          onClick={() => { onSelectSection('dashboard'); if(isMobile) setIsMobileMenuOpen(false);}}
+          onClick={() => { onSelectSection('dashboard'); if(isMobile) (AdminPageLayout as any).setIsMobileMenuOpenState(false);}}
           aria-label="Go to admin dashboard"
         >
           <div className={cn(
             "relative rounded-full overflow-hidden border border-sidebar-accent flex-shrink-0",
-            isCollapsed && !isMobile ? "h-8 w-8" : "h-10 w-10" 
+            isCollapsed && !isMobile ? "h-8 w-8" : "h-10 w-10" // Logo container size adjustment
           )}>
             <NextImage
               src="/logo.png"
@@ -123,7 +123,7 @@ const SidebarContent = ({
       </div>
 
       <ScrollArea className="flex-grow">
-        <nav className={cn("p-2 space-y-1", isCollapsed && !isMobile ? "flex flex-col items-center" : "")}>
+        <nav className={cn("p-2 space-y-1", isCollapsed && !isMobile ? "flex flex-col" : "")}> {/* Removed items-center for collapsed */}
           {navItems.filter(item => item.key !== 'settings').map((item) => {
             const Icon = item.icon;
             const isActive = activeSection === item.key;
@@ -132,20 +132,22 @@ const SidebarContent = ({
                 key={item.key}
                 variant="ghost"
                 className={cn(
-                  "w-full text-sm py-2.5 px-3", 
+                  "w-full text-sm rounded-lg group", // Base: w-full, rounded
                   isActive
-                    ? "bg-sidebar-primary text-sidebar-primary-foreground font-semibold rounded-lg"
-                    : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground rounded-lg",
-                  isCollapsed && !isMobile ? "justify-center w-auto p-2.5" : "justify-start" 
+                    ? "bg-sidebar-primary text-sidebar-primary-foreground font-semibold" // Active state
+                    : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground", // Inactive state
+                  isCollapsed && !isMobile
+                    ? "justify-center p-2.5" // Collapsed desktop: center icon, uniform padding
+                    : "justify-start py-2.5 px-3" // Expanded or mobile: start align, specific padding
                 )}
                 onClick={() => {
                   onSelectSection(item.key);
-                  if (isMobile) setIsMobileMenuOpen(false);
+                  if (isMobile) (AdminPageLayout as any).setIsMobileMenuOpenState(false);
                 }}
                 title={isCollapsed && !isMobile ? item.label : undefined} 
               >
                 <Icon className={cn(
-                  "h-5 w-5",
+                  "h-5 w-5 flex-shrink-0", // flex-shrink-0 to prevent icon squishing
                   isActive ? "text-sidebar-primary-foreground" : "text-sidebar-foreground/70 group-hover:text-sidebar-accent-foreground",
                   isCollapsed && !isMobile ? "mr-0" : "mr-2" 
                 )} />
@@ -158,24 +160,26 @@ const SidebarContent = ({
         </nav>
       </ScrollArea>
       {navItems.find(item => item.key === 'settings') && (
-        <div className={cn("mt-auto p-2 border-t border-sidebar-border", isCollapsed && !isMobile ? "flex flex-col items-center" : "")}>
+        <div className={cn("mt-auto p-2 border-t border-sidebar-border", isCollapsed && !isMobile ? "flex flex-col" : "")}> {/* Removed items-center for collapsed */}
             <Button
               variant="ghost"
               className={cn(
-                "w-full text-sm py-2.5 px-3",
+                "w-full text-sm rounded-lg group", // Base: w-full, rounded
                 activeSection === 'settings'
-                  ? "bg-sidebar-primary text-sidebar-primary-foreground font-semibold rounded-lg"
-                  : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground rounded-lg",
-                isCollapsed && !isMobile ? "justify-center w-auto p-2.5" : "justify-start"
+                  ? "bg-sidebar-primary text-sidebar-primary-foreground font-semibold" // Active state
+                  : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground", // Inactive state
+                 isCollapsed && !isMobile
+                    ? "justify-center p-2.5" // Collapsed desktop: center icon, uniform padding
+                    : "justify-start py-2.5 px-3" // Expanded or mobile: start align, specific padding
               )}
               onClick={() => {
                 onSelectSection('settings');
-                if (isMobile) setIsMobileMenuOpen(false);
+                if (isMobile) (AdminPageLayout as any).setIsMobileMenuOpenState(false);
               }}
               title={isCollapsed && !isMobile ? navItems.find(item => item.key === 'settings')?.label : undefined}
             >
               <SettingsIcon className={cn(
-                "h-5 w-5",
+                "h-5 w-5 flex-shrink-0",
                 activeSection === 'settings' ? "text-sidebar-primary-foreground" : "text-sidebar-foreground/70 group-hover:text-sidebar-accent-foreground",
                 isCollapsed && !isMobile ? "mr-0" : "mr-2"
               )} />
@@ -190,7 +194,11 @@ const SidebarContent = ({
     </div>
   );
 
-let setIsMobileMenuOpen: React.Dispatch<React.SetStateAction<boolean>>; // Hack for SidebarContent
+// Hack for SidebarContent to access setIsMobileMenuOpenState
+// This is not ideal and indicates a need for better state management if this component grows further.
+// For now, it resolves the immediate access issue.
+(AdminPageLayout as any).setIsMobileMenuOpenState = () => {};
+
 
 export default function AdminPageLayout({
   navItems,
@@ -202,9 +210,8 @@ export default function AdminPageLayout({
   pageTitle
 }: AdminPageLayoutProps) {
   const { theme, setTheme } = useTheme();
-  const { toast } = useToast();
   const [isMobileMenuOpenState, setIsMobileMenuOpenState] = useState(false);
-  setIsMobileMenuOpen = setIsMobileMenuOpenState; // Assign to the higher-scoped variable
+  (AdminPageLayout as any).setIsMobileMenuOpenState = setIsMobileMenuOpenState; // Assign to higher-scoped variable for SidebarContent
 
   const [headerIsMounted, setHeaderIsMounted] = useState(false);
 
@@ -464,6 +471,7 @@ export default function AdminPageLayout({
         isSidebarCollapsed ? "w-20" : "w-64"
       )}>
          <SidebarContent 
+            isMobile={false}
             isCollapsed={isSidebarCollapsed} 
             navItems={navItems}
             activeSection={activeSection}
@@ -481,20 +489,22 @@ export default function AdminPageLayout({
         <SheetContent side="left" className="p-0 w-72 bg-sidebar border-r border-sidebar-border">
           <SidebarContent 
             isMobile 
+            isCollapsed={false} // Mobile sidebar is never visually collapsed in this manner
             navItems={navItems}
             activeSection={activeSection}
             onSelectSection={onSelectSection}
-            toggleSidebarCollapse={toggleSidebarCollapse} 
+            toggleSidebarCollapse={() => {}} // No-op for mobile, or implement sheet close
           />
         </SheetContent>
       </Sheet>
 
       <div className={cn(
-        "flex flex-col flex-1 overflow-hidden transition-all duration-300 ease-in-out min-w-0" 
-        // Removed w-full, flex-1 and min-w-0 should handle it.
+        "flex flex-col flex-1 overflow-hidden transition-all duration-300 ease-in-out min-w-0"
       )}>
         <header className="sticky top-0 z-40 flex h-16 items-center justify-between border-b border-border bg-card px-4 md:px-6 shrink-0">
           <div className="md:hidden">
+            {/* This div ensures the title centers correctly on mobile when the trigger is on the left.
+                If your mobile trigger moves to the right, this might need adjustment or could be removed. */}
           </div> 
           <h1 className="text-xl font-semibold text-foreground">{pageTitle}</h1>
           <div className="flex items-center gap-3">
@@ -641,7 +651,7 @@ export default function AdminPageLayout({
                         <Trash2 className="mr-2 h-4 w-4" /> Remove Current Photo
                     </Button>
                 )}
-                {!currentDbProfilePhotoUrl && <div className="sm:hidden" /> }
+                {!currentDbProfilePhotoUrl && <div className="sm:hidden" /> } {/* Spacer for layout consistency */}
                 <div className="flex gap-2 justify-end"> 
                     <DialogClose asChild>
                         <Button type="button" variant="outline">Cancel</Button>
