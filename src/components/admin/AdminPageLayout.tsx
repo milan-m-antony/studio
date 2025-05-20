@@ -4,8 +4,8 @@
 import Link from 'next/link';
 import NextImage from 'next/image';
 import { Button, buttonVariants } from '@/components/ui/button';
-import {
-  Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle as SheetPrimitiveTitle,
+import { 
+  Sheet, SheetContent, SheetHeader, SheetTitle as SheetPrimitiveTitle, SheetTrigger,
   SheetDescription, SheetFooter
 } from '@/components/ui/sheet';
 import {
@@ -17,7 +17,7 @@ import {
   AlertDialogCancel,
   AlertDialogContent,
   AlertDialogDescription,
-  AlertDialogFooter as AlertDialogPrimitiveFooter, // Aliased to avoid conflict if CardFooter used
+  AlertDialogFooter as AlertDialogPrimitiveFooter,
   AlertDialogHeader as AlertDialogPrimitiveHeader,
   AlertDialogTitle as AlertDialogPrimitiveAlertDialogTitle,
 } from "@/components/ui/alert-dialog";
@@ -25,23 +25,25 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from '@/lib/supabaseClient';
-import type { AdminActivityLog, AdminProfile, User } from '@/types/supabase';
+import type { AdminActivityLog, AdminProfile } from '@/types/supabase';
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { ScrollArea } from '@/components/ui/scroll-area';
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
 import {
   Menu, X, Sun, Moon,
   LogOut as LogoutIcon, Bell as BellIcon, UserCircle, Settings as SettingsIcon,
-  UploadCloud, Trash2, History, ChevronRight, ChevronLeft, KeyRound, Mail as MailIcon, Image as ImageIcon
+  UploadCloud, Trash2, History, ChevronRight, ChevronLeft, KeyRound, Image as ImageIcon, Mail as MailIcon
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { useTheme } from '@/contexts/ThemeProvider';
 import { cn } from '@/lib/utils';
 import React, { useState, useEffect, type ChangeEvent, type ReactNode, useCallback } from 'react';
 import { format, parseISO, isValid as isValidDate } from 'date-fns';
+import * as AccordionPrimitive from "@radix-ui/react-accordion";
+
 
 const ADMIN_PROFILE_ID = '00000000-0000-0000-0000-00000000000A'; 
 
@@ -111,7 +113,7 @@ const SidebarContent = ({
       <ScrollArea className="flex-grow">
         <nav className={cn(
           "space-y-1",
-          isCollapsed && !isMobile ? "px-4 py-2 flex flex-col items-center" : "p-2"
+          isCollapsed && !isMobile ? "px-2 py-2" : "p-2" // Consistent padding for collapsed nav area
         )}>
           {navItems.filter(item => item.key !== 'settings').map((item) => {
             const Icon = item.icon;
@@ -126,7 +128,7 @@ const SidebarContent = ({
                     ? "bg-sidebar-primary text-sidebar-primary-foreground font-semibold"
                     : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
                   isCollapsed && !isMobile
-                    ? "justify-center py-2.5 px-0" 
+                    ? "justify-center py-2.5 px-0" // No horizontal padding for button itself
                     : "justify-start py-2.5 px-3"
                 )}
                 onClick={() => {
@@ -151,7 +153,7 @@ const SidebarContent = ({
 
       <div className={cn(
           "mt-auto border-t border-sidebar-border shrink-0",
-           isCollapsed && !isMobile ? "px-4 py-2 flex flex-col items-center" : "p-2"
+           isCollapsed && !isMobile ? "px-2 py-2" : "p-2" // Consistent padding for collapsed settings area
       )}>
         {navItems.find(item => item.key === 'settings') && (() => {
           const settingsItem = navItems.find(item => item.key === 'settings')!;
@@ -166,7 +168,7 @@ const SidebarContent = ({
                   ? "bg-sidebar-primary text-sidebar-primary-foreground font-semibold"
                   : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
                 isCollapsed && !isMobile
-                  ? "justify-center py-2.5 px-0"
+                  ? "justify-center py-2.5 px-0" // No horizontal padding for button itself
                   : "justify-start py-2.5 px-3"
               )}
               onClick={() => {
@@ -246,6 +248,7 @@ export default function AdminPageLayout({
         setProfilePhotoUrl(null); 
         setCurrentDbProfilePhotoUrl(null);
         setProfilePhotoPreview(null);
+        console.log("[AdminPageLayout] No current Supabase user, cannot fetch admin_profile.");
         return;
     }
     const { data, error } = await supabase
@@ -256,11 +259,14 @@ export default function AdminPageLayout({
 
     if (error) {
       console.error("[AdminPageLayout] Error fetching admin profile photo:", error);
+      toast({ title: "Profile Error", description: "Could not load profile photo.", variant: "destructive" });
     } else if (data && data.profile_photo_url) {
+      console.log("[AdminPageLayout] Profile photo URL fetched:", data.profile_photo_url);
       setProfilePhotoUrl(data.profile_photo_url);
       setCurrentDbProfilePhotoUrl(data.profile_photo_url);
       setProfilePhotoPreview(data.profile_photo_url); 
     } else {
+      console.log("[AdminPageLayout] No profile photo URL found in admin_profile.");
       setProfilePhotoUrl(null);
       setCurrentDbProfilePhotoUrl(null);
       setProfilePhotoPreview(null);
@@ -276,6 +282,7 @@ export default function AdminPageLayout({
       setIsSidebarCollapsed(JSON.parse(savedSidebarState));
     }
 
+    // Listen for auth changes to re-fetch profile if user logs in/out
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION') {
         fetchAdminProfile();
@@ -321,16 +328,27 @@ export default function AdminPageLayout({
   const fetchActivities = async () => {
     setIsLoadingActivities(true);
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) { setIsLoadingActivities(false); return; }
+    if (!user) { 
+        console.warn("[AdminPageLayout] No authenticated user to fetch activities for.");
+        setActivities([]);
+        setIsLoadingActivities(false); 
+        return; 
+    }
+    // For admin activity log, it's usually fine to fetch all logs,
+    // or logs specific to any admin action rather than just the current user's actions,
+    // depending on how `user_identifier` is populated.
     const { data, error } = await supabase
       .from('admin_activity_log')
       .select('*')
       .order('timestamp', { ascending: false })
       .limit(50);
     if (error) {
+      console.error("Error fetching admin activities:", error);
       toast({ title: "Error", description: "Could not fetch recent activities.", variant: "destructive" });
       setActivities([]);
-    } else setActivities(data || []);
+    } else {
+      setActivities(data || []);
+    }
     setIsLoadingActivities(false);
   };
 
@@ -345,29 +363,38 @@ export default function AdminPageLayout({
         toast({ title: "Authentication Error", description: "You must be logged in to clear logs.", variant: "destructive" });
         setIsLoadingActivities(false); return;
     }
-    const { error } = await supabase.from('admin_activity_log').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+    // Delete all rows. Using a condition that's always true for non-null IDs
+    const { error } = await supabase.from('admin_activity_log').delete().neq('id', '00000000-0000-0000-0000-000000000000'); 
     if (error) {
+      console.error("Error clearing activity log:", error);
       toast({ title: "Error", description: `Failed to clear activity log: ${error.message}`, variant: "destructive" });
     } else {
       toast({ title: "Success", description: "Activity log cleared." });
-      setActivities([]);
-      await supabase.from('admin_activity_log').insert({ action_type: 'ACTIVITY_LOG_CLEARED', description: `Admin ${user.email || user.id} cleared the activity log.`, user_identifier: user.id });
+      setActivities([]); // Clear local state
+      // Log the clear action itself
+      await supabase.from('admin_activity_log').insert({ 
+        action_type: 'ACTIVITY_LOG_CLEARED', 
+        description: `Admin "${user.email}" cleared the activity log.`,
+        user_identifier: user.id // Use Supabase user ID
+      });
     }
     setShowClearLogConfirm(false);
     setIsLoadingActivities(false);
   };
 
   const getUserInitials = (name: string | null | undefined) => {
-    if (!name) return "AD";
-    if (name.includes('@')) {
-      const emailPrefix = name.split('@')[0];
-      if (emailPrefix.length >= 2) return emailPrefix.substring(0, 2).toUpperCase();
-      if (emailPrefix.length === 1) return emailPrefix.toUpperCase() + "X";
-      return "AD";
+    if (!name) return "AD"; // Default for "Admin" or null/undefined
+    if (name.includes('@')) { // Likely an email
+        const emailPrefix = name.split('@')[0];
+        if (emailPrefix.length >= 2) return emailPrefix.substring(0, 2).toUpperCase();
+        if (emailPrefix.length === 1) return emailPrefix.toUpperCase() + "X"; // e.g. a@ becomes AX
+        return "AD";
     }
-    const parts = name.split(/[\s_]+/);
+    const parts = name.split(/[\s_]+/); // Split by space or underscore
     if (parts.length > 0 && parts[0]) {
-        if (parts.length > 1 && parts[1] && parts[1].length > 0) return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
+        if (parts.length > 1 && parts[1] && parts[1].length > 0) {
+            return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
+        }
         return parts[0].substring(0, 2).toUpperCase();
     }
     return "AD";
@@ -382,14 +409,15 @@ export default function AdminPageLayout({
       reader.readAsDataURL(file);
     } else {
       setProfilePhotoFile(null);
-      setProfilePhotoPreview(currentDbProfilePhotoUrl);
+      setProfilePhotoPreview(currentDbProfilePhotoUrl); // Revert to DB image if file selection is cleared
     }
   };
 
   const handleSaveProfilePhoto = async () => {
     setIsUploadingPhoto(true);
-    let newPhotoUrlToSave = currentDbProfilePhotoUrl;
-    const {data: { user: currentUserForUpdate } } = await supabase.auth.getUser();
+    let newPhotoUrlToSave = currentDbProfilePhotoUrl; // Start with current DB URL
+    const { data: { user: currentUserForUpdate } } = await supabase.auth.getUser();
+
     if (!currentUserForUpdate) {
         toast({ title: "Auth Error", description: "Please log in again to update profile photo.", variant: "destructive"});
         setIsUploadingPhoto(false); return;
@@ -399,65 +427,91 @@ export default function AdminPageLayout({
     if (currentDbProfilePhotoUrl) {
         try {
             const url = new URL(currentDbProfilePhotoUrl);
-            const pathParts = url.pathname.split('/admin-profile-photos/');
-            if (pathParts.length > 1 && !pathParts[1].startsWith('http')) oldImageStoragePathToDelete = decodeURIComponent(pathParts[1]);
-        } catch(e) { console.warn("[AdminPageLayout] Could not parse currentDbProfilePhotoUrl for deletion:", currentDbProfilePhotoUrl, e); }
+            // Path format: /storage/v1/object/public/bucket-name/file-path.ext
+            const pathParts = url.pathname.split(`/admin-profile-photos/`);
+            if (pathParts.length > 1 && !pathParts[1].startsWith('http')) { // Basic check to avoid non-storage URLs
+                oldImageStoragePathToDelete = decodeURIComponent(pathParts[1]);
+            }
+        } catch(e) {
+            console.warn("[AdminPageLayout] Could not parse currentDbProfilePhotoUrl for old path:", currentDbProfilePhotoUrl, e);
+        }
     }
 
-    if (profilePhotoFile) {
+    if (profilePhotoFile) { // A new file was selected for upload
       const fileExt = profilePhotoFile.name.split('.').pop();
-      const fileName = `admin_profile_${currentUserForUpdate.id}_${Date.now()}.${fileExt}`;
+      // Using a more specific filename to relate to the admin profile
+      const fileName = `admin_profile_photo_${ADMIN_PROFILE_ID}_${Date.now()}.${fileExt}`; 
       
       console.log('[AdminPageLayout] Attempting to upload new profile photo:', fileName);
       const { data: uploadData, error: uploadError } = await supabase.storage
         .from('admin-profile-photos')
-        .upload(fileName, profilePhotoFile, { cacheControl: '3600', upsert: false });
+        .upload(fileName, profilePhotoFile, { cacheControl: '3600', upsert: false }); // upsert: false to avoid overwriting if path somehow collides
 
       if (uploadError) {
         console.error("[AdminPageLayout] Error uploading profile photo to storage:", JSON.stringify(uploadError, null, 2));
         toast({ title: "Upload Error", description: `Failed to upload photo: ${uploadError.message}`, variant: "destructive" });
-        setIsUploadingPhoto(false); return;
+        setIsUploadingPhoto(false);
+        return;
       }
       const { data: publicUrlData } = supabase.storage.from('admin-profile-photos').getPublicUrl(fileName);
       if (!publicUrlData?.publicUrl) {
          toast({ title: "Error", description: "Failed to get public URL for new photo.", variant: "destructive" });
-         setIsUploadingPhoto(false); return;
+         setIsUploadingPhoto(false);
+         return;
       }
       newPhotoUrlToSave = publicUrlData.publicUrl;
     }
+    // If newPhotoUrlToSave is different from currentDbProfilePhotoUrl, or if currentDbProfilePhotoUrl was null and newPhotoUrlToSave is now set, we update.
+    // If newPhotoUrlToSave is currentDbProfilePhotoUrl (e.g. no file selected, no URL change), no DB update is needed unless other fields change.
+    // But for simplicity, we update if there's a change or a new file.
 
     console.log('[AdminPageLayout] Attempting to update admin_profile with photo URL:', newPhotoUrlToSave, 'for ID:', ADMIN_PROFILE_ID);
     console.log('[AdminPageLayout] Current user for DB update:', currentUserForUpdate?.email, 'User ID:', currentUserForUpdate?.id);
+
     const { error: dbError } = await supabase
       .from('admin_profile')
       .update({ profile_photo_url: newPhotoUrlToSave, updated_at: new Date().toISOString() })
       .eq('id', ADMIN_PROFILE_ID);
+    
     console.log('[AdminPageLayout] DB update result - error:', dbError ? JSON.stringify(dbError, null, 2) : 'null');
+
 
     if (dbError) {
       toast({ title: "Database Error", description: `Failed to save profile photo URL: ${dbError.message}`, variant: "destructive" });
     } else {
       toast({ title: "Success", description: "Profile photo updated." });
-      setProfilePhotoUrl(newPhotoUrlToSave);
-      setCurrentDbProfilePhotoUrl(newPhotoUrlToSave);
-      setProfilePhotoPreview(newPhotoUrlToSave);
-      if (oldImageStoragePathToDelete && newPhotoUrlToSave !== currentDbProfilePhotoUrl) {
+      setProfilePhotoUrl(newPhotoUrlToSave); // Update local state for Avatar
+      setCurrentDbProfilePhotoUrl(newPhotoUrlToSave); // Update DB URL state
+      setProfilePhotoPreview(newPhotoUrlToSave); // Update preview state
+
+      // Delete the old image from storage if a new one was uploaded and it's different from the old one
+      if (oldImageStoragePathToDelete && newPhotoUrlToSave !== currentDbProfilePhotoUrl && currentDbProfilePhotoUrl) { // ensure currentDb... was not null
+          console.log("[AdminPageLayout] Attempting to delete old profile photo from storage:", oldImageStoragePathToDelete);
           const { error: storageDeleteError } = await supabase.storage.from('admin-profile-photos').remove([oldImageStoragePathToDelete]);
-           if (storageDeleteError) console.warn("[AdminPageLayout] Failed to delete old profile photo from storage:", JSON.stringify(storageDeleteError, null, 2));
+           if (storageDeleteError) {
+                console.warn("[AdminPageLayout] Failed to delete old profile photo from storage:", JSON.stringify(storageDeleteError, null, 2));
+                // Optionally inform user that old image couldn't be deleted
+           } else {
+                console.log("[AdminPageLayout] Old profile photo successfully deleted from storage.");
+           }
       }
-      await supabase.from('admin_activity_log').insert({ action_type: 'PROFILE_PHOTO_UPDATED', description: `Admin profile photo updated by ${currentUserForUpdate.email}.`, user_identifier: currentUserForUpdate.id });
+      await supabase.from('admin_activity_log').insert({ 
+          action_type: 'PROFILE_PHOTO_UPDATED', 
+          description: `Admin profile photo updated by ${currentUserForUpdate.email}.`,
+          user_identifier: currentUserForUpdate.id
+      });
     }
-    setProfilePhotoFile(null);
+    setProfilePhotoFile(null); // Clear the selected file
     setIsUploadingPhoto(false);
     setIsPhotoModalOpen(false); // Close modal on successful save
   };
 
   const handleDeleteProfilePhoto = async () => {
-    if (!currentDbProfilePhotoUrl) {
+    if (!currentDbProfilePhotoUrl) { // Check against the confirmed DB URL
       toast({ title: "No Photo", description: "No profile photo to delete.", variant: "default" });
       return;
     }
-    setIsUploadingPhoto(true);
+    setIsUploadingPhoto(true); // Use same loading state
     const {data: { user: currentUserForDelete } } = await supabase.auth.getUser();
      if (!currentUserForDelete) {
         toast({ title: "Auth Error", description: "Please log in again to remove profile photo.", variant: "destructive"});
@@ -467,13 +521,23 @@ export default function AdminPageLayout({
     let imageStoragePathToDelete: string | null = null;
     try {
         const url = new URL(currentDbProfilePhotoUrl);
-        const pathParts = url.pathname.split('/admin-profile-photos/');
-        if (pathParts.length > 1 && !pathParts[1].startsWith('http')) imageStoragePathToDelete = decodeURIComponent(pathParts[1]);
-    } catch(e) { console.warn("[AdminPageLayout] Could not parse currentDbProfilePhotoUrl for deletion (during explicit delete):", currentDbProfilePhotoUrl, e); }
+        const pathParts = url.pathname.split(`/admin-profile-photos/`);
+        if (pathParts.length > 1 && !pathParts[1].startsWith('http')) {
+            imageStoragePathToDelete = decodeURIComponent(pathParts[1]);
+        }
+    } catch(e) {
+        console.warn("[AdminPageLayout] Could not parse currentDbProfilePhotoUrl for deletion (during explicit delete):", currentDbProfilePhotoUrl, e);
+    }
 
     if (imageStoragePathToDelete) {
+      console.log("[AdminPageLayout] Attempting to delete profile photo from storage (explicit delete):", imageStoragePathToDelete);
       const { error: storageError } = await supabase.storage.from('admin-profile-photos').remove([imageStoragePathToDelete]);
-      if (storageError) console.warn("[AdminPageLayout] Error deleting profile photo from storage:", JSON.stringify(storageError, null, 2));
+      if (storageError) {
+        console.warn("[AdminPageLayout] Error deleting profile photo from storage (explicit delete):", JSON.stringify(storageError, null, 2));
+        // Do not stop here, still try to update DB
+      } else {
+         console.log("[AdminPageLayout] Profile photo successfully deleted from storage (explicit delete).");
+      }
     }
 
     const { error: dbError } = await supabase
@@ -485,11 +549,18 @@ export default function AdminPageLayout({
       toast({ title: "Database Error", description: `Failed to remove profile photo URL: ${dbError.message}`, variant: "destructive" });
     } else {
       toast({ title: "Success", description: "Profile photo removed." });
-      setProfilePhotoUrl(null); setCurrentDbProfilePhotoUrl(null); setProfilePhotoPreview(null);
-      await supabase.from('admin_activity_log').insert({ action_type: 'PROFILE_PHOTO_REMOVED', description: `Admin profile photo removed by ${currentUserForDelete.email}.`, user_identifier: currentUserForDelete.id });
+      setProfilePhotoUrl(null); 
+      setCurrentDbProfilePhotoUrl(null); 
+      setProfilePhotoPreview(null);
+      setProfilePhotoFile(null); // Clear any selected file
+      await supabase.from('admin_activity_log').insert({ 
+          action_type: 'PROFILE_PHOTO_REMOVED', 
+          description: `Admin profile photo removed by ${currentUserForDelete.email}.`,
+          user_identifier: currentUserForDelete.id
+      });
     }
-    setProfilePhotoFile(null);
     setIsUploadingPhoto(false);
+    // Keep modal open for further action or user can close it
   };
 
   const handleChangePassword = async () => {
@@ -513,17 +584,23 @@ export default function AdminPageLayout({
       setPasswordChangeError(`Failed to change password: ${error.message}`);
       toast({ title: "Password Change Failed", description: error.message, variant: "destructive" });
     } else {
-      toast({ title: "Success", description: "Password changed successfully. You may be logged out." });
+      toast({ title: "Success", description: "Password changed successfully. You may need to log in again." });
       setNewPassword(''); setConfirmPassword('');
-      await supabase.from('admin_activity_log').insert({ action_type: 'ADMIN_PASSWORD_CHANGED', description: `Admin password changed by ${currentUserForPasswordChange.email}.`, user_identifier: currentUserForPasswordChange.id });
+      await supabase.from('admin_activity_log').insert({ 
+          action_type: 'ADMIN_PASSWORD_CHANGED', 
+          description: `Admin password changed by ${currentUserForPasswordChange.email}.`,
+          user_identifier: currentUserForPasswordChange.id 
+      });
       setIsPasswordModalOpen(false); 
+      // Consider forcing logout or re-authentication for security
     }
     setIsChangingPassword(false);
   };
 
   const handleOpenPhotoModal = () => {
-    fetchAdminProfile(); 
-    setProfilePhotoFile(null); 
+    fetchAdminProfile(); // Re-fetch to ensure preview is current
+    setProfilePhotoFile(null); // Clear any stale file selection
+    // setProfilePhotoPreview(currentDbProfilePhotoUrl); // Preview is set by fetchAdminProfile
     setIsPhotoModalOpen(true);
   };
 
@@ -533,6 +610,16 @@ export default function AdminPageLayout({
     setPasswordChangeError('');
     setIsPasswordModalOpen(true);
   };
+
+  let themeIconToRender: ReactNode = <div className="h-5 w-5" />; // Placeholder
+  if (headerIsMounted) {
+    let effectiveTheme = theme;
+    if (theme === 'system') {
+      effectiveTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    }
+    themeIconToRender = effectiveTheme === 'dark' ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />;
+  }
+
 
   return (
     <>
@@ -559,12 +646,9 @@ export default function AdminPageLayout({
           </Button>
         </SheetTrigger>
         <SheetContent side="left" className="p-0 w-72 bg-sidebar border-r border-sidebar-border">
-          <SheetHeader className="p-4 border-b border-sidebar-border">
-            <SheetPrimitiveTitle className="text-sidebar-foreground">Admin Menu</SheetPrimitiveTitle>
-          </SheetHeader>
-          <SidebarContent
+           <SidebarContent
             isMobile
-            isCollapsed={false}
+            isCollapsed={false} 
             navItems={navItems}
             activeSection={activeSection}
             onSelectSection={onSelectSection}
@@ -605,7 +689,7 @@ export default function AdminPageLayout({
                           <p className="text-xs text-muted-foreground">
                             {isValidDate(parseISO(activity.timestamp)) ? format(parseISO(activity.timestamp), "MMM d, yyyy 'at' h:mm a") : "Invalid Date"}
                             {' by '}
-                            <span className="font-medium">{activity.user_identifier?.includes('@') ? activity.user_identifier.split('@')[0] : activity.user_identifier || 'System'}</span>
+                            <span className="font-medium">{activity.user_identifier?.includes('@') ? activity.user_identifier.split('@')[0] : (activity.user_identifier || 'System')}</span>
                           </p>
                           {activity.details && (<pre className="mt-1 text-xs bg-muted p-2 rounded-md overflow-x-auto">{JSON.stringify(activity.details, null, 2)}</pre>)}
                         </li>
@@ -624,7 +708,7 @@ export default function AdminPageLayout({
             </Sheet>
 
             <Button variant="ghost" size="icon" onClick={toggleTheme} aria-label="Toggle theme" className="hover:text-primary" disabled={!headerIsMounted}>
-              {currentThemeIcon}
+              {themeIconToRender}
             </Button>
 
             <DropdownMenu>
@@ -668,13 +752,13 @@ export default function AdminPageLayout({
       </div>
     </div>
 
-    {/* Profile Photo Management Modal */}
+    {/* Change Profile Picture Modal */}
     <Dialog open={isPhotoModalOpen} onOpenChange={setIsPhotoModalOpen}>
         <DialogContent className="sm:max-w-md">
             <DialogPrimitiveHeader>
                 <DialogPrimitiveDialogTitle>Change Profile Picture</DialogPrimitiveDialogTitle>
                 <DialogDescription>
-                    Upload a new photo or remove the current one.
+                    Upload a new photo or remove the current one. Image will be circular.
                 </DialogDescription>
             </DialogPrimitiveHeader>
             <ScrollArea className="max-h-[70vh] p-1 pr-2">
@@ -699,15 +783,15 @@ export default function AdminPageLayout({
                       <Button type="button" onClick={handleSaveProfilePhoto} disabled={isUploadingPhoto || (!profilePhotoFile && profilePhotoPreview === currentDbProfilePhotoUrl)} size="sm">
                           {isUploadingPhoto && profilePhotoFile ? <><UploadCloud className="mr-2 h-4 w-4 animate-pulse"/>Saving...</> : <><UploadCloud className="mr-2 h-4 w-4"/>Save Photo</>}
                       </Button>
-                      {currentDbProfilePhotoUrl && (
+                      {currentDbProfilePhotoUrl && ( // Only show remove if there's a DB photo
                           <Button type="button" variant="destructive" onClick={handleDeleteProfilePhoto} disabled={isUploadingPhoto} size="sm">
-                              {isUploadingPhoto && !profilePhotoFile ? "Removing..." : <><Trash2 className="mr-2 h-4 w-4"/>Remove Photo</>}
+                              {isUploadingPhoto && !profilePhotoFile ? "Removing..." : <><Trash2 className="mr-2 h-4 w-4"/>Remove Current Photo</>}
                           </Button>
                       )}
                   </div>
               </div>
             </ScrollArea>
-            <DialogFooter className="pt-4 border-t"> <DialogClose asChild> <Button type="button" variant="outline">Close</Button> </DialogClose> </DialogFooter>
+            <DialogFooter className="pt-4 border-t"><DialogClose asChild><Button type="button" variant="outline">Close</Button></DialogClose></DialogFooter>
         </DialogContent>
     </Dialog>
 
@@ -729,13 +813,10 @@ export default function AdminPageLayout({
           </div>
           {passwordChangeError && <p className="text-sm text-destructive">{passwordChangeError}</p>}
         </div>
-        <DialogFooter>
-          <DialogClose asChild><Button type="button" variant="outline">Cancel</Button></DialogClose>
-          <Button type="button" onClick={handleChangePassword} disabled={isChangingPassword}>
+        <DialogFooter><DialogClose asChild><Button type="button" variant="outline">Cancel</Button></DialogClose><Button type="button" onClick={handleChangePassword} disabled={isChangingPassword}>
               {isChangingPassword ? <KeyRound className="mr-2 h-4 w-4 animate-spin"/> : <KeyRound className="mr-2 h-4 w-4"/>}
               Change Password
-          </Button>
-        </DialogFooter>
+          </Button></DialogFooter>
       </DialogContent>
     </Dialog>
 
@@ -749,8 +830,15 @@ export default function AdminPageLayout({
           </AlertDialogDescription>
         </AlertDialogPrimitiveHeader>
         <AlertDialogPrimitiveFooter>
-          <AlertDialogCancel onClick={() => setShowClearLogConfirm(false)} className={cn(buttonVariants({ variant: "outline" }), "border-destructive-foreground/40 text-destructive-foreground", "hover:bg-destructive-foreground/10 hover:text-destructive-foreground hover:border-destructive-foreground/60")}>Cancel</AlertDialogCancel>
-          <AlertDialogAction onClick={handleClearActivityLog} disabled={isLoadingActivities} className={cn(buttonVariants({ variant: "default" }), "bg-destructive-foreground text-destructive", "hover:bg-destructive-foreground/90")}>
+          <AlertDialogCancel 
+            onClick={() => setShowClearLogConfirm(false)} 
+            className={cn(buttonVariants({ variant: "outline" }), "border-destructive-foreground/40 text-destructive-foreground", "hover:bg-destructive-foreground/10 hover:text-destructive-foreground hover:border-destructive-foreground/60")}
+          >Cancel</AlertDialogCancel>
+          <AlertDialogAction 
+            onClick={handleClearActivityLog} 
+            disabled={isLoadingActivities}
+            className={cn(buttonVariants({ variant: "default" }), "bg-destructive-foreground text-destructive", "hover:bg-destructive-foreground/90")}
+          >
             {isLoadingActivities ? "Clearing..." : "Clear Log"}
           </AlertDialogAction>
         </AlertDialogPrimitiveFooter>
