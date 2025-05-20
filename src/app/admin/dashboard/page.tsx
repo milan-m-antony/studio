@@ -106,7 +106,7 @@ export default function AdminDashboardPage() {
     setIsMounted(true);
     console.log("[AdminDashboardPage] Component mounted. Setting up auth listener.");
 
-    const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       console.log("[AdminDashboardPage] Auth state changed:", event, "Session user:", session?.user?.email);
       setCurrentUser(session?.user ?? null);
       setIsLoadingAuth(false); 
@@ -144,7 +144,7 @@ export default function AdminDashboardPage() {
 
     return () => {
       console.log("[AdminDashboardPage] Unmounting, unsubscribing auth listener.");
-      authListener?.unsubscribe();
+      subscription?.unsubscribe();
     };
   }, [activeSection, router]); // Added router to dependency array
 
@@ -309,27 +309,28 @@ export default function AdminDashboardPage() {
       return;
     }
     
-    // Instead of signInWithPassword, we can just check if the entered password is correct
-    // For a real production scenario, you might want to re-authenticate or use a specific "sudo" mode
-    // For this simple client-side check with Supabase Auth, this is a placeholder.
-    // A true password check before such a destructive action should be done server-side or with more robust re-auth.
-    // For now, we'll assume if they got this far, the original login was valid.
-    // This check relies on the admin password set in your environment or known to you.
-    // THIS IS A SIMPLIFIED CHECK - NOT TRUE RE-AUTHENTICATION for this demo.
-    // A better approach would be to call a dedicated Supabase function that re-authenticates.
-    // For the purpose of this prototype, we proceed directly if the modal is open.
-    // A better check would be against a temporary token or asking for OTP if MFA was setup.
-
-    // The flow is: Modal1 asks for password -> If password is correct (conceptually for now), open Modal2
-    // The actual 'danger-delete-all-data' function would be the real gatekeeper.
-    // For this client-side flow, we'll assume password entry is a sufficient gate for the *client* to proceed.
-
+    // For this client-side flow, we assume password entry is a sufficient gate for the client to proceed.
+    // The actual 'danger-delete-all-data' function (if implemented) would be the real gatekeeper.
     console.log("[AdminDashboardPage] Password confirmation modal submitted. Proceeding to countdown modal.");
+    
+    // Attempt to sign in with the entered password to verify it.
+    // This is a simplified re-authentication check for this client-side flow.
+    const { error: reauthError } = await supabase.auth.signInWithPassword({
+        email: currentUser.email, // Use the current user's email
+        password: adminPasswordConfirm,
+    });
+
+    if (reauthError) {
+        console.error("[AdminDashboardPage] Re-authentication failed:", reauthError);
+        toast({ title: "Password Incorrect", description: "The admin password entered is incorrect.", variant: "destructive"});
+        // Note: Supabase automatically signs out the user if re-authentication with a new password fails.
+        // We might need to manually sign them back in or handle the signed-out state.
+        // For simplicity here, we'll just show the error. The user might need to log in again if Supabase signed them out.
+        return;
+    }
+
+    // If re-authentication is successful (no error)
     setShowDeleteAllDataPasswordModal(false);
-    // We don't actually re-verify the password against Supabase Auth here, 
-    // as it requires user interaction and is complex for this flow without deeper re-auth.
-    // The real security is the Edge Function being protected.
-    // The password modal here serves as a strong client-side deterrent.
     setAdminPasswordConfirm(''); 
     setShowDeleteAllDataConfirmModal(true);
     setDeleteCountdown(5); 
@@ -631,6 +632,5 @@ export default function AdminDashboardPage() {
     </AdminPageLayout>
   );
 }
-
 
     
