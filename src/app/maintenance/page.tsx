@@ -57,18 +57,18 @@ export default async function MaintenancePage() {
   const message = await getMaintenanceMessage();
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen bg-gray-900 text-gray-200 p-4 text-center selection:bg-primary/70 selection:text-white">
-      <div className="max-w-lg w-full bg-gray-800 p-8 rounded-xl shadow-2xl">
+    <div className="flex flex-col items-center justify-center min-h-screen bg-background text-foreground p-4 text-center">
+      <div className="max-w-lg w-full bg-card text-card-foreground p-8 rounded-xl shadow-2xl">
         <div className="mb-6">
           <AlertTriangle className="h-20 w-20 text-primary mx-auto animate-pulse" />
         </div>
-        <h1 className="text-4xl font-bold text-gray-50 mb-4">
+        <h1 className="text-4xl font-bold text-card-foreground mb-4">
           Site Under Maintenance
         </h1>
-        <p className="text-lg text-gray-300 leading-relaxed">
+        <p className="text-lg text-card-foreground/80 leading-relaxed">
           {message}
         </p>
-        <p className="mt-8 text-sm text-gray-500">
+        <p className="mt-8 text-sm text-muted-foreground">
           We appreciate your patience and understanding.
         </p>
       </div>
