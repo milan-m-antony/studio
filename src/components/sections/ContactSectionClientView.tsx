@@ -14,6 +14,18 @@ interface ContactSectionClientViewProps {
   socialLinks: SocialLink[];
 }
 
+// Helper to get a Lucide icon component by name
+const getLucideIcon = (iconName: string | null | undefined, DefaultIcon: LucideIcon): LucideIcon => {
+  if (iconName && LucideIcons[iconName as keyof typeof LucideIcons]) {
+    const Icon = LucideIcons[iconName as keyof typeof LucideIcons] as LucideIcon;
+    if (typeof Icon === 'function') { // Check if it's a component
+      return Icon;
+    }
+  }
+  return DefaultIcon;
+};
+
+
 export default function ContactSectionClientView({ contactDetails, socialLinks }: ContactSectionClientViewProps) {
   
   const defaultContactDetails = {
@@ -52,7 +64,7 @@ export default function ContactSectionClientView({ contactDetails, socialLinks }
               <LucideIcons.Phone className="h-6 w-6 text-primary mt-1 flex-shrink-0" />
               <div>
                 <p className="font-medium text-foreground">Phone</p>
-                <Link href={currentPhoneHref} className="text-muted-foreground hover:text-primary transition-colors break-all">
+                <Link href={currentPhoneHref || '#'} className="text-muted-foreground hover:text-primary transition-colors break-all">
                   {currentPhone}
                 </Link>
               </div>
@@ -62,7 +74,7 @@ export default function ContactSectionClientView({ contactDetails, socialLinks }
               <LucideIcons.Mail className="h-6 w-6 text-primary mt-1 flex-shrink-0" />
               <div>
                 <p className="font-medium text-foreground">Email</p>
-                <Link href={currentEmailHref} className="text-muted-foreground hover:text-primary transition-colors break-all">
+                <Link href={currentEmailHref || '#'} className="text-muted-foreground hover:text-primary transition-colors break-all">
                   {currentEmail}
                 </Link>
               </div>
@@ -83,7 +95,7 @@ export default function ContactSectionClientView({ contactDetails, socialLinks }
                             alt={`${social.label} icon`} 
                             width={20}
                             height={20}
-                            className="object-contain dark:filter dark:brightness-0 dark:invert" // Keeping invert for social icons if they are dark
+                            className="object-contain" // Removed dark mode filters
                           />
                         </div>
                       ) : (
