@@ -24,9 +24,9 @@ import {
   DialogDescription,
   DialogFooter,
   DialogHeader,
-  DialogTitle,
+  // DialogTitle, // Replaced by SheetTitle for sheets
   DialogClose
-} from "@/components/ui/dialog";
+} from "@/components/ui/dialog"; // Keep DialogTitle if used for Manage Profile Photo
 import {
   AlertDialog,
   AlertDialogAction,
@@ -80,19 +80,21 @@ const SidebarContent = ({
   navItems,
   activeSection,
   onSelectSection,
-  toggleSidebarCollapse
+  onCloseMobileSheet, // New prop to close mobile sheet
+  toggleSidebarCollapse,
 }: { 
   isMobile?: boolean, 
   isCollapsed?: boolean,
   navItems: AdminNavItem[],
   activeSection: string,
   onSelectSection: (sectionKey: string) => void,
+  onCloseMobileSheet?: () => void; // New prop type
   toggleSidebarCollapse?: () => void
  }) => (
     <div className={cn("flex flex-col h-full bg-sidebar text-sidebar-foreground", isMobile ? "w-full" : "")}>
       <div className={cn(
         "border-b border-sidebar-border flex items-center h-16",
-        isCollapsed && !isMobile ? "px-4 justify-center" : "px-4 justify-between" // Ensure px-4 when collapsed
+        isCollapsed && !isMobile ? "px-4 justify-center" : "px-4 justify-between"
       )}>
         <Link
           href="/admin/dashboard"
@@ -100,12 +102,15 @@ const SidebarContent = ({
             "flex items-center", 
             isCollapsed && !isMobile ? "justify-center w-full" : ""
           )}
-          onClick={() => { onSelectSection('dashboard'); if(isMobile && (AdminPageLayout as any).setIsMobileMenuOpenState) (AdminPageLayout as any).setIsMobileMenuOpenState(false);}}
+          onClick={() => { 
+            onSelectSection('dashboard'); 
+            if (isMobile && onCloseMobileSheet) onCloseMobileSheet();
+          }}
           aria-label="Go to admin dashboard"
         >
           <div className={cn(
             "relative rounded-full overflow-hidden border border-sidebar-accent flex-shrink-0",
-            isCollapsed && !isMobile ? "h-8 w-8" : "h-10 w-10" // Logo container size adjustment
+            isCollapsed && !isMobile ? "h-8 w-8" : "h-10 w-10"
           )}>
             <NextImage
               src="/logo.png"
@@ -125,7 +130,7 @@ const SidebarContent = ({
       <ScrollArea className="flex-grow">
         <nav className={cn(
           "space-y-1", 
-          isCollapsed && !isMobile ? "px-4 py-2 flex flex-col" : "p-2" // px-4 when collapsed
+          isCollapsed && !isMobile ? "px-4 py-2 flex flex-col" : "p-2"
         )}>
           {navItems.filter(item => item.key !== 'settings').map((item) => {
             const Icon = item.icon;
@@ -140,12 +145,12 @@ const SidebarContent = ({
                     ? "bg-sidebar-primary text-sidebar-primary-foreground font-semibold"
                     : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
                   isCollapsed && !isMobile
-                    ? "justify-center py-2.5 px-0" // Remove horizontal padding for button itself
+                    ? "justify-center py-2.5 px-0" 
                     : "justify-start py-2.5 px-3"
                 )}
                 onClick={() => {
                   onSelectSection(item.key);
-                  if (isMobile && (AdminPageLayout as any).setIsMobileMenuOpenState) (AdminPageLayout as any).setIsMobileMenuOpenState(false);
+                  if (isMobile && onCloseMobileSheet) onCloseMobileSheet();
                 }}
                 title={isCollapsed && !isMobile ? item.label : undefined} 
               >
@@ -165,7 +170,7 @@ const SidebarContent = ({
       
       <div className={cn(
           "mt-auto border-t border-sidebar-border",
-          isCollapsed && !isMobile ? "px-4 py-2 flex flex-col" : "p-2" // px-4 when collapsed
+          isCollapsed && !isMobile ? "px-4 py-2 flex flex-col" : "p-2"
       )}>
         {navItems.find(item => item.key === 'settings') && (() => {
           const settingsItem = navItems.find(item => item.key === 'settings')!;
@@ -180,12 +185,12 @@ const SidebarContent = ({
                   ? "bg-sidebar-primary text-sidebar-primary-foreground font-semibold"
                   : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
                 isCollapsed && !isMobile
-                  ? "justify-center py-2.5 px-0" // Remove horizontal padding for button itself
+                  ? "justify-center py-2.5 px-0"
                   : "justify-start py-2.5 px-3"
               )}
               onClick={() => {
                 onSelectSection(settingsItem.key);
-                if (isMobile && (AdminPageLayout as any).setIsMobileMenuOpenState) (AdminPageLayout as any).setIsMobileMenuOpenState(false);
+                if (isMobile && onCloseMobileSheet) onCloseMobileSheet();
               }}
               title={isCollapsed && !isMobile ? settingsItem.label : undefined}
             >
@@ -206,8 +211,6 @@ const SidebarContent = ({
     </div>
   );
 
-(AdminPageLayout as any).setIsMobileMenuOpenState = () => {};
-
 
 export default function AdminPageLayout({
   navItems,
@@ -220,8 +223,7 @@ export default function AdminPageLayout({
 }: AdminPageLayoutProps) {
   const { theme, setTheme } = useTheme();
   const [isMobileMenuOpenState, setIsMobileMenuOpenStateInternal] = useState(false);
-  (AdminPageLayout as any).setIsMobileMenuOpenState = setIsMobileMenuOpenStateInternal;
-
+  
   const [headerIsMounted, setHeaderIsMounted] = useState(false);
 
   const [profilePhotoUrl, setProfilePhotoUrl] = useState<string | null>(null);
@@ -476,7 +478,7 @@ export default function AdminPageLayout({
 
   return (
     <>
-    <div className="flex h-screen bg-sidebar text-sidebar-foreground"> {/* Changed parent background to sidebar */}
+    <div className="flex h-screen bg-sidebar text-sidebar-foreground">
       <aside className={cn(
         "hidden md:flex md:flex-shrink-0 transition-all duration-300 ease-in-out",
         isSidebarCollapsed ? "w-20" : "w-64"
@@ -488,6 +490,7 @@ export default function AdminPageLayout({
             activeSection={activeSection}
             onSelectSection={onSelectSection}
             toggleSidebarCollapse={toggleSidebarCollapse}
+            onCloseMobileSheet={() => setIsMobileMenuOpenStateInternal(false)}
          />
       </aside>
 
@@ -498,23 +501,27 @@ export default function AdminPageLayout({
           </Button>
         </SheetTrigger>
         <SheetContent side="left" className="p-0 w-72 bg-sidebar border-r border-sidebar-border">
+          <SheetHeader className="p-4 border-b"> {/* Added SheetHeader for mobile */}
+            <SheetTitle>Admin Menu</SheetTitle> {/* Added SheetTitle for mobile */}
+          </SheetHeader>
           <SidebarContent 
             isMobile 
             isCollapsed={false}
             navItems={navItems}
             activeSection={activeSection}
             onSelectSection={onSelectSection}
+            onCloseMobileSheet={() => setIsMobileMenuOpenStateInternal(false)}
           />
         </SheetContent>
       </Sheet>
 
       <div className={cn(
         "flex flex-col flex-1 overflow-hidden transition-all duration-300 ease-in-out min-w-0",
-        "bg-sidebar text-sidebar-foreground" // Apply sidebar background to main content area as well
+        "bg-sidebar text-sidebar-foreground" 
       )}>
         <header className="sticky top-0 z-40 flex h-16 items-center justify-between border-b border-border bg-card px-4 md:px-6 shrink-0">
           <div className="md:hidden">
-            {/* Spacer for mobile menu trigger, or put trigger here if preferred */}
+            {/* Spacer for mobile menu trigger */}
           </div> 
           <h1 className="text-xl font-semibold text-foreground">{pageTitle}</h1>
           <div className="flex items-center gap-3">
@@ -702,6 +709,5 @@ export default function AdminPageLayout({
     </>
   );
 }
-
 
     
