@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useEffect, useState, type FormEvent } from 'react';
+import React, { useEffect, useState, type FormEvent, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -13,13 +13,24 @@ import { Switch } from "@/components/ui/switch";
 import { 
   ShieldCheck, LogOut, AlertTriangle, LogIn, Home as HomeIcon, Users, Briefcase, 
   Wrench, MapPin as JourneyIcon, Award, FileText as ResumeIcon, Mail, 
-  Settings as SettingsIcon, LayoutDashboard, Gavel as LegalIcon, Loader2 
+  Settings as SettingsIcon, LayoutDashboard, Gavel as LegalIcon, Loader2, Save, Trash2 
 } from 'lucide-react';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/lib/supabaseClient'; 
 import type { SiteSettings } from '@/types/supabase';
 import { useToast } from "@/hooks/use-toast";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle as AlertDialogPrimitiveTitle,
+} from "@/components/ui/alert-dialog";
+
 
 // Import Admin Managers
 import HeroManager from '@/components/admin/HeroManager';
@@ -33,7 +44,9 @@ import ContactManager from '@/components/admin/ContactManager';
 import LegalManager from '@/components/admin/LegalManager';
 import AdminPageLayout, { type AdminNavItem } from '@/components/admin/AdminPageLayout';
 
-const ADMIN_SITE_SETTINGS_ID = 'global_settings'; // Fixed ID for site_settings row
+const ADMIN_SITE_SETTINGS_ID = 'global_settings'; 
+const ADMIN_DASHBOARD_FIXED_ID_FOR_DELETION_CONFIRM = '00000000-0000-0000-0000-DANGERDELETEALL';
+
 
 const adminNavItems: AdminNavItem[] = [
   { key: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -77,21 +90,30 @@ export default function AdminDashboardPage() {
   const [error, setError] = useState('');
   const [activeSection, setActiveSection] = useState('dashboard');
 
-  // State for Site Settings / Maintenance Mode
+  // State for Site Settings
   const [isMaintenanceMode, setIsMaintenanceMode] = useState(false);
   const [isLoadingSettings, setIsLoadingSettings] = useState(false);
   const [maintenanceMessageInput, setMaintenanceMessageInput] = useState('');
+
+  // State for "Delete All Data" feature
+  const [showDeleteAllDataPasswordModal, setShowDeleteAllDataPasswordModal] = useState(false);
+  const [showDeleteAllDataConfirmModal, setShowDeleteAllDataConfirmModal] = useState(false);
+  const [adminPasswordConfirm, setAdminPasswordConfirm] = useState('');
+  const [deleteCountdown, setDeleteCountdown] = useState(5);
+  const [isDeletingAllData, setIsDeletingAllData] = useState(false);
+  const deleteCountdownIntervalRef = React.useRef<NodeJS.Timeout | null>(null);
+
 
   useEffect(() => {
     setIsMounted(true);
     if (typeof window !== 'undefined') {
       const authStatus = localStorage.getItem('isAdminAuthenticated') === 'true';
       setIsAuthenticatedForRender(authStatus);
-      if (authStatus && activeSection === 'settings') { // Also fetch if settings tab is active
+      if (authStatus && activeSection === 'settings') { 
         fetchSiteSettings();
       }
     }
-  }, [activeSection]); // Re-check auth and fetch settings if activeSection changes
+  }, [activeSection]); 
 
   const fetchSiteSettings = async () => {
     setIsLoadingSettings(true);
@@ -124,11 +146,15 @@ export default function AdminDashboardPage() {
     } else {
       setIsMaintenanceMode(checked);
       toast({ title: "Success", description: `Maintenance mode ${checked ? 'enabled' : 'disabled'}.` });
-      await supabase.from('admin_activity_log').insert({
-        action_type: checked ? 'MAINTENANCE_MODE_ENABLED' : 'MAINTENANCE_MODE_DISABLED',
-        description: `Admin ${checked ? 'enabled' : 'disabled'} site maintenance mode.`,
-        user_identifier: process.env.NEXT_PUBLIC_ADMIN_USERNAME || 'admin'
-      });
+      try {
+        await supabase.from('admin_activity_log').insert({
+            action_type: checked ? 'MAINTENANCE_MODE_ENABLED' : 'MAINTENANCE_MODE_DISABLED',
+            description: `Admin ${checked ? 'enabled' : 'disabled'} site maintenance mode.`,
+            user_identifier: process.env.NEXT_PUBLIC_ADMIN_USERNAME || 'admin'
+        });
+      } catch (logError) {
+          console.error("Error logging maintenance mode toggle:", logError);
+      }
     }
     setIsLoadingSettings(false);
   };
@@ -145,15 +171,18 @@ export default function AdminDashboardPage() {
       toast({ title: "Error", description: "Failed to save maintenance message.", variant: "destructive" });
     } else {
       toast({ title: "Success", description: "Maintenance message saved." });
-      await supabase.from('admin_activity_log').insert({
-        action_type: 'MAINTENANCE_MESSAGE_UPDATED',
-        description: `Admin updated the site maintenance message.`,
-        user_identifier: process.env.NEXT_PUBLIC_ADMIN_USERNAME || 'admin'
-      });
+       try {
+        await supabase.from('admin_activity_log').insert({
+            action_type: 'MAINTENANCE_MESSAGE_UPDATED',
+            description: `Admin updated the site maintenance message.`,
+            user_identifier: process.env.NEXT_PUBLIC_ADMIN_USERNAME || 'admin'
+        });
+      } catch (logError) {
+          console.error("Error logging maintenance message update:", logError);
+      }
     }
     setIsLoadingSettings(false);
   };
-
 
   const handleLoginSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -164,24 +193,24 @@ export default function AdminDashboardPage() {
     const expectedUsername = process.env.NEXT_PUBLIC_ADMIN_USERNAME;
     const expectedPassword = process.env.NEXT_PUBLIC_ADMIN_PASSWORD;
     
-    console.log("[Admin Login] Attempting login...");
-    console.log("[Admin Login] Entered Username:", `"${trimmedUsername}"`);
-    console.log("[Admin Login] Expected Username from env:", `"${expectedUsername}"`);
+    console.log("[AdminDashboardPage] Attempting login...");
+    console.log("[AdminDashboardPage] Entered Username:", `"${trimmedUsername}"`);
+    console.log("[AdminDashboardPage] Expected Username from env:", `"${expectedUsername}"`);
 
     const usernameMatch = trimmedUsername === expectedUsername;
     const passwordMatch = trimmedPassword === expectedPassword;
 
-    console.log("[Admin Login] Username match status:", usernameMatch);
-    console.log("[Admin Login] Password match status (not logging actual passwords):", passwordMatch);
+    console.log("[AdminDashboardPage] Username match status:", usernameMatch);
+    console.log("[AdminDashboardPage] Password match status (not logging actual passwords):", passwordMatch);
 
 
     if (usernameMatch && passwordMatch) {
       if (typeof window !== 'undefined') {
         localStorage.setItem('isAdminAuthenticated', 'true');
-        window.dispatchEvent(new CustomEvent('authChange')); // For header link
+        window.dispatchEvent(new CustomEvent('authChange')); 
       }
       setIsAuthenticatedForRender(true);
-      console.log("[Admin Login] Login successful.");
+      console.log("[AdminDashboardPage] Login successful.");
       toast({ title: "Login Successful", description: "Welcome to the admin dashboard." });
       try {
         await supabase.from('admin_activity_log').insert({ 
@@ -192,19 +221,20 @@ export default function AdminDashboardPage() {
       } catch (logError) {
         console.error("Error logging admin login:", logError);
       }
+      router.replace('/admin/dashboard'); // Force re-evaluation of the route
     } else {
       setError("Invalid username or password.");
-      console.log("[Admin Login] Login failed.");
+      console.log("[AdminDashboardPage] Login failed.");
       toast({ title: "Login Failed", description: "Invalid username or password.", variant: "destructive" });
       setIsAuthenticatedForRender(false);
     }
   };
 
   const handleLogout = async () => {
-    const adminUsername = process.env.NEXT_PUBLIC_ADMIN_USERNAME || "Admin";
+    const adminUsernameForLog = process.env.NEXT_PUBLIC_ADMIN_USERNAME || "Admin";
     if (typeof window !== 'undefined') {
       localStorage.removeItem('isAdminAuthenticated');
-      window.dispatchEvent(new CustomEvent('authChange')); // For header link
+      window.dispatchEvent(new CustomEvent('authChange')); 
     }
     setIsAuthenticatedForRender(false);
     setUsername('');
@@ -214,14 +244,87 @@ export default function AdminDashboardPage() {
     try {
       await supabase.from('admin_activity_log').insert({ 
           action_type: 'ADMIN_LOGOUT', 
-          description: `Admin "${adminUsername}" logged out.`,
-          user_identifier: adminUsername
+          description: `Admin "${adminUsernameForLog}" logged out.`,
+          user_identifier: adminUsernameForLog
         });
     } catch (logError) {
       console.error("Error logging admin logout:", logError);
     }
     router.push('/admin/dashboard'); 
   };
+
+  // ---- Delete All Data Logic ----
+  const handleInitiateDeleteAllData = () => {
+    setAdminPasswordConfirm('');
+    setShowDeleteAllDataPasswordModal(true);
+  };
+
+  const handlePasswordConfirmForDelete = () => {
+    if (adminPasswordConfirm.trim() === process.env.NEXT_PUBLIC_ADMIN_PASSWORD) {
+      setShowDeleteAllDataPasswordModal(false);
+      setAdminPasswordConfirm('');
+      setShowDeleteAllDataConfirmModal(true);
+      setDeleteCountdown(5); // Reset countdown
+      if (deleteCountdownIntervalRef.current) clearInterval(deleteCountdownIntervalRef.current);
+      deleteCountdownIntervalRef.current = setInterval(() => {
+        setDeleteCountdown(prev => {
+          if (prev <= 1) {
+            if (deleteCountdownIntervalRef.current) clearInterval(deleteCountdownIntervalRef.current);
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    } else {
+      toast({ title: "Incorrect Password", description: "Admin password confirmation failed.", variant: "destructive"});
+    }
+  };
+
+  const handleFinalDeleteAllData = async () => {
+    if (deleteCountdown > 0) {
+      toast({ title: "Cannot Delete Yet", description: "Please wait for the countdown to finish.", variant: "default"});
+      return;
+    }
+    setIsDeletingAllData(true);
+    toast({ title: "Processing Deletion", description: "Attempting to delete all portfolio data..."});
+
+    try {
+      const { error: functionError } = await supabase.functions.invoke('danger-delete-all-data', {
+        // No body needed if function is designed to delete all without specific params
+      });
+
+      if (functionError) {
+        throw functionError;
+      }
+
+      toast({ title: "Success", description: "All portfolio data deletion process initiated successfully. Data will be cleared from tables. Storage files are not affected by this operation.", duration: 7000 });
+      // Log this critical action
+      await supabase.from('admin_activity_log').insert({
+        action_type: 'DATA_DELETION_INITIATED',
+        description: 'Admin initiated deletion of all portfolio data.',
+        user_identifier: process.env.NEXT_PUBLIC_ADMIN_USERNAME || 'admin'
+      });
+      // Refresh all managers by forcing a full page reload or navigating away and back
+      // For simplicity, we might just refresh the dashboard to show empty sections
+      setActiveSection('dashboard'); // Navigate to overview
+      router.refresh(); // This will re-fetch data for all components on the page
+    } catch (err: any) {
+      console.error("Error invoking delete-all-data function:", err);
+      toast({ title: "Deletion Failed", description: err.message || "Failed to initiate data deletion. Check Edge Function logs.", variant: "destructive" });
+    } finally {
+      setIsDeletingAllData(false);
+      setShowDeleteAllDataConfirmModal(false);
+    }
+  };
+
+  useEffect(() => {
+    return () => {
+      if (deleteCountdownIntervalRef.current) {
+        clearInterval(deleteCountdownIntervalRef.current);
+      }
+    };
+  }, []);
+
 
   if (!isMounted) {
     return (
@@ -258,9 +361,13 @@ export default function AdminDashboardPage() {
             </form>
           </CardContent>
            <CardFooter className="mt-6 flex flex-col items-center space-y-2">
-             <Link href="/" className={cn(buttonVariants({ variant: "link" }), "text-muted-foreground hover:text-primary p-0 h-auto")}>
-                <HomeIcon className="mr-2 h-4 w-4 inline-block" />Back to Portfolio
-             </Link>
+             <Button variant="link" className="text-muted-foreground hover:text-primary p-0 h-auto" asChild>
+                <Link href="/">
+                    <span>
+                        <HomeIcon className="mr-2 h-4 w-4 inline-block" />Back to Portfolio
+                    </span>
+                </Link>
+             </Button>
           </CardFooter>
         </Card>
       </div>
@@ -287,69 +394,167 @@ export default function AdminDashboardPage() {
       {activeSection === 'contact' && <ContactManager />}
       {activeSection === 'legal' && <LegalManager />} 
       {activeSection === 'settings' && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Site Settings</CardTitle>
-            <CardDescription>Manage global site settings and configurations.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-8">
-            <Card className="shadow-md">
+        <div className="space-y-8">
+            <Card>
               <CardHeader>
-                <CardTitle className="text-xl">Site Availability</CardTitle>
-                <CardDescription>Control whether your site is live or in maintenance mode.</CardDescription>
+                <CardTitle>Site Settings</CardTitle>
+                <CardDescription>Manage global site settings and configurations.</CardDescription>
               </CardHeader>
-              <CardContent>
-                <div className="flex items-center justify-between p-4 border rounded-lg shadow-sm bg-card-foreground/5 dark:bg-card-foreground/10">
-                  <div>
-                    <Label htmlFor="maintenance-mode-switch" className="font-semibold text-lg cursor-pointer">
-                      Maintenance Mode
-                    </Label>
-                    <p className="text-sm text-muted-foreground max-w-md">
-                      When enabled, visitors will see a maintenance page.
-                      You can still access the admin dashboard.
+              <CardContent className="space-y-8">
+                <Card className="shadow-md">
+                  <CardHeader>
+                    <CardTitle className="text-xl">Site Availability</CardTitle>
+                    <CardDescription>Control whether your site is live or in maintenance mode.</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="flex items-center justify-between p-4 border rounded-lg shadow-sm bg-card-foreground/5 dark:bg-card-foreground/10">
+                      <div>
+                        <Label htmlFor="maintenance-mode-switch" className="font-semibold text-lg cursor-pointer">
+                          Maintenance Mode
+                        </Label>
+                        <p className="text-sm text-muted-foreground max-w-md">
+                          When enabled, visitors will see a maintenance page.
+                          You can still access the admin dashboard.
+                        </p>
+                      </div>
+                      {isLoadingSettings ? (
+                        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                      ) : (
+                        <Switch
+                          id="maintenance-mode-switch"
+                          checked={isMaintenanceMode}
+                          onCheckedChange={handleToggleMaintenanceMode}
+                          aria-label="Toggle maintenance mode"
+                          className="data-[state=checked]:bg-destructive data-[state=unchecked]:bg-muted"
+                        />
+                      )}
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-3">
+                      {isMaintenanceMode 
+                        ? "Site is currently IN MAINTENANCE MODE. Only admins may see full content." 
+                        : "Site is currently LIVE and accessible to all visitors."}
                     </p>
-                  </div>
-                  {isLoadingSettings ? (
-                    <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-                  ) : (
-                    <Switch
-                      id="maintenance-mode-switch"
-                      checked={isMaintenanceMode}
-                      onCheckedChange={handleToggleMaintenanceMode}
-                      aria-label="Toggle maintenance mode"
-                      className="data-[state=checked]:bg-destructive data-[state=unchecked]:bg-muted"
-                    />
-                  )}
-                </div>
-                <p className="text-xs text-muted-foreground mt-3">
-                  {isMaintenanceMode 
-                    ? "Site is currently IN MAINTENANCE MODE. Only admins may see full content." 
-                    : "Site is currently LIVE and accessible to all visitors."}
-                </p>
-                 
-                 <div className="mt-6 pt-6 border-t">
-                    <Label htmlFor="maintenanceMessage" className="font-semibold text-lg block mb-2">Maintenance Page Message</Label>
-                    <Textarea 
-                        id="maintenanceMessage"
-                        value={maintenanceMessageInput}
-                        onChange={(e) => setMaintenanceMessageInput(e.target.value)}
-                        placeholder="Our site is currently undergoing scheduled maintenance. We expect to be back online shortly. Thank you for your patience!"
-                        rows={4}
-                        className="mb-2"
-                        disabled={isLoadingSettings}
-                    />
-                    <Button onClick={handleSaveMaintenanceMessage} disabled={isLoadingSettings}>
-                        {isLoadingSettings ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                        Save Message
-                    </Button>
-                 </div>
+                    
+                    <div className="mt-6 pt-6 border-t">
+                        <Label htmlFor="maintenanceMessage" className="font-semibold text-lg block mb-2">Maintenance Page Message</Label>
+                        <Textarea 
+                            id="maintenanceMessage"
+                            value={maintenanceMessageInput}
+                            onChange={(e) => setMaintenanceMessageInput(e.target.value)}
+                            placeholder="Our site is currently undergoing scheduled maintenance. We expect to be back online shortly. Thank you for your patience!"
+                            rows={4}
+                            className="mb-2"
+                            disabled={isLoadingSettings}
+                        />
+                        <Button onClick={handleSaveMaintenanceMessage} disabled={isLoadingSettings} size="sm">
+                            {isLoadingSettings ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4"/>}
+                            Save Message
+                        </Button>
+                    </div>
+                  </CardContent>
+                </Card>
               </CardContent>
             </Card>
-            {/* Add other settings sections/cards here as needed */}
-          </CardContent>
-        </Card>
+
+            {/* Danger Zone Card */}
+            <Card className="border-destructive shadow-lg">
+                <CardHeader>
+                    <CardTitle className="text-destructive flex items-center gap-2"><AlertTriangle className="h-6 w-6"/>Danger Zone</CardTitle>
+                    <CardDescription className="text-destructive/80">These actions are irreversible and can lead to data loss.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <div className="space-y-4">
+                        <div>
+                            <h4 className="font-semibold text-lg text-destructive">Delete All Portfolio Data</h4>
+                            <p className="text-sm text-destructive/80 mb-3">
+                                This will attempt to delete all content from your portfolio tables (projects, skills, about, resume, etc.) via a Supabase Edge Function. 
+                                This does **not** delete storage files (images, PDFs) or core settings like your admin credentials. This action is irreversible.
+                            </p>
+                            <Button variant="destructive" onClick={handleInitiateDeleteAllData} disabled={isDeletingAllData}>
+                                {isDeletingAllData ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
+                                Delete All Portfolio Data
+                            </Button>
+                        </div>
+                        {/* Add other destructive actions here if needed */}
+                    </div>
+                </CardContent>
+            </Card>
+        </div>
       )}
+
+      {/* Delete All Data - Password Confirmation Modal */}
+      <AlertDialog open={showDeleteAllDataPasswordModal} onOpenChange={setShowDeleteAllDataPasswordModal}>
+        <AlertDialogContent className="bg-destructive border-destructive text-destructive-foreground">
+          <AlertDialogHeader>
+            <AlertDialogPrimitiveTitle className="text-destructive-foreground">Confirm Admin Password</AlertDialogPrimitiveTitle>
+            <AlertDialogDescription className="text-destructive-foreground/90">
+              To proceed with deleting all portfolio data, please re-enter your admin password. This is a critical action.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="py-4">
+            <Label htmlFor="adminPasswordConfirmDelete" className="text-destructive-foreground/90">Admin Password</Label>
+            <Input 
+              id="adminPasswordConfirmDelete" 
+              type="password" 
+              value={adminPasswordConfirm}
+              onChange={(e) => setAdminPasswordConfirm(e.target.value)}
+              className="bg-destructive-foreground/10 border-destructive-foreground/30 text-destructive-foreground placeholder:text-destructive-foreground/50 focus:ring-destructive-foreground"
+              placeholder="Enter your admin password"
+            />
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel 
+              onClick={() => setShowDeleteAllDataPasswordModal(false)}
+              className={cn(buttonVariants({ variant: "outline" }), "border-destructive-foreground/40 text-destructive-foreground", "hover:bg-destructive-foreground/10 hover:text-destructive-foreground hover:border-destructive-foreground/60")}
+            >Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handlePasswordConfirmForDelete}
+              className={cn(buttonVariants({ variant: "default" }), "bg-destructive-foreground text-destructive", "hover:bg-destructive-foreground/90")}
+            >Proceed</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Delete All Data - Final Confirmation Modal with Countdown */}
+      <AlertDialog open={showDeleteAllDataConfirmModal} onOpenChange={setShowDeleteAllDataConfirmModal}>
+        <AlertDialogContent className="bg-destructive border-destructive text-destructive-foreground">
+          <AlertDialogHeader>
+            <AlertDialogPrimitiveTitle className="text-destructive-foreground">FINAL CONFIRMATION: DELETE ALL PORTFOLIO DATA?</AlertDialogPrimitiveTitle>
+            <AlertDialogDescription className="text-destructive-foreground/90">
+              This action is **IRREVERSIBLE** and will delete all content from your portfolio database tables. 
+              Storage files (images, PDFs) will NOT be deleted by this action.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="py-4 text-center">
+            <p className="text-lg text-destructive-foreground/90">
+              Button will be enabled in <span className="font-bold text-xl">{deleteCountdown}</span> second{deleteCountdown !== 1 ? 's' : ''}.
+            </p>
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel 
+              onClick={() => {
+                setShowDeleteAllDataConfirmModal(false);
+                if (deleteCountdownIntervalRef.current) clearInterval(deleteCountdownIntervalRef.current);
+              }}
+              className={cn(buttonVariants({ variant: "outline" }), "border-destructive-foreground/40 text-destructive-foreground", "hover:bg-destructive-foreground/10 hover:text-destructive-foreground hover:border-destructive-foreground/60")}
+            >Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleFinalDeleteAllData} 
+              disabled={deleteCountdown > 0 || isDeletingAllData}
+              className={cn(
+                buttonVariants({ variant: "default" }), 
+                "bg-destructive-foreground text-destructive", 
+                "hover:bg-destructive-foreground/90",
+                (deleteCountdown > 0 || isDeletingAllData) && "opacity-50 cursor-not-allowed"
+              )}
+            >
+              {isDeletingAllData ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+              Confirm Deletion
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
     </AdminPageLayout>
   );
 }
-
