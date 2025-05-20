@@ -6,10 +6,10 @@ import { useRouter } from 'next/navigation';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea'; // Added for maintenance message
+import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Switch } from "@/components/ui/switch"; // Added Switch component
+import { Switch } from "@/components/ui/switch";
 import { 
   ShieldCheck, LogOut, AlertTriangle, LogIn, Home as HomeIcon, Users, Briefcase, 
   Wrench, MapPin as JourneyIcon, Award, FileText as ResumeIcon, Mail, 
@@ -18,7 +18,8 @@ import {
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/lib/supabaseClient'; 
-import type { SiteSettings } from '@/types/supabase'; // Added SiteSettings type
+import type { SiteSettings } from '@/types/supabase';
+import { useToast } from "@/hooks/use-toast"; // Import useToast
 
 // Import Admin Managers
 import HeroManager from '@/components/admin/HeroManager';
@@ -68,6 +69,7 @@ const DashboardOverview = () => (
 
 export default function AdminDashboardPage() {
   const router = useRouter();
+  const { toast } = useToast(); // Initialize useToast
   const [isMounted, setIsMounted] = useState(false);
   const [isAuthenticatedForRender, setIsAuthenticatedForRender] = useState(false);
   const [username, setUsername] = useState('');
@@ -101,7 +103,7 @@ export default function AdminDashboardPage() {
 
     if (error) {
       console.error("Error fetching site settings:", error);
-      // toast({ title: "Error", description: "Could not load site settings.", variant: "destructive" });
+      toast({ title: "Error", description: "Could not load site settings.", variant: "destructive" });
     } else if (data) {
       setIsMaintenanceMode(data.is_maintenance_mode_enabled);
       setMaintenanceMessageInput(data.maintenance_message || '');
@@ -118,10 +120,10 @@ export default function AdminDashboardPage() {
 
     if (error) {
       console.error("Error updating maintenance mode:", error);
-      // toast({ title: "Error", description: "Failed to update maintenance mode.", variant: "destructive" });
+      toast({ title: "Error", description: "Failed to update maintenance mode.", variant: "destructive" });
     } else {
       setIsMaintenanceMode(checked);
-      // toast({ title: "Success", description: `Maintenance mode ${checked ? 'enabled' : 'disabled'}.` });
+      toast({ title: "Success", description: `Maintenance mode ${checked ? 'enabled' : 'disabled'}.` });
       // Log activity
       await supabase.from('admin_activity_log').insert({
         action_type: checked ? 'MAINTENANCE_MODE_ENABLED' : 'MAINTENANCE_MODE_DISABLED',
@@ -132,8 +134,27 @@ export default function AdminDashboardPage() {
     setIsLoadingSettings(false);
   };
   
-  // Handler for saving maintenance message (optional future feature)
-  // const handleSaveMaintenanceMessage = async () => { /* ... */ };
+  const handleSaveMaintenanceMessage = async () => {
+    setIsLoadingSettings(true);
+    const { error } = await supabase
+      .from('site_settings')
+      .update({ maintenance_message: maintenanceMessageInput, updated_at: new Date().toISOString() })
+      .eq('id', ADMIN_SITE_SETTINGS_ID);
+
+    if (error) {
+      console.error("Error saving maintenance message:", error);
+      toast({ title: "Error", description: "Failed to save maintenance message.", variant: "destructive" });
+    } else {
+      toast({ title: "Success", description: "Maintenance message saved." });
+      // Log activity
+      await supabase.from('admin_activity_log').insert({
+        action_type: 'MAINTENANCE_MESSAGE_UPDATED',
+        description: `Admin updated the site maintenance message.`,
+        user_identifier: process.env.NEXT_PUBLIC_ADMIN_USERNAME || 'admin'
+      });
+    }
+    setIsLoadingSettings(false);
+  };
 
 
   const handleLoginSubmit = async (e: FormEvent) => {
@@ -142,44 +163,31 @@ export default function AdminDashboardPage() {
     const trimmedUsername = username.trim();
     const trimmedPassword = password.trim();
 
-    console.log("[Admin Login] Attempting login...");
-    console.log("[Admin Login] Entered Username:", `"${trimmedUsername}"`);
-
     const expectedUsername = process.env.NEXT_PUBLIC_ADMIN_USERNAME;
     const expectedPassword = process.env.NEXT_PUBLIC_ADMIN_PASSWORD;
     
-    console.log("[Admin Login] Expected Username from env:", `"${expectedUsername}"`);
-
     const usernameMatch = trimmedUsername === expectedUsername;
     const passwordMatch = trimmedPassword === expectedPassword;
 
-    console.log("[Admin Login] Username match status:", usernameMatch);
-    console.log("[Admin Login] Password match status (not logging actual passwords):", passwordMatch);
-
-
     if (usernameMatch && passwordMatch) {
-      console.log("[Admin Login] Login successful.");
       if (typeof window !== 'undefined') {
         localStorage.setItem('isAdminAuthenticated', 'true');
         window.dispatchEvent(new CustomEvent('authChange'));
       }
       setIsAuthenticatedForRender(true);
+      toast({ title: "Login Successful", description: "Welcome to the admin dashboard." });
       try {
-        const { error: logError } = await supabase
-          .from('admin_activity_log')
-          .insert({ 
+        await supabase.from('admin_activity_log').insert({ 
             action_type: 'ADMIN_LOGIN_SUCCESS', 
             description: `Admin "${trimmedUsername}" logged in successfully.`,
             user_identifier: trimmedUsername
           });
-        if (logError) console.error("Error logging admin login:", logError);
-      } catch (e) {
-        console.error("Exception during admin login logging:", e);
+      } catch (logError) {
+        console.error("Error logging admin login:", logError);
       }
-
     } else {
-      console.log("[Admin Login] Login failed.");
       setError("Invalid username or password.");
+      toast({ title: "Login Failed", description: "Invalid username or password.", variant: "destructive" });
       setIsAuthenticatedForRender(false);
     }
   };
@@ -194,17 +202,15 @@ export default function AdminDashboardPage() {
     setUsername('');
     setPassword('');
     setActiveSection('dashboard'); 
+    toast({ title: "Logged Out", description: "You have been successfully logged out." });
     try {
-      const { error: logError } = await supabase
-        .from('admin_activity_log')
-        .insert({ 
+      await supabase.from('admin_activity_log').insert({ 
           action_type: 'ADMIN_LOGOUT', 
           description: `Admin "${adminUsername}" logged out.`,
           user_identifier: adminUsername
         });
-      if (logError) console.error("Error logging admin logout:", logError);
-    } catch (e) {
-      console.error("Exception during admin logout logging:", e);
+    } catch (logError) {
+      console.error("Error logging admin logout:", logError);
     }
     router.push('/admin/dashboard'); 
   };
@@ -279,7 +285,6 @@ export default function AdminDashboardPage() {
             <CardDescription>Manage global site settings and configurations.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-8">
-            {/* Site Availability / Maintenance Mode Card */}
             <Card className="shadow-md">
               <CardHeader>
                 <CardTitle className="text-xl">Site Availability</CardTitle>
@@ -292,7 +297,7 @@ export default function AdminDashboardPage() {
                       Maintenance Mode
                     </Label>
                     <p className="text-sm text-muted-foreground max-w-md">
-                      When enabled, visitors (excluding logged-in admins, ideally) will see a maintenance page.
+                      When enabled, visitors will see a maintenance page.
                       You can still access the admin dashboard.
                     </p>
                   </div>
@@ -310,11 +315,10 @@ export default function AdminDashboardPage() {
                 </div>
                 <p className="text-xs text-muted-foreground mt-3">
                   {isMaintenanceMode 
-                    ? "Site is currently in maintenance mode. Only admins may see full content." 
-                    : "Site is currently live and accessible to all visitors."}
+                    ? "Site is currently IN MAINTENANCE MODE. Only admins may see full content." 
+                    : "Site is currently LIVE and accessible to all visitors."}
                 </p>
-                 {/* Placeholder for editing maintenance message - could be another Card or section here */}
-                 {/* 
+                 
                  <div className="mt-6 pt-6 border-t">
                     <Label htmlFor="maintenanceMessage" className="font-semibold text-lg block mb-2">Maintenance Page Message</Label>
                     <Textarea 
@@ -324,13 +328,13 @@ export default function AdminDashboardPage() {
                         placeholder="Our site is currently undergoing scheduled maintenance. We expect to be back online shortly. Thank you for your patience!"
                         rows={4}
                         className="mb-2"
+                        disabled={isLoadingSettings}
                     />
                     <Button onClick={handleSaveMaintenanceMessage} disabled={isLoadingSettings}>
                         {isLoadingSettings ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                         Save Message
                     </Button>
                  </div>
-                 */}
               </CardContent>
             </Card>
             {/* Add other settings sections/cards here as needed */}
@@ -340,6 +344,3 @@ export default function AdminDashboardPage() {
     </AdminPageLayout>
   );
 }
-
-
-    
