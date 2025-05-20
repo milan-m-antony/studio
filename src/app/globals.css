@@ -125,7 +125,7 @@ body {
   animation: fadeIn 0.8s ease-out forwards;
 }
 
-/* New animation for preloader numbers */
+/* Animation for preloader numbers: zoom in big, then shrink out */
 @keyframes zoomInOutNumber {
   0% {
     transform: scale(0.5);
@@ -143,6 +143,25 @@ body {
 
 .animate-zoomInOutNumber {
   animation: zoomInOutNumber ease-in-out forwards; /* Duration set by inline style */
+}
+
+/* Animations for block reveal effect */
+@keyframes coverScreenFromBottom {
+  from { height: 0%; bottom: 0; top: auto; }
+  to { height: 100%; bottom: 0; top: auto; }
+}
+
+@keyframes uncoverScreenToTop {
+  from { height: 100%; top: 0; bottom: auto; }
+  to { height: 0%; top: 0; bottom: auto; }
+}
+
+.animate-cover-screen {
+  animation: coverScreenFromBottom ease-in-out forwards;
+}
+
+.animate-uncover-screen {
+  animation: uncoverScreenToTop ease-in-out forwards;
 }
 
 
