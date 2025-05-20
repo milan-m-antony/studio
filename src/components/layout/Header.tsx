@@ -2,9 +2,10 @@
 "use client";
 
 import Link from 'next/link';
+import NextImage from 'next/image'; // Import NextImage
 import { useState, useEffect, type ReactNode } from 'react';
 import { usePathname } from 'next/navigation';
-import { Menu, X, Sun, Moon, Code2, Home, User, Briefcase, Wrench, Map as MapIcon, Award, FileText, Mail } from 'lucide-react';
+import { Menu, X, Sun, Moon, Home, User, Briefcase, Wrench, Map as MapIcon, Award, FileText, Mail } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { useTheme } from '@/contexts/ThemeProvider';
@@ -71,7 +72,7 @@ export default function Header() {
   const pathname = usePathname();
 
   useEffect(() => {
-    setIsClient(true);
+    setIsClient(true); // Set to true once component mounts on client
   }, []);
 
   useEffect(() => {
@@ -146,24 +147,39 @@ export default function Header() {
   const toggleTheme = () => {
     if (!isClient) return;
     let currentEffectiveTheme = theme;
-    if (theme === 'system' && typeof window !== 'undefined') { // Check window for matchMedia
+    if (theme === 'system' && typeof window !== 'undefined') {
         currentEffectiveTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
     }
     const newThemeToSet = currentEffectiveTheme === 'dark' ? 'light' : 'dark';
     setTheme(newThemeToSet);
   };
   
-  // Conditional rendering for the entire header on admin paths
   if (isClient && pathname.startsWith('/admin')) {
     return null;
   }
+
+  let themeIconNode: ReactNode = <div className="h-5 w-5" />; // Placeholder for SSR and initial client render
+  if (isClient) {
+    let effectiveTheme = theme;
+    if (theme === 'system') {
+      effectiveTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    }
+    themeIconNode = effectiveTheme === 'dark' ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />;
+  }
+
 
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container mx-auto flex h-16 max-w-screen-2xl items-center justify-between px-4 sm:px-6 lg:px-8">
         <Link href="/" className="flex items-center gap-2">
-          <Code2 className="h-7 w-7 text-primary" />
-          <span className="font-bold text-xl">Milan.dev</span>
+          {/* Replaced text logo with Image component */}
+          <NextImage 
+            src="/logo.png" 
+            alt="MLN Logo" 
+            width={60} // Adjust width as needed
+            height={32} // Adjust height as needed
+            priority 
+          />
         </Link>
 
         <nav className="hidden md:flex items-center space-x-1">
@@ -178,17 +194,7 @@ export default function Header() {
             aria-label="Toggle theme"
             disabled={!isClient} 
           >
-            {isClient ? (
-              (() => {
-                let effectiveTheme = theme;
-                if (theme === 'system' && typeof window !== 'undefined') {
-                  effectiveTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-                }
-                return effectiveTheme === 'dark' ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />;
-              })()
-            ) : (
-              <div className="h-5 w-5" /> // Placeholder rendered on server and initial client pass
-            )}
+            {themeIconNode}
           </Button>
 
           <div className="md:hidden">
@@ -209,8 +215,13 @@ export default function Header() {
                       className="flex items-center gap-2"
                       onClick={() => setIsMobileMenuOpen(false)}
                     >
-                      <Code2 className="h-7 w-7 text-primary" />
-                      <span className="font-bold text-xl">Milan.dev</span>
+                      <NextImage 
+                        src="/logo.png" 
+                        alt="MLN Logo" 
+                        width={60} // Adjust width as needed for mobile sheet
+                        height={32} // Adjust height as needed for mobile sheet
+                        priority
+                      />
                     </Link>
                   </SheetTitle>
                 </SheetHeader>
@@ -227,3 +238,5 @@ export default function Header() {
     </header>
   );
 }
+
+    
