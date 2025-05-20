@@ -18,7 +18,7 @@ import {
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/lib/supabaseClient'; 
-import type { SiteSettings, AdminActivityLog, User as SupabaseUser } from '@/types/supabase';
+import type { SiteSettings, User as SupabaseUser } from '@/types/supabase'; // Removed AdminActivityLog as it's managed in AdminPageLayout
 import { useToast } from "@/hooks/use-toast";
 import {
   AlertDialog,
@@ -115,16 +115,15 @@ export default function AdminDashboardPage() {
         setEmailInput(''); 
         setPassword('');   
         setError('');      
-        setActiveSection('dashboard'); // Reset to dashboard view on logout
-        router.replace('/admin/dashboard'); // Ensure redirection to login if needed
+        setActiveSection('dashboard'); 
+        router.replace('/admin/dashboard'); 
       } else if (event === 'SIGNED_IN' && session?.user) {
-         if (activeSection === 'settings') { // Only fetch if settings is already active or becomes active
+         if (activeSection === 'settings') { 
              fetchSiteSettings();
          }
       }
     });
     
-    // Check initial session
     const getInitialSession = async () => {
         console.log("[AdminDashboardPage] Checking initial session on mount.");
         const { data: { session }, error: sessionError } = await supabase.auth.getSession();
@@ -146,7 +145,7 @@ export default function AdminDashboardPage() {
       console.log("[AdminDashboardPage] Unmounting, unsubscribing auth listener.");
       subscription?.unsubscribe();
     };
-  }, [activeSection, router]); // Added router to dependency array
+  }, [activeSection, router]);
 
 
   const fetchSiteSettings = async () => {
@@ -167,12 +166,15 @@ export default function AdminDashboardPage() {
       setMaintenanceMessageInput(data.maintenance_message || '');
     } else {
       console.log("[AdminDashboardPage] No site settings found, using defaults.");
+      // Optionally initialize settings in DB if they don't exist
+      // For now, it just means the UI will show defaults (false for switch, empty for message)
     }
     setIsLoadingSettings(false);
   };
 
   const handleToggleMaintenanceMode = async (checked: boolean) => {
-    if (!currentUser) {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
         toast({ title: "Auth Error", description: "Please log in to change settings.", variant: "destructive"});
         return;
     }
@@ -192,7 +194,7 @@ export default function AdminDashboardPage() {
         await supabase.from('admin_activity_log').insert({
             action_type: checked ? 'MAINTENANCE_MODE_ENABLED' : 'MAINTENANCE_MODE_DISABLED',
             description: `Admin ${checked ? 'enabled' : 'disabled'} site maintenance mode.`,
-            user_identifier: currentUser.id 
+            user_identifier: user.id 
         });
       } catch (logError) {
           console.error("Error logging maintenance mode toggle:", logError);
@@ -202,7 +204,8 @@ export default function AdminDashboardPage() {
   };
   
   const handleSaveMaintenanceMessage = async () => {
-    if (!currentUser) {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
         toast({ title: "Auth Error", description: "Please log in to save settings.", variant: "destructive"});
         return;
     }
@@ -221,7 +224,7 @@ export default function AdminDashboardPage() {
         await supabase.from('admin_activity_log').insert({
             action_type: 'MAINTENANCE_MESSAGE_UPDATED',
             description: `Admin updated the site maintenance message.`,
-            user_identifier: currentUser.id
+            user_identifier: user.id
         });
       } catch (logError) {
           console.error("Error logging maintenance message update:", logError);
@@ -235,11 +238,16 @@ export default function AdminDashboardPage() {
     setError('');
     setIsLoadingAuth(true);
     
-    console.log("[AdminDashboardPage] Attempting Supabase login for email:", emailInput.trim());
+    const trimmedEmail = emailInput.trim();
+    const trimmedPassword = password.trim(); // Trim password as well
 
+    console.log("[AdminDashboardPage] Attempting Supabase login for email:", trimmedEmail);
+    console.log("[AdminDashboardPage] Entered Email:", `"${trimmedEmail}"`);
+    // Do not log the password itself
+    
     const { data, error: signInError } = await supabase.auth.signInWithPassword({
-      email: emailInput.trim(),
-      password: password, 
+      email: trimmedEmail,
+      password: trimmedPassword, 
     });
 
     setIsLoadingAuth(false);
@@ -261,6 +269,7 @@ export default function AdminDashboardPage() {
       } catch (logError) {
         console.error("Error logging admin login:", logError);
       }
+      // No need to call router.replace here, onAuthStateChange handles UI update
     } else {
         setError("An unexpected error occurred during login. No user data returned.");
         toast({ title: "Login Error", description: "An unexpected error occurred. Please try again.", variant: "destructive" });
@@ -270,7 +279,7 @@ export default function AdminDashboardPage() {
   const handleLogout = async () => {
     if (!currentUser) return;
     const userIdForLog = currentUser.id;
-    const userEmailForLog = currentUser.email || "Admin"; // Fallback, though email should exist
+    const userEmailForLog = currentUser.email || "Admin"; 
     console.log(`[AdminDashboardPage] Attempting Supabase logout for user: ${userEmailForLog}`);
     
     const { error: signOutError } = await supabase.auth.signOut();
@@ -309,27 +318,17 @@ export default function AdminDashboardPage() {
       return;
     }
     
-    // For this client-side flow, we assume password entry is a sufficient gate for the client to proceed.
-    // The actual 'danger-delete-all-data' function (if implemented) would be the real gatekeeper.
-    console.log("[AdminDashboardPage] Password confirmation modal submitted. Proceeding to countdown modal.");
-    
-    // Attempt to sign in with the entered password to verify it.
-    // This is a simplified re-authentication check for this client-side flow.
     const { error: reauthError } = await supabase.auth.signInWithPassword({
-        email: currentUser.email, // Use the current user's email
+        email: currentUser.email,
         password: adminPasswordConfirm,
     });
 
     if (reauthError) {
-        console.error("[AdminDashboardPage] Re-authentication failed:", reauthError);
+        console.error("[AdminDashboardPage] Re-authentication for delete failed:", reauthError);
         toast({ title: "Password Incorrect", description: "The admin password entered is incorrect.", variant: "destructive"});
-        // Note: Supabase automatically signs out the user if re-authentication with a new password fails.
-        // We might need to manually sign them back in or handle the signed-out state.
-        // For simplicity here, we'll just show the error. The user might need to log in again if Supabase signed them out.
         return;
     }
 
-    // If re-authentication is successful (no error)
     setShowDeleteAllDataPasswordModal(false);
     setAdminPasswordConfirm(''); 
     setShowDeleteAllDataConfirmModal(true);
@@ -363,7 +362,6 @@ export default function AdminDashboardPage() {
 
       if (functionError) {
         console.error("Error invoking Edge Function (raw):", JSON.stringify(functionError, null, 2));
-        // Attempt to parse context if it's a FunctionsFetchError with JSON message
         let detailedMessage = functionError.message;
         if (functionError.context && typeof functionError.context.message === 'string') {
             try {
@@ -451,7 +449,6 @@ export default function AdminDashboardPage() {
     );
   }
 
-  // If authenticated, show dashboard
   return (
     <AdminPageLayout
       navItems={adminNavItems}
@@ -632,5 +629,6 @@ export default function AdminDashboardPage() {
     </AdminPageLayout>
   );
 }
+    
 
     
