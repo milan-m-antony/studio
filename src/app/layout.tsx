@@ -8,7 +8,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Geist, Geist_Mono } from 'next/font/google';
 import { supabase } from '@/lib/supabaseClient';
 import type { LegalDocument } from '@/types/supabase';
-import Preloader from '@/components/layout/Preloader'; // Import the Preloader
+import Preloader from '@/components/layout/Preloader';
 
 const geistSans = Geist({
   variable: '--font-geist-sans',
@@ -26,23 +26,40 @@ export const metadata: Metadata = {
 };
 
 async function getLegalDocument(id: string): Promise<LegalDocument | null> {
-  console.log(`[RootLayout] Fetching legal document with ID: ${id}`);
-  const { data, error } = await supabase
-    .from('legal_documents')
-    .select('id, title, content, updated_at')
-    .eq('id', id)
-    .maybeSingle();
+  console.log(`[RootLayout] Attempting to fetch legal document with ID: ${id}`);
+  try {
+    const { data, error, status, statusText } = await supabase
+      .from('legal_documents')
+      .select('id, title, content, updated_at')
+      .eq('id', id)
+      .maybeSingle();
 
-  if (error) {
-    console.error(`[RootLayout] Error fetching legal document ${id}:`, JSON.stringify(error, null, 2));
+    if (error) {
+      let errorMessage = `[RootLayout] Error fetching legal document ${id}. `;
+      if (typeof error === 'object' && error !== null) {
+        const supabaseError = error as { message?: string; details?: string; hint?: string; code?: string };
+        errorMessage += `Message: ${supabaseError.message || 'N/A'}, Details: ${supabaseError.details || 'N/A'}, Hint: ${supabaseError.hint || 'N/A'}, Code: ${supabaseError.code || 'N/A'}. `;
+      } else {
+        try {
+          errorMessage += `Received error: ${JSON.stringify(error)}. `;
+        } catch (e) {
+          errorMessage += `Received non-serializable error. `;
+        }
+      }
+      errorMessage += `Status: ${status || 'N/A'} ${statusText || 'N/A'}.`;
+      console.error(errorMessage);
+      return null;
+    }
+    if (data) {
+      console.log(`[RootLayout] Successfully fetched document: ${data.title} (updated: ${data.updated_at})`);
+    } else {
+      console.warn(`[RootLayout] No document found for ID: ${id}, returning null.`);
+    }
+    return data;
+  } catch (e: any) {
+    console.error(`[RootLayout] EXCEPTION while fetching legal document ${id}:`, e.message, e);
     return null;
   }
-  if (data) {
-    console.log(`[RootLayout] Successfully fetched document: ${data.title} (updated: ${data.updated_at})`);
-  } else {
-    console.log(`[RootLayout] No document found for ID: ${id}`);
-  }
-  return data;
 }
 
 export default async function RootLayout({
@@ -50,10 +67,10 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  console.log("[RootLayout] Rendering RootLayout server component.");
   const termsDocPromise = getLegalDocument('terms-and-conditions');
   const privacyDocPromise = getLegalDocument('privacy-policy');
 
-  // Await promises here if needed, or pass them down if Footer can handle promises (not typical for client components)
   const [termsDoc, privacyDoc] = await Promise.all([termsDocPromise, privacyDocPromise]);
 
   console.log('[RootLayout] Rendering with termsDoc title:', termsDoc?.title, 'and privacyDoc title:', privacyDoc?.title);
