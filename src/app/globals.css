@@ -125,7 +125,17 @@ body {
   animation: fadeIn 0.8s ease-out forwards;
 }
 
-/* Removed preloaderPulse animation as it was specific to the number counter */
+/* Preloader Pulse Animation for Numbers */
+@keyframes preloaderPulse {
+  0% { transform: scale(0.95); opacity: 0.8; }
+  50% { transform: scale(1.05); opacity: 1; }
+  100% { transform: scale(1); opacity: 0.95; }
+}
+
+.animate-preloaderPulse {
+  animation: preloaderPulse 0.2s ease-in-out forwards;
+}
+
 
 /* Scrollbar hiding utilities */
 @layer utilities {

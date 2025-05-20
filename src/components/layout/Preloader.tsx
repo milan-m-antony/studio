@@ -7,13 +7,20 @@ import { Loader2 } from 'lucide-react';
 export default function Preloader() {
   const [loading, setLoading] = useState(true);
   const [fadingOut, setFadingOut] = useState(false);
+  const [progress, setProgress] = useState(1); // Start count from 1
+
   const fallbackTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const fadingOutRef = useRef(false); // Ref to prevent multiple fade-out triggers
+  const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const fadingOutRef = useRef(false);
 
   const clearAllTimers = useCallback(() => {
     if (fallbackTimeoutRef.current) {
       clearTimeout(fallbackTimeoutRef.current);
       fallbackTimeoutRef.current = null;
+    }
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+      intervalRef.current = null;
     }
   }, []);
 
@@ -22,6 +29,7 @@ export default function Preloader() {
     fadingOutRef.current = true;
 
     clearAllTimers();
+    setProgress(100); // Ensure counter hits 100
     setFadingOut(true);
     
     setTimeout(() => {
@@ -30,13 +38,13 @@ export default function Preloader() {
   }, [clearAllTimers]);
 
   useEffect(() => {
-    fadingOutRef.current = false; // Reset on mount
-    
+    fadingOutRef.current = false; 
+
     const handleWindowLoad = () => {
+      console.log("[Preloader] Window loaded, starting fade out.");
       startFadeOut();
     };
 
-    // Fallback to hide preloader after a certain time
     fallbackTimeoutRef.current = setTimeout(() => {
       console.log("[Preloader] Fallback timeout reached, starting fade out.");
       startFadeOut();
@@ -57,6 +65,29 @@ export default function Preloader() {
     };
   }, [startFadeOut, clearAllTimers]);
 
+  useEffect(() => {
+    if (fadingOutRef.current) return; // Don't start new interval if already fading out
+
+    intervalRef.current = setInterval(() => {
+      setProgress((prevProgress) => {
+        if (prevProgress >= 100) {
+          if (intervalRef.current) clearInterval(intervalRef.current);
+          // The startFadeOut should be triggered by onload or fallback,
+          // but if counter reaches 100 naturally first, ensure fadeOut starts.
+          if (!fadingOutRef.current) startFadeOut();
+          return 100;
+        }
+        return prevProgress + 1;
+      });
+    }, 30); // Adjust speed as needed (30ms for a quick count to 100)
+
+    return () => {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+      }
+    };
+  }, [startFadeOut]);
+
 
   if (!loading) {
     return null;
@@ -72,10 +103,13 @@ export default function Preloader() {
       aria-live="polite"
     >
       <div className="text-center mb-8">
+        {/* Display the animated number */}
         <span
-          className="text-7xl md:text-8xl lg:text-9xl font-bold tracking-wider" // Added tracking-wider for a bit more spacing
+          key={progress} // Re-trigger animation on progress change
+          className="animate-preloaderPulse text-7xl md:text-8xl lg:text-9xl font-bold"
+          style={{ animationDelay: '0s', animationDuration: '0.2s' }} // Ensure animation plays quickly for each number
         >
-          MMA
+          {progress}
         </span>
       </div>
       
