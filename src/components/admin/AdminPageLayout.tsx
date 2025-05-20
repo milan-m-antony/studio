@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
 import {
   Menu, X, Sun, Moon,
-  LogOut as LogoutIcon, LayoutDashboard, Bell as BellIcon, UserCircle, Settings, UploadCloud, Trash2, History
+  LogOut as LogoutIcon, LayoutDashboard, Bell as BellIcon, UserCircle, Settings as SettingsIcon, UploadCloud, Trash2, History
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { useTheme } from '@/contexts/ThemeProvider';
@@ -264,6 +264,7 @@ export default function AdminPageLayout({
     setIsUploadingPhoto(false);
   };
 
+  const settingsNavItem = navItems.find(item => item.key === 'settings');
 
   const SidebarContent = ({ isMobile = false }: { isMobile?: boolean }) => (
     <div className={cn("flex flex-col h-full text-sidebar-foreground", isMobile ? "w-full" : "w-64")}>
@@ -274,7 +275,7 @@ export default function AdminPageLayout({
         </Link>
       </div>
       <nav className="flex-grow p-2 space-y-1 overflow-y-auto">
-        {navItems.map((item) => {
+        {navItems.filter(item => item.key !== 'settings').map((item) => { // Filter out 'settings'
           const Icon = item.icon;
           const isActive = activeSection === item.key;
           return (
@@ -298,7 +299,26 @@ export default function AdminPageLayout({
           );
         })}
       </nav>
-      {/* Removed the dedicated Settings button from the bottom of the sidebar */}
+      {settingsNavItem && (
+        <div className="mt-auto p-2 border-t border-sidebar-border">
+            <Button
+              variant="ghost"
+              className={cn(
+                "w-full justify-start text-sm py-2.5 px-3",
+                activeSection === 'settings'
+                  ? "bg-sidebar-primary text-sidebar-primary-foreground font-semibold rounded-lg"
+                  : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground rounded-lg"
+              )}
+              onClick={() => {
+                onSelectSection('settings');
+                if (isMobile) setIsMobileMenuOpen(false);
+              }}
+            >
+              <settingsNavItem.icon className={cn("mr-3 h-5 w-5", activeSection === 'settings' ? "text-sidebar-primary-foreground" : "text-sidebar-foreground/70 group-hover:text-sidebar-accent-foreground")} />
+              {settingsNavItem.label}
+            </Button>
+        </div>
+      )}
     </div>
   );
 
