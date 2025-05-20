@@ -4,13 +4,12 @@
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
 import { usePathname } from 'next/navigation';
-import { Menu, X, Sun, Moon, Code2, Home, User, Briefcase, Wrench, Map as MapIcon, Award, FileText, Mail } from 'lucide-react'; // Removed LayoutDashboard
+import { Menu, X, Sun, Moon, Code2, Home, User, Briefcase, Wrench, Map as MapIcon, Award, FileText, Mail, LayoutDashboard } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { useTheme } from '@/contexts/ThemeProvider';
 import { cn } from '@/lib/utils';
 
-// Base public navigation items
 const publicNavItems = [
   { href: '#hero', label: 'Home', icon: Home },
   { href: '#about', label: 'About', icon: User },
@@ -22,11 +21,9 @@ const publicNavItems = [
   { href: '#contact', label: 'Contact', icon: Mail },
 ];
 
-// Removed adminDashboardNavItem and logic for isUserAdmin affecting nav items
-
 const NavLinks = ({ onClick, activeHref }: { onClick?: () => void; activeHref: string; }) => (
   <>
-    {publicNavItems.map((item) => { // Always render publicNavItems
+    {publicNavItems.map((item) => {
       const IconComponent = item.icon;
       const isActive = item.href === activeHref;
       return (
@@ -72,29 +69,30 @@ export default function Header() {
   const { theme, setTheme } = useTheme();
   const [activeLink, setActiveLink] = useState<string>('#hero');
   const pathname = usePathname();
-  // Removed isUserAdmin and related useEffect for authChange affecting nav items here
-
-  useEffect(() => setMounted(true), []);
+  const [shouldRenderHeader, setShouldRenderHeader] = useState(true);
 
   useEffect(() => {
-    const determineActiveLink = () => {
-      const currentPath = pathname;
-      const currentHash = window.location.hash;
+    setMounted(true);
+  }, []);
 
-      // If on any /admin page, no public nav should be active unless it's a link to the main page
-      if (currentPath.startsWith('/admin')) {
-         // Check if we are on /admin/dashboard and one of the public items points to '/'
-        const homeItem = publicNavItems.find(item => item.href === '/');
-        if(currentPath === '/admin/dashboard' && homeItem) {
-            // setActiveLink(homeItem.href); // Or set to empty if dashboard has its own active state
-            setActiveLink(''); // Admin has its own active link system
-        } else {
-            setActiveLink('');
-        }
+  useEffect(() => {
+    if (mounted) {
+      if (pathname.startsWith('/admin')) {
+        setShouldRenderHeader(false);
+      } else {
+        setShouldRenderHeader(true);
+      }
+    }
+  }, [pathname, mounted]);
+  
+  useEffect(() => {
+    const determineActiveLink = () => {
+      if (!mounted || pathname.startsWith('/admin')) {
+        setActiveLink(''); // No active link for admin pages in public header
         return;
       }
       
-      // Logic for public pages (scroll spy)
+      const currentHash = window.location.hash;
       if (currentPath === '/') {
         if (currentHash && currentHash !== '#') {
           if (publicNavItems.some(item => item.href === currentHash)) {
@@ -139,6 +137,8 @@ export default function Header() {
       }
     };
 
+    const currentPath = pathname; // Capture pathname for use in determineActiveLink
+
     if (mounted) {
       determineActiveLink(); 
       window.addEventListener('scroll', determineActiveLink, { passive: true });
@@ -156,7 +156,16 @@ export default function Header() {
   }, [pathname, mounted]); 
 
 
-  if (!mounted) return null;
+  if (!mounted) {
+    // To prevent hydration mismatch, render a basic structure that the server might also render,
+    // or nothing if it's truly client-side only logic determining visibility.
+    // Given RootLayout always includes <Header />, we should render the header structure
+    // and let the `shouldRenderHeader` state hide it after mount if needed.
+  }
+  
+  if (!shouldRenderHeader && mounted) {
+    return null;
+  }
 
   let effectiveTheme = theme;
   if (theme === 'system' && typeof window !== 'undefined') {
@@ -166,11 +175,6 @@ export default function Header() {
   const toggleTheme = () => {
     setTheme(effectiveTheme === 'dark' ? 'light' : 'dark');
   };
-
-  // Do not show the public header on admin routes
-  if (pathname.startsWith('/admin')) {
-    return null;
-  }
 
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
