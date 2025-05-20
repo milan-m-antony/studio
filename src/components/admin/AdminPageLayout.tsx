@@ -9,7 +9,7 @@ import {
   SheetDescription, SheetFooter
 } from '@/components/ui/sheet';
 import {
-  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader as DialogPrimitiveHeader, DialogTitle as DialogPrimitiveDialogTitle, DialogClose
+  Dialog, DialogContent, DialogDescription, DialogFooter as DialogPrimitiveFooter, DialogHeader as DialogPrimitiveHeader, DialogTitle as DialogPrimitiveDialogTitle, DialogClose
 } from "@/components/ui/dialog";
 import {
   AlertDialog,
@@ -35,7 +35,7 @@ import { Separator } from "@/components/ui/separator";
 import {
   Menu, X, Sun, Moon,
   LogOut as LogoutIcon, Bell as BellIcon, UserCircle, Settings as SettingsIcon,
-  UploadCloud, Trash2, History, ChevronRight, ChevronLeft, KeyRound, Image as ImageIcon, Mail as MailIcon
+  UploadCloud, Trash2, History, ChevronRight, ChevronLeft, KeyRound, Mail as MailIcon, UserCog
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { useTheme } from '@/contexts/ThemeProvider';
@@ -113,7 +113,7 @@ const SidebarContent = ({
       <ScrollArea className="flex-grow">
         <nav className={cn(
           "space-y-1",
-          isCollapsed && !isMobile ? "px-2 py-2" : "p-2" // Consistent padding for collapsed nav area
+          isCollapsed && !isMobile ? "px-2 py-2" : "p-2"
         )}>
           {navItems.filter(item => item.key !== 'settings').map((item) => {
             const Icon = item.icon;
@@ -128,7 +128,7 @@ const SidebarContent = ({
                     ? "bg-sidebar-primary text-sidebar-primary-foreground font-semibold"
                     : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
                   isCollapsed && !isMobile
-                    ? "justify-center py-2.5 px-0" // No horizontal padding for button itself
+                    ? "justify-center py-2.5 px-0" 
                     : "justify-start py-2.5 px-3"
                 )}
                 onClick={() => {
@@ -153,7 +153,7 @@ const SidebarContent = ({
 
       <div className={cn(
           "mt-auto border-t border-sidebar-border shrink-0",
-           isCollapsed && !isMobile ? "px-2 py-2" : "p-2" // Consistent padding for collapsed settings area
+           isCollapsed && !isMobile ? "px-2 py-2" : "p-2"
       )}>
         {navItems.find(item => item.key === 'settings') && (() => {
           const settingsItem = navItems.find(item => item.key === 'settings')!;
@@ -168,7 +168,7 @@ const SidebarContent = ({
                   ? "bg-sidebar-primary text-sidebar-primary-foreground font-semibold"
                   : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
                 isCollapsed && !isMobile
-                  ? "justify-center py-2.5 px-0" // No horizontal padding for button itself
+                  ? "justify-center py-2.5 px-0"
                   : "justify-start py-2.5 px-3"
               )}
               onClick={() => {
@@ -193,6 +193,7 @@ const SidebarContent = ({
       </div>
     </div>
   );
+}
 
 interface AdminPageLayoutProps {
   navItems: AdminNavItem[];
@@ -200,8 +201,8 @@ interface AdminPageLayoutProps {
   onSelectSection: (sectionKey: string) => void;
   onLogout: () => void;
   username: string | null; 
-  pageTitle: string;
   children: ReactNode;
+  pageTitle: string;
 }
 
 export default function AdminPageLayout({
@@ -230,25 +231,28 @@ export default function AdminPageLayout({
   const [currentDbProfilePhotoUrl, setCurrentDbProfilePhotoUrl] = useState<string | null>(null);
   
   const [isPhotoModalOpen, setIsPhotoModalOpen] = useState(false);
-  const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
+  const [isAccountSettingsModalOpen, setIsAccountSettingsModalOpen] = useState(false); // Renamed from isPasswordModalOpen
 
   const [profilePhotoFile, setProfilePhotoFile] = useState<File | null>(null);
   const [profilePhotoPreview, setProfilePhotoPreview] = useState<string | null>(null);
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
+
+  const [newEmailInput, setNewEmailInput] = useState('');
+  const [emailChangeError, setEmailChangeError] = useState('');
+  const [isChangingEmail, setIsChangingEmail] = useState(false);
 
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [passwordChangeError, setPasswordChangeError] = useState('');
   const [isChangingPassword, setIsChangingPassword] = useState(false);
 
+
   const fetchAdminProfile = useCallback(async () => {
-    console.log("[AdminPageLayout] Fetching admin profile photo...");
     const { data: { user: currentUser } } = await supabase.auth.getUser();
     if (!currentUser) {
         setProfilePhotoUrl(null); 
         setCurrentDbProfilePhotoUrl(null);
         setProfilePhotoPreview(null);
-        console.log("[AdminPageLayout] No current Supabase user, cannot fetch admin_profile.");
         return;
     }
     const { data, error } = await supabase
@@ -261,12 +265,10 @@ export default function AdminPageLayout({
       console.error("[AdminPageLayout] Error fetching admin profile photo:", error);
       toast({ title: "Profile Error", description: "Could not load profile photo.", variant: "destructive" });
     } else if (data && data.profile_photo_url) {
-      console.log("[AdminPageLayout] Profile photo URL fetched:", data.profile_photo_url);
       setProfilePhotoUrl(data.profile_photo_url);
       setCurrentDbProfilePhotoUrl(data.profile_photo_url);
       setProfilePhotoPreview(data.profile_photo_url); 
     } else {
-      console.log("[AdminPageLayout] No profile photo URL found in admin_profile.");
       setProfilePhotoUrl(null);
       setCurrentDbProfilePhotoUrl(null);
       setProfilePhotoPreview(null);
@@ -282,7 +284,6 @@ export default function AdminPageLayout({
       setIsSidebarCollapsed(JSON.parse(savedSidebarState));
     }
 
-    // Listen for auth changes to re-fetch profile if user logs in/out
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION') {
         fetchAdminProfile();
@@ -307,21 +308,21 @@ export default function AdminPageLayout({
 
   useEffect(() => {
     if (headerIsMounted) {
-      let currentEffectiveTheme = theme;
+      let effectiveTheme = theme;
       if (theme === 'system' && typeof window !== 'undefined') {
-        currentEffectiveTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+        effectiveTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
       }
-      setCurrentThemeIcon(currentEffectiveTheme === 'dark' ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />);
+      setCurrentThemeIcon(effectiveTheme === 'dark' ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />);
     }
   }, [theme, headerIsMounted]);
 
   const toggleTheme = () => {
     if (!headerIsMounted) return;
-    let currentEffectiveTheme = theme;
+    let effectiveTheme = theme;
     if (theme === 'system' && typeof window !== 'undefined') {
-        currentEffectiveTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+        effectiveTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
     }
-    const newThemeToSet = currentEffectiveTheme === 'dark' ? 'light' : 'dark';
+    const newThemeToSet = effectiveTheme === 'dark' ? 'light' : 'dark';
     setTheme(newThemeToSet);
   };
 
@@ -329,14 +330,10 @@ export default function AdminPageLayout({
     setIsLoadingActivities(true);
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) { 
-        console.warn("[AdminPageLayout] No authenticated user to fetch activities for.");
         setActivities([]);
         setIsLoadingActivities(false); 
         return; 
     }
-    // For admin activity log, it's usually fine to fetch all logs,
-    // or logs specific to any admin action rather than just the current user's actions,
-    // depending on how `user_identifier` is populated.
     const { data, error } = await supabase
       .from('admin_activity_log')
       .select('*')
@@ -363,34 +360,33 @@ export default function AdminPageLayout({
         toast({ title: "Authentication Error", description: "You must be logged in to clear logs.", variant: "destructive" });
         setIsLoadingActivities(false); return;
     }
-    // Delete all rows. Using a condition that's always true for non-null IDs
     const { error } = await supabase.from('admin_activity_log').delete().neq('id', '00000000-0000-0000-0000-000000000000'); 
     if (error) {
       console.error("Error clearing activity log:", error);
       toast({ title: "Error", description: `Failed to clear activity log: ${error.message}`, variant: "destructive" });
     } else {
       toast({ title: "Success", description: "Activity log cleared." });
-      setActivities([]); // Clear local state
-      // Log the clear action itself
+      setActivities([]); 
       await supabase.from('admin_activity_log').insert({ 
         action_type: 'ACTIVITY_LOG_CLEARED', 
         description: `Admin "${user.email}" cleared the activity log.`,
-        user_identifier: user.id // Use Supabase user ID
+        user_identifier: user.id 
       });
+      fetchActivities(); // Re-fetch to show the "cleared" log entry
     }
     setShowClearLogConfirm(false);
     setIsLoadingActivities(false);
   };
 
   const getUserInitials = (name: string | null | undefined) => {
-    if (!name) return "AD"; // Default for "Admin" or null/undefined
-    if (name.includes('@')) { // Likely an email
+    if (!name) return "AD"; 
+    if (name.includes('@')) { 
         const emailPrefix = name.split('@')[0];
         if (emailPrefix.length >= 2) return emailPrefix.substring(0, 2).toUpperCase();
-        if (emailPrefix.length === 1) return emailPrefix.toUpperCase() + "X"; // e.g. a@ becomes AX
+        if (emailPrefix.length === 1) return emailPrefix.toUpperCase() + "X"; 
         return "AD";
     }
-    const parts = name.split(/[\s_]+/); // Split by space or underscore
+    const parts = name.split(/[\s_]+/); 
     if (parts.length > 0 && parts[0]) {
         if (parts.length > 1 && parts[1] && parts[1].length > 0) {
             return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
@@ -409,13 +405,13 @@ export default function AdminPageLayout({
       reader.readAsDataURL(file);
     } else {
       setProfilePhotoFile(null);
-      setProfilePhotoPreview(currentDbProfilePhotoUrl); // Revert to DB image if file selection is cleared
+      setProfilePhotoPreview(currentDbProfilePhotoUrl);
     }
   };
 
   const handleSaveProfilePhoto = async () => {
     setIsUploadingPhoto(true);
-    let newPhotoUrlToSave = currentDbProfilePhotoUrl; // Start with current DB URL
+    let newPhotoUrlToSave = currentDbProfilePhotoUrl;
     const { data: { user: currentUserForUpdate } } = await supabase.auth.getUser();
 
     if (!currentUserForUpdate) {
@@ -427,9 +423,8 @@ export default function AdminPageLayout({
     if (currentDbProfilePhotoUrl) {
         try {
             const url = new URL(currentDbProfilePhotoUrl);
-            // Path format: /storage/v1/object/public/bucket-name/file-path.ext
             const pathParts = url.pathname.split(`/admin-profile-photos/`);
-            if (pathParts.length > 1 && !pathParts[1].startsWith('http')) { // Basic check to avoid non-storage URLs
+            if (pathParts.length > 1 && !pathParts[1].startsWith('http')) {
                 oldImageStoragePathToDelete = decodeURIComponent(pathParts[1]);
             }
         } catch(e) {
@@ -437,15 +432,13 @@ export default function AdminPageLayout({
         }
     }
 
-    if (profilePhotoFile) { // A new file was selected for upload
+    if (profilePhotoFile) {
       const fileExt = profilePhotoFile.name.split('.').pop();
-      // Using a more specific filename to relate to the admin profile
       const fileName = `admin_profile_photo_${ADMIN_PROFILE_ID}_${Date.now()}.${fileExt}`; 
       
-      console.log('[AdminPageLayout] Attempting to upload new profile photo:', fileName);
       const { data: uploadData, error: uploadError } = await supabase.storage
         .from('admin-profile-photos')
-        .upload(fileName, profilePhotoFile, { cacheControl: '3600', upsert: false }); // upsert: false to avoid overwriting if path somehow collides
+        .upload(fileName, profilePhotoFile, { cacheControl: '3600', upsert: false }); 
 
       if (uploadError) {
         console.error("[AdminPageLayout] Error uploading profile photo to storage:", JSON.stringify(uploadError, null, 2));
@@ -461,38 +454,24 @@ export default function AdminPageLayout({
       }
       newPhotoUrlToSave = publicUrlData.publicUrl;
     }
-    // If newPhotoUrlToSave is different from currentDbProfilePhotoUrl, or if currentDbProfilePhotoUrl was null and newPhotoUrlToSave is now set, we update.
-    // If newPhotoUrlToSave is currentDbProfilePhotoUrl (e.g. no file selected, no URL change), no DB update is needed unless other fields change.
-    // But for simplicity, we update if there's a change or a new file.
-
-    console.log('[AdminPageLayout] Attempting to update admin_profile with photo URL:', newPhotoUrlToSave, 'for ID:', ADMIN_PROFILE_ID);
-    console.log('[AdminPageLayout] Current user for DB update:', currentUserForUpdate?.email, 'User ID:', currentUserForUpdate?.id);
-
+    
     const { error: dbError } = await supabase
       .from('admin_profile')
       .update({ profile_photo_url: newPhotoUrlToSave, updated_at: new Date().toISOString() })
       .eq('id', ADMIN_PROFILE_ID);
     
-    console.log('[AdminPageLayout] DB update result - error:', dbError ? JSON.stringify(dbError, null, 2) : 'null');
-
-
     if (dbError) {
       toast({ title: "Database Error", description: `Failed to save profile photo URL: ${dbError.message}`, variant: "destructive" });
     } else {
       toast({ title: "Success", description: "Profile photo updated." });
-      setProfilePhotoUrl(newPhotoUrlToSave); // Update local state for Avatar
-      setCurrentDbProfilePhotoUrl(newPhotoUrlToSave); // Update DB URL state
-      setProfilePhotoPreview(newPhotoUrlToSave); // Update preview state
+      setProfilePhotoUrl(newPhotoUrlToSave); 
+      setCurrentDbProfilePhotoUrl(newPhotoUrlToSave); 
+      setProfilePhotoPreview(newPhotoUrlToSave); 
 
-      // Delete the old image from storage if a new one was uploaded and it's different from the old one
-      if (oldImageStoragePathToDelete && newPhotoUrlToSave !== currentDbProfilePhotoUrl && currentDbProfilePhotoUrl) { // ensure currentDb... was not null
-          console.log("[AdminPageLayout] Attempting to delete old profile photo from storage:", oldImageStoragePathToDelete);
+      if (oldImageStoragePathToDelete && newPhotoUrlToSave !== currentDbProfilePhotoUrl && currentDbProfilePhotoUrl) {
           const { error: storageDeleteError } = await supabase.storage.from('admin-profile-photos').remove([oldImageStoragePathToDelete]);
            if (storageDeleteError) {
                 console.warn("[AdminPageLayout] Failed to delete old profile photo from storage:", JSON.stringify(storageDeleteError, null, 2));
-                // Optionally inform user that old image couldn't be deleted
-           } else {
-                console.log("[AdminPageLayout] Old profile photo successfully deleted from storage.");
            }
       }
       await supabase.from('admin_activity_log').insert({ 
@@ -501,17 +480,17 @@ export default function AdminPageLayout({
           user_identifier: currentUserForUpdate.id
       });
     }
-    setProfilePhotoFile(null); // Clear the selected file
+    setProfilePhotoFile(null); 
     setIsUploadingPhoto(false);
-    setIsPhotoModalOpen(false); // Close modal on successful save
+    setIsPhotoModalOpen(false);
   };
 
   const handleDeleteProfilePhoto = async () => {
-    if (!currentDbProfilePhotoUrl) { // Check against the confirmed DB URL
+    if (!currentDbProfilePhotoUrl) {
       toast({ title: "No Photo", description: "No profile photo to delete.", variant: "default" });
       return;
     }
-    setIsUploadingPhoto(true); // Use same loading state
+    setIsUploadingPhoto(true); 
     const {data: { user: currentUserForDelete } } = await supabase.auth.getUser();
      if (!currentUserForDelete) {
         toast({ title: "Auth Error", description: "Please log in again to remove profile photo.", variant: "destructive"});
@@ -526,17 +505,13 @@ export default function AdminPageLayout({
             imageStoragePathToDelete = decodeURIComponent(pathParts[1]);
         }
     } catch(e) {
-        console.warn("[AdminPageLayout] Could not parse currentDbProfilePhotoUrl for deletion (during explicit delete):", currentDbProfilePhotoUrl, e);
+        console.warn("[AdminPageLayout] Could not parse currentDbProfilePhotoUrl for deletion:", currentDbProfilePhotoUrl, e);
     }
 
     if (imageStoragePathToDelete) {
-      console.log("[AdminPageLayout] Attempting to delete profile photo from storage (explicit delete):", imageStoragePathToDelete);
       const { error: storageError } = await supabase.storage.from('admin-profile-photos').remove([imageStoragePathToDelete]);
       if (storageError) {
-        console.warn("[AdminPageLayout] Error deleting profile photo from storage (explicit delete):", JSON.stringify(storageError, null, 2));
-        // Do not stop here, still try to update DB
-      } else {
-         console.log("[AdminPageLayout] Profile photo successfully deleted from storage (explicit delete).");
+        console.warn("[AdminPageLayout] Error deleting profile photo from storage:", JSON.stringify(storageError, null, 2));
       }
     }
 
@@ -552,7 +527,7 @@ export default function AdminPageLayout({
       setProfilePhotoUrl(null); 
       setCurrentDbProfilePhotoUrl(null); 
       setProfilePhotoPreview(null);
-      setProfilePhotoFile(null); // Clear any selected file
+      setProfilePhotoFile(null); 
       await supabase.from('admin_activity_log').insert({ 
           action_type: 'PROFILE_PHOTO_REMOVED', 
           description: `Admin profile photo removed by ${currentUserForDelete.email}.`,
@@ -560,8 +535,39 @@ export default function AdminPageLayout({
       });
     }
     setIsUploadingPhoto(false);
-    // Keep modal open for further action or user can close it
   };
+
+  const handleChangeEmail = async () => {
+    setEmailChangeError('');
+    if (!newEmailInput.trim() || !/\S+@\S+\.\S+/.test(newEmailInput.trim())) {
+      setEmailChangeError("Please enter a valid new email address.");
+      return;
+    }
+    setIsChangingEmail(true);
+    const { data: { user: currentUserForEmailChange } } = await supabase.auth.getUser();
+    if (!currentUserForEmailChange) {
+        toast({ title: "Auth Error", description: "Please log in again to change email.", variant: "destructive"});
+        setIsChangingEmail(false); return;
+    }
+    const { error } = await supabase.auth.updateUser({ email: newEmailInput.trim() });
+    if (error) {
+      setEmailChangeError(`Failed to change email: ${error.message}`);
+      toast({ title: "Email Change Failed", description: error.message, variant: "destructive" });
+    } else {
+      toast({ title: "Confirmation Email Sent", description: "A confirmation email has been sent to your new email address. Please click the link in it to complete the change. You may need to log in again with your new email address afterwards.", duration: 10000 });
+      await supabase.from('admin_activity_log').insert({ 
+          action_type: 'ADMIN_EMAIL_CHANGE_INITIATED', 
+          description: `Admin initiated email change from ${currentUserForEmailChange.email} to ${newEmailInput.trim()}.`,
+          user_identifier: currentUserForEmailChange.id,
+          details: { old_email: currentUserForEmailChange.email, new_email: newEmailInput.trim() }
+      });
+      setNewEmailInput('');
+      // Note: Email change requires confirmation, current session might remain valid until then or logout.
+      // Supabase handles this, and onAuthStateChange should pick up if the session is invalidated.
+    }
+    setIsChangingEmail(false);
+  };
+
 
   const handleChangePassword = async () => {
     setPasswordChangeError('');
@@ -591,35 +597,25 @@ export default function AdminPageLayout({
           description: `Admin password changed by ${currentUserForPasswordChange.email}.`,
           user_identifier: currentUserForPasswordChange.id 
       });
-      setIsPasswordModalOpen(false); 
-      // Consider forcing logout or re-authentication for security
+      setIsAccountSettingsModalOpen(false); 
     }
     setIsChangingPassword(false);
   };
 
   const handleOpenPhotoModal = () => {
-    fetchAdminProfile(); // Re-fetch to ensure preview is current
-    setProfilePhotoFile(null); // Clear any stale file selection
-    // setProfilePhotoPreview(currentDbProfilePhotoUrl); // Preview is set by fetchAdminProfile
+    fetchAdminProfile(); 
+    setProfilePhotoFile(null); 
     setIsPhotoModalOpen(true);
   };
 
-  const handleOpenPasswordModal = () => {
+  const handleOpenAccountSettingsModal = () => {
+    setNewEmailInput('');
+    setEmailChangeError('');
     setNewPassword('');
     setConfirmPassword('');
     setPasswordChangeError('');
-    setIsPasswordModalOpen(true);
+    setIsAccountSettingsModalOpen(true);
   };
-
-  let themeIconToRender: ReactNode = <div className="h-5 w-5" />; // Placeholder
-  if (headerIsMounted) {
-    let effectiveTheme = theme;
-    if (theme === 'system') {
-      effectiveTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-    }
-    themeIconToRender = effectiveTheme === 'dark' ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />;
-  }
-
 
   return (
     <>
@@ -662,7 +658,7 @@ export default function AdminPageLayout({
         "bg-background text-foreground" 
       )}>
         <header className="sticky top-0 z-40 flex h-16 items-center justify-between border-b border-border bg-card px-4 md:px-6 shrink-0">
-          <div className="md:hidden"> {/* Placeholder for mobile menu trigger if needed here */} </div>
+          <div className="md:hidden"></div>
           <h1 className="text-xl font-semibold text-foreground">{pageTitle}</h1>
           <div className="flex items-center gap-3">
             <Sheet open={isActivitySheetOpen} onOpenChange={setIsActivitySheetOpen}>
@@ -708,7 +704,7 @@ export default function AdminPageLayout({
             </Sheet>
 
             <Button variant="ghost" size="icon" onClick={toggleTheme} aria-label="Toggle theme" className="hover:text-primary" disabled={!headerIsMounted}>
-              {themeIconToRender}
+              {currentThemeIcon}
             </Button>
 
             <DropdownMenu>
@@ -729,12 +725,12 @@ export default function AdminPageLayout({
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={handleOpenPhotoModal}>
-                  <ImageIcon className="mr-2 h-4 w-4" />
+                  <UserCircle className="mr-2 h-4 w-4" />
                   <span>Change Profile Picture</span>
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={handleOpenPasswordModal}>
-                  <KeyRound className="mr-2 h-4 w-4" />
-                  <span>Change Password</span>
+                <DropdownMenuItem onClick={handleOpenAccountSettingsModal}>
+                  <UserCog className="mr-2 h-4 w-4" />
+                  <span>Account Settings</span>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={onLogout}>
@@ -783,7 +779,7 @@ export default function AdminPageLayout({
                       <Button type="button" onClick={handleSaveProfilePhoto} disabled={isUploadingPhoto || (!profilePhotoFile && profilePhotoPreview === currentDbProfilePhotoUrl)} size="sm">
                           {isUploadingPhoto && profilePhotoFile ? <><UploadCloud className="mr-2 h-4 w-4 animate-pulse"/>Saving...</> : <><UploadCloud className="mr-2 h-4 w-4"/>Save Photo</>}
                       </Button>
-                      {currentDbProfilePhotoUrl && ( // Only show remove if there's a DB photo
+                      {currentDbProfilePhotoUrl && ( 
                           <Button type="button" variant="destructive" onClick={handleDeleteProfilePhoto} disabled={isUploadingPhoto} size="sm">
                               {isUploadingPhoto && !profilePhotoFile ? "Removing..." : <><Trash2 className="mr-2 h-4 w-4"/>Remove Current Photo</>}
                           </Button>
@@ -791,32 +787,65 @@ export default function AdminPageLayout({
                   </div>
               </div>
             </ScrollArea>
-            <DialogFooter className="pt-4 border-t"><DialogClose asChild><Button type="button" variant="outline">Close</Button></DialogClose></DialogFooter>
+            <DialogPrimitiveFooter className="pt-4 border-t"> <DialogClose asChild><Button type="button" variant="outline">Close</Button></DialogClose> </DialogPrimitiveFooter>
         </DialogContent>
     </Dialog>
 
-    {/* Change Password Modal */}
-    <Dialog open={isPasswordModalOpen} onOpenChange={setIsPasswordModalOpen}>
+    {/* Account Settings (Email & Password) Modal */}
+    <Dialog open={isAccountSettingsModalOpen} onOpenChange={setIsAccountSettingsModalOpen}>
       <DialogContent className="sm:max-w-md">
         <DialogPrimitiveHeader>
-          <DialogPrimitiveDialogTitle>Change Password</DialogPrimitiveDialogTitle>
-          <DialogDescription>Enter and confirm your new password.</DialogDescription>
+          <DialogPrimitiveDialogTitle>Account Settings</DialogPrimitiveDialogTitle>
+          <DialogDescription>Manage your admin account email and password.</DialogDescription>
         </DialogPrimitiveHeader>
-        <div className="grid gap-4 py-4">
-          <div className="space-y-2">
-              <Label htmlFor="newPassword">New Password</Label>
-              <Input id="newPassword" type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="Enter new password (min. 6 characters)" className={passwordChangeError ? "border-destructive" : ""} />
+        <ScrollArea className="max-h-[70vh] p-1 pr-2">
+          <div className="grid gap-6 py-4 px-2">
+            {/* Change Email Section */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg flex items-center"><MailIcon className="mr-2 h-5 w-5 text-primary"/>Change Email</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div>
+                  <p className="text-sm text-muted-foreground mb-1">Current Email: <span className="font-medium text-foreground">{username}</span></p>
+                  <Label htmlFor="newEmail">New Email Address</Label>
+                  <Input id="newEmail" type="email" value={newEmailInput} onChange={(e) => setNewEmailInput(e.target.value)} placeholder="Enter new email" className={emailChangeError ? "border-destructive" : ""} />
+                  {emailChangeError && <p className="text-sm text-destructive mt-1">{emailChangeError}</p>}
+                </div>
+                <Button type="button" onClick={handleChangeEmail} disabled={isChangingEmail || !newEmailInput.trim()} className="w-full sm:w-auto">
+                  {isChangingEmail ? <MailIcon className="mr-2 h-4 w-4 animate-spin"/> : <MailIcon className="mr-2 h-4 w-4"/>}
+                  Request Email Change
+                </Button>
+                <p className="text-xs text-muted-foreground">A confirmation link will be sent to the new email address. You might be logged out after confirming.</p>
+              </CardContent>
+            </Card>
+
+            <Separator />
+
+            {/* Change Password Section */}
+            <Card>
+               <CardHeader>
+                <CardTitle className="text-lg flex items-center"><KeyRound className="mr-2 h-5 w-5 text-primary"/>Change Password</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                    <Label htmlFor="newPassword">New Password</Label>
+                    <Input id="newPassword" type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="Enter new password (min. 6 characters)" className={passwordChangeError ? "border-destructive" : ""} />
+                </div>
+                <div className="space-y-2">
+                    <Label htmlFor="confirmPassword">Confirm New Password</Label>
+                    <Input id="confirmPassword" type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} placeholder="Confirm new password" className={passwordChangeError ? "border-destructive" : ""} />
+                </div>
+                {passwordChangeError && <p className="text-sm text-destructive">{passwordChangeError}</p>}
+                <Button type="button" onClick={handleChangePassword} disabled={isChangingPassword || !newPassword || !confirmPassword} className="w-full sm:w-auto">
+                    {isChangingPassword ? <KeyRound className="mr-2 h-4 w-4 animate-spin"/> : <KeyRound className="mr-2 h-4 w-4"/>}
+                    Change Password
+                </Button>
+              </CardContent>
+            </Card>
           </div>
-          <div className="space-y-2">
-              <Label htmlFor="confirmPassword">Confirm New Password</Label>
-              <Input id="confirmPassword" type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} placeholder="Confirm new password" className={passwordChangeError ? "border-destructive" : ""} />
-          </div>
-          {passwordChangeError && <p className="text-sm text-destructive">{passwordChangeError}</p>}
-        </div>
-        <DialogFooter><DialogClose asChild><Button type="button" variant="outline">Cancel</Button></DialogClose><Button type="button" onClick={handleChangePassword} disabled={isChangingPassword}>
-              {isChangingPassword ? <KeyRound className="mr-2 h-4 w-4 animate-spin"/> : <KeyRound className="mr-2 h-4 w-4"/>}
-              Change Password
-          </Button></DialogFooter>
+        </ScrollArea>
+        <DialogPrimitiveFooter className="pt-4 border-t"><DialogClose asChild><Button type="button" variant="outline">Close</Button></DialogClose></DialogPrimitiveFooter>
       </DialogContent>
     </Dialog>
 
