@@ -5,8 +5,8 @@ import Link from 'next/link';
 import NextImage from 'next/image';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
-import { 
-  Menu, X, Sun, Moon, 
+import {
+  Menu, X, Sun, Moon,
   LogOut as LogoutIcon, LayoutDashboard, Bell as BellIcon, UserCircle, Settings, UploadCloud, Trash2, History
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
@@ -40,13 +40,13 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { format, parseISO } from 'date-fns';
 
 
-const ADMIN_PROFILE_ID = '00000000-0000-0000-0000-00000000000A'; 
+const ADMIN_PROFILE_ID = '00000000-0000-0000-0000-00000000000A';
 
 export interface AdminNavItem {
   key: string;
   label: string;
   icon: LucideIcon;
-  href?: string; 
+  href?: string;
 }
 
 interface AdminPageLayoutProps {
@@ -105,13 +105,13 @@ export default function AdminPageLayout({
   };
 
   const fetchActivities = async () => {
-    if (!isActivitySheetOpen) return; 
+    if (!isActivitySheetOpen) return;
     setIsLoadingActivities(true);
     const { data, error } = await supabase
       .from('admin_activity_log')
       .select('*')
       .order('timestamp', { ascending: false })
-      .limit(20); 
+      .limit(20);
 
     if (error) {
       console.error("Error fetching admin activities:", error);
@@ -150,7 +150,7 @@ export default function AdminPageLayout({
   }, [profilePhotoFile, currentDbProfilePhotoUrl]);
 
 
-  if (!mounted) return null; 
+  if (!mounted) return null;
 
   let effectiveTheme = theme;
   if (theme === 'system' && typeof window !== 'undefined') {
@@ -160,8 +160,8 @@ export default function AdminPageLayout({
   const toggleTheme = () => setTheme(effectiveTheme === 'dark' ? 'light' : 'dark');
 
   const getUserInitials = (name: string) => {
-    if (!name) return "A"; 
-    const parts = name.split(/[\s@.]+/); 
+    if (!name) return "A";
+    const parts = name.split(/[\s@.]+/);
     if (parts.length > 0 && parts[0]) {
         if (parts.length > 1 && parts[1]) {
              return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
@@ -181,17 +181,17 @@ export default function AdminPageLayout({
 
   const handleSaveProfilePhoto = async () => {
     setIsUploadingPhoto(true);
-    let newPhotoUrlToSave: string | null = currentDbProfilePhotoUrl; 
+    let newPhotoUrlToSave: string | null = currentDbProfilePhotoUrl;
 
     if (profilePhotoFile) {
       const fileExt = profilePhotoFile.name.split('.').pop();
       const fileName = `admin_avatar_${Date.now()}.${fileExt}`;
-      const filePath = `${fileName}`; 
+      const filePath = `${fileName}`;
 
       toast({ title: "Uploading Profile Photo", description: "Please wait..." });
       const { data: uploadData, error: uploadError } = await supabase.storage
         .from('admin-profile-photos')
-        .upload(filePath, profilePhotoFile, { cacheControl: '3600', upsert: true }); 
+        .upload(filePath, profilePhotoFile, { cacheControl: '3600', upsert: true });
 
       if (uploadError) {
         toast({ title: "Upload Error", description: `Failed to upload photo: ${uploadError.message}`, variant: "destructive" });
@@ -219,9 +219,9 @@ export default function AdminPageLayout({
       toast({ title: "Database Error", description: `Failed to save profile photo URL: ${dbError.message}`, variant: "destructive" });
     } else {
       toast({ title: "Success", description: "Profile photo updated." });
-      setProfilePhotoUrl(newPhotoUrlToSave); 
+      setProfilePhotoUrl(newPhotoUrlToSave);
       setCurrentDbProfilePhotoUrl(newPhotoUrlToSave);
-      setProfilePhotoFile(null); 
+      setProfilePhotoFile(null);
       setIsPhotoModalOpen(false);
     }
     setIsUploadingPhoto(false);
@@ -232,7 +232,7 @@ export default function AdminPageLayout({
         toast({ title: "No Photo", description: "There is no profile photo to delete.", variant: "default" });
         return;
     }
-    setIsUploadingPhoto(true); 
+    setIsUploadingPhoto(true);
 
     const pathParts = currentDbProfilePhotoUrl.split('/admin-profile-photos/');
     if (pathParts.length > 1 && !pathParts[1].startsWith('http')) {
@@ -245,7 +245,7 @@ export default function AdminPageLayout({
     } else {
         console.warn("Could not parse storage path for deletion:", currentDbProfilePhotoUrl);
     }
-    
+
     const { error: dbError } = await supabase
       .from('admin_profile')
       .update({ profile_photo_url: null, updated_at: new Date().toISOString() })
@@ -269,7 +269,7 @@ export default function AdminPageLayout({
     <div className={cn("flex flex-col h-full text-sidebar-foreground", isMobile ? "w-full" : "w-64")}>
       <div className="p-4 border-b border-sidebar-border">
         <Link href="/admin/dashboard" className="flex items-center gap-2" onClick={() => { onSelectSection('dashboard'); if(isMobile) setIsMobileMenuOpen(false);}}>
-          <LayoutDashboard className="h-7 w-7 text-primary" /> {/* Using primary color for logo icon consistent with theme */}
+          <LayoutDashboard className="h-7 w-7 text-primary" />
           <span className="font-bold text-xl">Admin</span>
         </Link>
       </div>
@@ -280,11 +280,11 @@ export default function AdminPageLayout({
           return (
             <Button
               key={item.key}
-              variant="ghost" // Base variant is ghost for all
+              variant="ghost"
               className={cn(
                 "w-full justify-start text-sm py-2.5 px-3",
-                isActive 
-                  ? "bg-sidebar-primary text-sidebar-primary-foreground font-semibold rounded-lg" 
+                isActive
+                  ? "bg-sidebar-primary text-sidebar-primary-foreground font-semibold rounded-lg"
                   : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground rounded-lg"
               )}
               onClick={() => {
@@ -298,24 +298,7 @@ export default function AdminPageLayout({
           );
         })}
       </nav>
-      <div className="p-2 border-t border-sidebar-border mt-auto">
-        <Button
-            variant="ghost"
-            className={cn(
-                "w-full justify-start text-sm py-2.5 px-3",
-                 activeSection === 'settings' 
-                   ? "bg-sidebar-primary text-sidebar-primary-foreground font-semibold rounded-lg" 
-                   : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground rounded-lg"
-            )}
-            onClick={() => {
-                onSelectSection('settings');
-                if (isMobile) setIsMobileMenuOpen(false);
-            }}
-        >
-          <Settings className={cn("mr-3 h-5 w-5", activeSection === 'settings' ? "text-sidebar-primary-foreground" : "text-sidebar-foreground/70 group-hover:text-sidebar-accent-foreground")} />
-          Settings
-        </Button>
-      </div>
+      {/* Removed the dedicated Settings button from the bottom of the sidebar */}
     </div>
   );
 
@@ -324,7 +307,7 @@ export default function AdminPageLayout({
     <>
     <div className="flex h-screen bg-background text-foreground">
       <aside className="hidden md:flex md:flex-shrink-0">
-         <div className="flex flex-col w-64 border-r border-sidebar-border bg-sidebar h-full"> {/* Changed bg-card to bg-sidebar, border-border to border-sidebar-border */}
+         <div className="flex flex-col w-64 border-r border-sidebar-border bg-sidebar h-full">
             <SidebarContent />
          </div>
       </aside>
@@ -335,14 +318,14 @@ export default function AdminPageLayout({
             <Menu className="h-6 w-6" />
           </Button>
         </SheetTrigger>
-        <SheetContent side="left" className="p-0 w-72 bg-sidebar border-r border-sidebar-border"> {/* Changed bg-card to bg-sidebar, border-border to border-sidebar-border */}
+        <SheetContent side="left" className="p-0 w-72 bg-sidebar border-r border-sidebar-border">
           <SidebarContent isMobile />
         </SheetContent>
       </Sheet>
 
       <div className="flex flex-col flex-1 w-full overflow-hidden">
         <header className="sticky top-0 z-40 flex h-16 items-center justify-between border-b border-border bg-card px-4 md:px-6 shrink-0">
-          <div className="md:hidden"></div> 
+          <div className="md:hidden"></div>
           <h1 className="text-xl font-semibold text-foreground">{pageTitle}</h1>
           <div className="flex items-center gap-3">
             <Sheet open={isActivitySheetOpen} onOpenChange={setIsActivitySheetOpen}>
@@ -356,7 +339,7 @@ export default function AdminPageLayout({
                   <SheetTitle className="flex items-center"><History className="mr-2 h-5 w-5"/>Recent Activity</SheetTitle>
                   <SheetDescription>Latest updates and actions in the admin panel.</SheetDescription>
                 </SheetHeader>
-                <ScrollArea className="h-[calc(100vh-100px)] p-4"> 
+                <ScrollArea className="h-[calc(100vh-100px)] p-4">
                   {isLoadingActivities ? (
                     <p className="text-muted-foreground text-center py-4">Loading activities...</p>
                   ) : activities.length === 0 ? (
@@ -385,7 +368,7 @@ export default function AdminPageLayout({
             <Button variant="ghost" size="icon" onClick={toggleTheme} aria-label="Toggle theme" className="hover:text-primary">
               {effectiveTheme === 'dark' ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
             </Button>
-            
+
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="relative h-8 w-8 rounded-full p-0">
@@ -486,6 +469,3 @@ export default function AdminPageLayout({
     </>
   );
 }
-
-
-      
