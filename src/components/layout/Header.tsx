@@ -2,7 +2,7 @@
 "use client";
 
 import Link from 'next/link';
-import NextImage from 'next/image'; // Import NextImage
+import NextImage from 'next/image'; // Ensure NextImage is imported
 import { useState, useEffect, type ReactNode } from 'react';
 import { usePathname } from 'next/navigation';
 import { Menu, X, Sun, Moon, Home, User, Briefcase, Wrench, Map as MapIcon, Award, FileText, Mail } from 'lucide-react';
@@ -70,7 +70,7 @@ export default function Header() {
   const { theme, setTheme } = useTheme();
   const [activeLink, setActiveLink] = useState<string>('#hero');
   const pathname = usePathname();
-  const [themeIconContent, setThemeIconContent] = useState<ReactNode>(<div className="h-5 w-5" />); // Placeholder
+  const [themeIconNode, setThemeIconNode] = useState<ReactNode>(<div className="h-5 w-5" />); // Placeholder
 
   useEffect(() => {
     setIsClient(true);
@@ -83,9 +83,8 @@ export default function Header() {
     if (theme === 'system') {
       currentEffectiveTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
     }
-    setThemeIconContent(currentEffectiveTheme === 'dark' ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />);
+    setThemeIconNode(currentEffectiveTheme === 'dark' ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />);
   }, [isClient, theme]);
-
 
   useEffect(() => {
     const determineActiveLink = () => {
@@ -141,7 +140,7 @@ export default function Header() {
     };
     
     if (isClient) {
-      determineActiveLink(); // Initial check
+      determineActiveLink();
       window.addEventListener('scroll', determineActiveLink, { passive: true });
       window.addEventListener('hashchange', determineActiveLink);
       window.addEventListener('resize', determineActiveLink);
@@ -157,7 +156,7 @@ export default function Header() {
   }, [pathname, isClient, activeLink]); 
 
   const toggleTheme = () => {
-    if (!isClient) return; // Should not happen if button is enabled only on client
+    if (!isClient) return;
     let currentEffectiveTheme = theme;
     if (theme === 'system' && typeof window !== 'undefined') {
         currentEffectiveTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
@@ -167,8 +166,15 @@ export default function Header() {
   };
   
   if (isClient && pathname.startsWith('/admin')) {
-    return null;
+    return null; // Don't render header on admin paths after client mount
   }
+  if (!isClient && pathname.startsWith('/admin')) {
+    // During SSR or initial client render for an admin path,
+    // we could return null or a minimal placeholder if truly nothing should be there.
+    // However, to avoid hydration issues, it's often better to let the `if (isClient && ...)` handle it.
+    // For now, let's ensure it renders its structure for SSR to match potential client initial render.
+  }
+
 
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -177,8 +183,8 @@ export default function Header() {
           <NextImage 
             src="/logo.png" 
             alt="MLN Logo" 
-            width={60} 
-            height={32} 
+            width={60} // Adjust as needed
+            height={32} // Adjust as needed
             priority 
           />
         </Link>
@@ -193,9 +199,9 @@ export default function Header() {
             size="icon"
             onClick={toggleTheme}
             aria-label="Toggle theme"
-            disabled={!isClient}
+            disabled={!isClient} // Disable button until client is mounted
           >
-            {themeIconContent}
+            {themeIconNode}
           </Button>
 
           <div className="md:hidden">
@@ -219,8 +225,8 @@ export default function Header() {
                       <NextImage 
                         src="/logo.png" 
                         alt="MLN Logo" 
-                        width={60} 
-                        height={32} 
+                        width={60} // Adjust as needed
+                        height={32} // Adjust as needed
                         priority
                       />
                     </Link>
