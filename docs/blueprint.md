@@ -1,27 +1,206 @@
-# **App Name**: Personal portfolio
 
-## Core Features:
+# Application Blueprint: Personal Portfolio - Milan
 
-- Parallax Hero Section: A bold welcome screen with layered parallax effects and a subtle floating animation with a headline 'Hi, I'm Milan — a Creative Developer' and a CTA: 'Scroll to explore my journey'
-- Projects Gallery: Showcase key projects with descriptions, images, and links to live demos or repositories. Include auto slide functionality, and add forward and previous buttons.
-- Skills Overview: Provide a summary of skills and technologies with visual icons, like small icon boxes of many skills with categories such as: 💻 Programming Languages (Python, JavaScript, TypeScript, Java, C / C++, HTML / CSS), 🌐 Web Development (React.js, Next.js, Node.js, Express.js, RESTful APIs, Tailwind CSS, Bootstrap), 📱 Mobile Development (React Native, Flutter (Dart), Android (Java/Kotlin)), ☁️ Cloud & DevOps (Microsoft Azure, GitHub Actions, Docker, Firebase), 🗃️ Databases (MongoDB, MySQL, PostgreSQL, SQLite), 🧠 AI / ML / Data (Pandas, NumPy, Scikit-learn, TensorFlow, Keras, OpenAI API, Data Visualization (Matplotlib, Seaborn)), 🧰 Tools & Platforms (Git, GitHub, VS Code, Figma, Adobe XD, Postman, Linux, WSL, Ubuntu), 🎨 Soft Skills (Problem Solving, Communication, Team Collaboration, Time Management, Creativity). Also add a search bar for skills search with back functionality.
-- Contact Section: Include a contact form or direct links to email and social media profiles for easy communication.
-- Resume/CV Download: Provide a downloadable PDF version of your updated resume. Optionally, include a 'Print Resume' button for easy access
-- Timeline / Career Journey: Interactive timeline showing your education, work experience, certifications, and milestones. Visually appealing and easy to digest.
-- Light/Dark Mode Toggle: Improve accessibility and provide user control over visual preferences.
-- Certifications & Badges: Display certifications from platforms like Coursera, Udemy, LinkedIn, or Azure.
-- Admin Dashboard: Create an Admin Dashboard where admin can add, edit, delete contents in portfolio like about, skills, projects, etc
+## 1. Overview
 
-## Style Guidelines:
+*   **Purpose:** A dynamic, modern personal portfolio website for Milan, showcasing projects, skills, career journey, and contact information. All content is dynamically managed through a comprehensive admin dashboard.
+*   **Key Technologies:** Next.js (App Router), React, TypeScript, Supabase (PostgreSQL for database, Supabase Storage for file uploads), ShadCN UI components, Tailwind CSS.
 
-- Use a professional color palette with a focus on readability and visual hierarchy.
-- Accent: Teal (#008080) for a touch of sophistication and modernity.
-- Prioritize clear and legible typography with appropriate headings and body text sizes.
-- Utilize a consistent and clean icon set to visually represent skills, technologies, and contact information.
-- Employ a responsive layout that adapts seamlessly to different screen sizes and devices use hamburger menu for smaller devices.
-- Incorporate subtle animations and transitions to enhance user experience without being distracting.
-- Parallax Effect
-- Scroll-triggered reveals AOS, GSAP, or ScrollTrigger
-- Floating cards CSS 3D transform or Framer Motion
-- Animated background Vanta.js (waves, dots, net, etc.)
-- Typewriter intro Typed.js or custom CSS/JS
+## 2. Core Public-Facing Features (User View)
+
+*   **Hero Section:**
+    *   Displays admin-configurable main name.
+    *   Features a typewriter effect for multiple subtitles, managed from the admin panel.
+    *   Shows a list of social media links with icons (icon image URLs configured by admin).
+    *   Includes a scroll-down indicator.
+*   **About Me Section:**
+    *   Dynamic headline composed of multiple parts (main, code keyword, connector, creativity keyword), all editable.
+    *   Multiple paragraphs of text for the "About Me" description, managed via admin.
+    *   Displays an image (uploaded via admin) with an optional tagline (editable).
+*   **Projects Gallery:**
+    *   Displays projects in a responsive carousel.
+    *   Each project card shows: title, description, image (uploaded), tags, status (e.g., "Deployed", "In Progress" with progress bar), and links to Live Demo and Source Code (if available). All project details are managed by the admin.
+*   **Skills Overview:**
+    *   Skills are grouped into categories.
+    *   Categories can have custom icon image URLs.
+    *   Individual skills within categories can have their own icon image URLs and descriptions.
+    *   A search bar allows users to filter skills and categories.
+*   **Career Journey (Timeline):**
+    *   An interactive, visually distinct timeline.
+    *   Displays events like work experience, education, certifications, and milestones.
+    *   Each event includes a date, title, description, and a custom icon (via image URL).
+*   **Certifications & Badges:**
+    *   Displays certifications in a responsive carousel.
+    *   Each certification card shows: title, issuer, date, image (uploaded), and a link to verify the credential (if provided).
+    *   Image preview in a lightbox/modal on click.
+*   **Resume/CV Section:**
+    *   Displays an overall resume description/summary from the admin panel.
+    *   Provides buttons to "Preview PDF" (in a lightbox-style modal) and "Download PDF". The PDF itself is uploaded via the admin dashboard.
+    *   Includes "Last Updated" timestamp for the resume.
+    *   Uses tabs to show detailed sections:
+        *   **Experience:** Lists job roles with company, dates, description points, and an optional icon (via image URL).
+        *   **Education:** Lists degrees/certifications with institution, dates, description, and an optional icon (via image URL).
+        *   **Key Skills:** Displays skills grouped by categories. Categories can have icons (via image URL). Skills are listed as badges.
+        *   **Languages:** Lists languages with proficiency levels and optional icons (via image URL).
+*   **Contact Section:**
+    *   Displays contact information (address, phone, email) managed via admin.
+    *   Lists social media links (label, URL, icon image URL, display text) managed via admin.
+    *   Includes a functional contact form (Name, Email, Subject, Message, optional Phone Number) that saves submissions to the Supabase database.
+*   **Footer:**
+    *   Contains copyright information.
+    *   Links to "Terms & Conditions" and "Privacy Policy" pages, which display content dynamically managed from the admin dashboard (shown in modals).
+*   **UI/UX Features:**
+    *   Light/Dark mode toggle, persistent across sessions.
+    *   Fully responsive design for various screen sizes.
+    *   Preloader screen with a "1, 2, 3" zoom animation on initial load.
+    *   Subtle animations and transitions for a modern feel.
+
+## 3. Admin Dashboard Features (`/admin/dashboard`)
+
+*   **Authentication:**
+    *   Login page at `/admin/dashboard` (or redirects from `/admin`).
+    *   Uses static credentials defined in environment variables (`NEXT_PUBLIC_ADMIN_USERNAME`, `NEXT_PUBLIC_ADMIN_PASSWORD`). Client-side authentication.
+*   **Layout:**
+    *   Collapsible sidebar for navigation between content management sections.
+    *   Header displaying current section title, theme toggle, admin profile avatar, and activity log trigger.
+*   **Content Management Sections (All with CRUD capabilities):**
+    *   **Dashboard Overview:** Landing page (placeholder).
+    *   **Hero Section Manager:**
+        *   Edit Main Name.
+        *   Edit Subtitles (comma-separated for typewriter).
+        *   Add, Edit, Delete Social Media Links (each with label, URL, icon image URL).
+    *   **About Section Manager:**
+        *   Edit Headline components (main, code keyword, connector, creativity keyword).
+        *   Edit Paragraphs 1, 2, 3.
+        *   Upload/Manage "About Me" image (stored in `about-images` bucket).
+        *   Edit Image Tagline.
+    *   **Projects Manager:**
+        *   Add, Edit, Delete projects.
+        *   Fields: Title, Description, Image Upload (to `project-images` bucket) or URL, Live Demo URL, Repo URL, Tags (comma-separated), Status (dropdown: Deployed, In Progress, etc.), Progress percentage (slider).
+    *   **Skills Manager:**
+        *   **Skill Categories:** Add, Edit, Delete categories (Name, Icon Image Upload to `category-icons` bucket or URL, Sort Order).
+        *   **Skills (within categories):** Add, Edit, Delete skills (Name, Icon Image Upload to `skill-icons` bucket or URL, Description).
+    *   **Journey (Timeline) Manager:**
+        *   Add, Edit, Delete timeline events.
+        *   Fields: Date, Title, Description, Icon Image URL, Type (dropdown: Work, Education, etc.), Sort Order.
+    *   **Certifications Manager:**
+        *   Add, Edit, Delete certifications.
+        *   Fields: Title, Issuer, Date, Image Upload (to `certification-images` bucket) or URL, Verification URL.
+    *   **Resume Manager:**
+        *   **General Info:** Edit overall resume description, Upload/Manage main Resume PDF (to `resume-pdfs` bucket).
+        *   **Experience Tab:** Add, Edit, Delete experience entries (Job Title, Company, Dates, Description Points (textarea), Icon Image URL, Sort Order).
+        *   **Education Tab:** Add, Edit, Delete education entries (Degree/Cert, Institution, Dates, Description, Icon Image URL, Sort Order).
+        *   **Key Skills Tab:**
+            *   Manage Skill Categories (Category Name, Icon Image URL, Sort Order).
+            *   Manage Skills within categories (Skill Name).
+        *   **Languages Tab:** Add, Edit, Delete languages (Language Name, Proficiency, Icon Image URL, Sort Order).
+    *   **Contact & Submissions Manager:**
+        *   **Contact Page Details:** Edit Address, Phone (display & href), Email (display & href).
+        *   **Social Links (for contact page):** Add, Edit, Delete links (Label, URL, Icon Image URL, Display Text, Sort Order).
+        *   **Contact Form Submissions:** View list of submissions, filter by status (New, Replied, Archived), mark as starred, change status, view full message in a modal, delete submissions. (Reply via Edge Function partially implemented on client, full setup pending Edge Function deployment).
+    *   **Legal Pages Manager:**
+        *   Edit content for "Terms & Conditions".
+        *   Edit content for "Privacy Policy". (Content stored as text, can be Markdown/HTML).
+    *   **Settings Manager:**
+        *   Toggle site-wide Maintenance Mode (On/Off).
+        *   Edit the custom message displayed during Maintenance Mode.
+*   **Admin Profile:**
+    *   Dropdown menu from avatar.
+    *   Manage (upload, update, delete) admin profile photo (stored in `admin-profile-photos` bucket).
+    *   Logout button.
+*   **Activity Log:**
+    *   Accessible via a Bell icon in the header.
+    *   Displays a sheet with a list of recent admin actions (e.g., "Project 'X' created", "Admin logged in").
+    *   Option to clear the entire activity log (with confirmation).
+*   **Image Uploads:** All image uploads are handled via client-side selection, then uploaded to designated Supabase Storage buckets. Old images are deleted from storage when replaced or removed.
+
+## 4. Database Schema (Supabase - PostgreSQL)
+
+*   **`projects`**: `id`, `title`, `description`, `image_url`, `live_demo_url`, `repo_url`, `tags` (TEXT[]), `status`, `progress`, `created_at`.
+*   **`skill_categories`**: `id`, `name` (UNIQUE), `icon_image_url`, `sort_order`, `created_at`.
+*   **`skills`**: `id`, `name`, `icon_image_url`, `description`, `category_id` (FK to `skill_categories`), `created_at`.
+*   **`certifications`**: `id`, `title`, `issuer`, `date`, `image_url`, `verify_url`, `created_at`.
+*   **`timeline_events`**: `id`, `date`, `title`, `description`, `icon_image_url`, `type`, `sort_order`, `created_at`.
+*   **`about_content`**: `id` (Fixed UUID: `'00000000-0000-0000-0000-000000000001'`), `headline_main`, `headline_code_keyword`, `headline_connector`, `headline_creativity_keyword`, `paragraph1`, `paragraph2`, `paragraph3`, `image_url`, `image_tagline`, `updated_at`.
+*   **`resume_meta`**: `id` (Fixed UUID: `'00000000-0000-0000-0000-000000000003'`), `description`, `resume_pdf_url`, `updated_at`.
+*   **`resume_experience`**: `id`, `job_title`, `company_name`, `date_range`, `description_points` (TEXT[]), `icon_image_url`, `sort_order`, `created_at`.
+*   **`resume_education`**: `id`, `degree_or_certification`, `institution_name`, `date_range`, `description`, `icon_image_url`, `sort_order`, `created_at`.
+*   **`resume_key_skill_categories`**: `id`, `category_name` (UNIQUE), `icon_image_url`, `sort_order`, `created_at`.
+*   **`resume_key_skills`**: `id`, `skill_name`, `category_id` (FK to `resume_key_skill_categories`).
+*   **`resume_languages`**: `id`, `language_name` (UNIQUE), `proficiency`, `icon_image_url`, `sort_order`, `created_at`.
+*   **`hero_content`**: `id` (Fixed UUID: `'00000000-0000-0000-0000-000000000004'`), `main_name`, `subtitles` (TEXT[]), `social_media_links` (JSONB - array of `{label, url, icon_image_url}`), `updated_at`.
+*   **`contact_page_details`**: `id` (Fixed UUID: `'00000000-0000-0000-0000-000000000005'`), `address`, `phone`, `phone_href`, `email`, `email_href`, `updated_at`.
+*   **`social_links`**: `id`, `label`, `icon_image_url`, `url`, `display_text`, `sort_order`, `created_at`.
+*   **`contact_submissions`**: `id`, `name`, `email`, `subject`, `message`, `phone_number`, `status` (TEXT, default 'New'), `is_starred` (BOOLEAN, default false), `submitted_at`, `notes`.
+*   **`site_settings`**: `id` (Fixed TEXT: `'global_settings'`), `is_maintenance_mode_enabled` (BOOLEAN), `maintenance_message` (TEXT), `updated_at`.
+*   **`admin_profile`**: `id` (Fixed UUID: `'00000000-0000-0000-0000-00000000000A'`), `profile_photo_url`, `updated_at`.
+*   **`admin_activity_log`**: `id`, `timestamp`, `user_identifier`, `action_type`, `description`, `details` (JSONB), `is_read` (BOOLEAN).
+*   **`legal_documents`**: `id` (TEXT, PK - e.g., 'terms-and-conditions'), `title`, `content`, `updated_at`.
+
+*(All tables have appropriate RLS policies: public read for viewable content, and admin (`anon` for dev, `authenticated` for prod ideal) for management).*
+
+## 5. Storage Buckets (Supabase Storage)
+
+*   `project-images`
+*   `category-icons` (for skill categories)
+*   `skill-icons`
+*   `about-images`
+*   `certification-images`
+*   `resume-pdfs`
+*   `resume-experience-icons`
+*   `resume-education-icons`
+*   `resume-language-icons`
+*   `admin-profile-photos`
+
+*(RLS policies on buckets allow public read and admin (`anon` for dev) uploads/deletes).*
+
+## 6. Key Client-Side Components (Public-Facing)
+
+*   Section Components: `HeroSection.tsx`, `AboutSectionClientView.tsx`, `ProjectCarousel.tsx`, `SkillsClientView.tsx`, `TimelineItem.tsx`, `CertificationsClientView.tsx`, `ResumeSectionClientView.tsx`, `ContactSectionClientView.tsx`.
+*   UI Components: Extensive use of ShadCN UI components (`Button.tsx`, `Card.tsx`, `Dialog.tsx`, `Sheet.tsx`, `Input.tsx`, `Textarea.tsx`, `Switch.tsx`, `Accordion.tsx`, `Tabs.tsx`, `Badge.tsx`, `Progress.tsx`, `Avatar.tsx`, `DropdownMenu.tsx`, `ScrollArea.tsx`, `Select.tsx`, `Tooltip.tsx`, `AlertDialog.tsx`, `Toast.tsx`, `Toaster.tsx`).
+*   Layout Components: `Header.tsx`, `Footer.tsx`, `Preloader.tsx`.
+*   `ContactForm.tsx`
+
+## 7. Key Admin-Side Components
+
+*   `AdminPageLayout.tsx` (Main layout for the admin dashboard).
+*   Manager Components:
+    *   `HeroManager.tsx`
+    *   `AboutManager.tsx`
+    *   `ProjectsManager.tsx`
+    *   `SkillsManager.tsx`
+    *   `TimelineManager.tsx`
+    *   `CertificationsManager.tsx`
+    *   `ResumeManager.tsx`
+    *   `ContactManager.tsx`
+    *   `LegalManager.tsx`
+
+## 8. Server-Side Logic
+
+*   **Data Fetching:** Primarily done in Server Components (e.g., `src/app/page.tsx`, and the server-side parts of section components like `ProjectsSection.tsx`, `SkillsSection.tsx`, etc.) using the Supabase client.
+*   **Server Actions:**
+    *   `src/lib/actions.ts`: Used for the public contact form submission (`submitContactForm`).
+    *   Admin dashboard CRUD operations are handled client-side directly invoking Supabase client methods (insert, update, delete, storage uploads).
+*   **Middleware (`src/middleware.ts`):**
+    *   Handles maintenance mode redirection by checking `site_settings` in Supabase.
+
+## 9. Styling
+
+*   **Tailwind CSS:** For utility-first styling throughout the application.
+*   **ShadCN UI Theme:** Base theme configured in `src/app/globals.css` with CSS variables for light and dark modes, including custom sidebar theme variables.
+
+## 10. Key Environment Variables (`.env.local`)
+
+*   `NEXT_PUBLIC_SUPABASE_URL`
+*   `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+*   `NEXT_PUBLIC_ADMIN_USERNAME`
+*   `NEXT_PUBLIC_ADMIN_PASSWORD`
+
+## 11. Potential Future Enhancements
+
+*   Transition admin dashboard from client-side credential check to full Supabase Authentication for better security.
+*   Implement server-side pagination and more advanced filtering/searching for admin lists.
+*   Complete the email reply functionality for contact submissions with a fully deployed Supabase Edge Function.
+*   Add a dedicated blog section with admin management.
+*   Integrate analytics (e.g., Google Analytics or Firebase Analytics).
+*   Optimize image loading further and explore advanced Next.js caching strategies (ISR, ISG) if `force-dynamic` becomes a performance bottleneck.
