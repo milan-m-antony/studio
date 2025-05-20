@@ -4,15 +4,19 @@
 import Link from 'next/link';
 import NextImage from 'next/image';
 import { Button, buttonVariants } from '@/components/ui/button';
-import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle, SheetDescription, SheetFooter } from '@/components/ui/sheet';
+import { 
+  Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle, 
+  SheetDescription, SheetFooter 
+} from '@/components/ui/sheet';
 import {
   Menu, X, Sun, Moon,
-  LogOut as LogoutIcon, LayoutDashboard, Bell as BellIcon, UserCircle, Settings as SettingsIcon, UploadCloud, Trash2, History, FileText, ChevronRight
+  LogOut as LogoutIcon, LayoutDashboard, Bell as BellIcon, UserCircle, Settings as SettingsIcon, 
+  UploadCloud, Trash2, History, FileText, ChevronRight, ChevronLeft
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { useTheme } from '@/contexts/ThemeProvider';
 import { cn } from '@/lib/utils';
-import React, { useState, useEffect, type ChangeEvent, type ReactNode } from 'react';
+import React, { useState, useEffect, type ChangeEvent, type ReactNode, useCallback } from 'react';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   Dialog,
@@ -95,6 +99,23 @@ export default function AdminPageLayout({
   const [isLoadingActivities, setIsLoadingActivities] = useState(false);
   const [showClearLogConfirm, setShowClearLogConfirm] = useState(false);
   const [CurrentThemeIcon, setCurrentThemeIcon] = useState<ReactNode>(<div className="h-5 w-5" />);
+  
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+
+  useEffect(() => {
+    const savedState = localStorage.getItem('sidebarCollapsed');
+    if (savedState) {
+      setIsSidebarCollapsed(JSON.parse(savedState));
+    }
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem('sidebarCollapsed', JSON.stringify(isSidebarCollapsed));
+  }, [isSidebarCollapsed]);
+
+  const toggleSidebarCollapse = useCallback(() => {
+    setIsSidebarCollapsed(prev => !prev);
+  }, []);
 
 
   const fetchAdminProfile = async () => {
@@ -140,7 +161,7 @@ export default function AdminPageLayout({
     const { error } = await supabase
       .from('admin_activity_log')
       .delete()
-      .neq('id', '00000000-0000-0000-0000-000000000000'); // Placeholder ID, effectively deleting all
+      .neq('id', '00000000-0000-0000-0000-000000000000'); 
 
     if (error) {
       console.error("Error clearing activity log:", error);
@@ -176,7 +197,7 @@ export default function AdminPageLayout({
   }, [theme, headerIsMounted]);
 
   useEffect(() => {
-    if (isActivitySheetOpen && !isLoadingActivities) { // Fetch only if sheet is open and not already loading
+    if (isActivitySheetOpen && !isLoadingActivities) { 
       fetchActivities();
     }
   }, [isActivitySheetOpen]);
@@ -313,17 +334,22 @@ export default function AdminPageLayout({
     setIsUploadingPhoto(false);
   };
 
-
-  const SidebarContent = ({ isMobile = false }: { isMobile?: boolean }) => (
-    <div className={cn("flex flex-col h-full bg-sidebar text-sidebar-foreground", isMobile ? "w-full" : "w-64")}>
-      <div className="p-4 border-b border-sidebar-border flex items-center justify-between">
+  const SidebarContent = ({ isMobile = false, isCollapsed = false }: { isMobile?: boolean, isCollapsed?: boolean }) => (
+    <div className={cn("flex flex-col h-full bg-sidebar text-sidebar-foreground", isMobile ? "w-full" : "")}>
+      <div className={cn(
+        "px-4 border-b border-sidebar-border flex items-center h-16",
+        isCollapsed && !isMobile ? "justify-center" : "justify-between" 
+      )}>
         <Link
           href="/admin/dashboard"
-          className="flex items-center" // Removed gap-2 as text is removed
+          className={cn("flex items-center", isCollapsed && !isMobile ? "justify-center w-full" : "")}
           onClick={() => { onSelectSection('dashboard'); if(isMobile) setIsMobileMenuOpen(false);}}
           aria-label="Go to admin dashboard"
         >
-          <div className="relative h-10 w-10 rounded-full overflow-hidden border border-sidebar-accent flex-shrink-0">
+          <div className={cn(
+            "relative rounded-full overflow-hidden border border-sidebar-accent flex-shrink-0",
+            isCollapsed && !isMobile ? "h-8 w-8" : "h-10 w-10" 
+          )}>
             <NextImage
               src="/logo.png"
               alt="Portfolio Logo"
@@ -332,55 +358,60 @@ export default function AdminPageLayout({
             />
           </div>
         </Link>
-        {/* Placeholder for potential collapse button for desktop sidebar, not functional yet */}
         {!isMobile && (
-           <Button variant="ghost" size="icon" className="h-8 w-8 text-sidebar-foreground/70 hover:text-sidebar-foreground">
-            <ChevronRight className="h-5 w-5" />
+           <Button variant="ghost" size="icon" onClick={toggleSidebarCollapse} className="h-8 w-8 text-sidebar-foreground/70 hover:text-sidebar-foreground">
+            {isCollapsed ? <ChevronRight className="h-5 w-5" /> : <ChevronLeft className="h-5 w-5" />}
           </Button>
         )}
       </div>
-      <nav className="flex-grow p-2 space-y-1 overflow-y-auto">
-        {navItems.filter(item => item.key !== 'settings').map((item) => {
-          const Icon = item.icon;
-          const isActive = activeSection === item.key;
-          return (
-            <Button
-              key={item.key}
-              variant="ghost"
-              className={cn(
-                "w-full justify-start text-sm py-2.5 px-3",
-                isActive
-                  ? "bg-sidebar-primary text-sidebar-primary-foreground font-semibold rounded-lg"
-                  : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground rounded-lg"
-              )}
-              onClick={() => {
-                onSelectSection(item.key);
-                if (isMobile) setIsMobileMenuOpen(false);
-              }}
-            >
-              <Icon className={cn("mr-3 h-5 w-5", isActive ? "text-sidebar-primary-foreground" : "text-sidebar-foreground/70 group-hover:text-sidebar-accent-foreground")} />
-              {item.label}
-            </Button>
-          );
-        })}
-      </nav>
+      <ScrollArea className="flex-grow">
+        <nav className={cn("p-2 space-y-1", isCollapsed && !isMobile ? "flex flex-col items-center" : "")}>
+          {navItems.filter(item => item.key !== 'settings').map((item) => {
+            const Icon = item.icon;
+            const isActive = activeSection === item.key;
+            return (
+              <Button
+                key={item.key}
+                variant="ghost"
+                className={cn(
+                  "w-full justify-start text-sm py-2.5 px-3",
+                  isActive
+                    ? "bg-sidebar-primary text-sidebar-primary-foreground font-semibold rounded-lg"
+                    : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground rounded-lg",
+                  isCollapsed && !isMobile ? "justify-center w-auto p-2.5" : ""
+                )}
+                onClick={() => {
+                  onSelectSection(item.key);
+                  if (isMobile) setIsMobileMenuOpen(false);
+                }}
+                title={isCollapsed && !isMobile ? item.label : undefined}
+              >
+                <Icon className={cn("h-5 w-5", isActive ? "text-sidebar-primary-foreground" : "text-sidebar-foreground/70 group-hover:text-sidebar-accent-foreground", isCollapsed && !isMobile ? "mr-0" : "mr-3")} />
+                {(!isCollapsed || isMobile) && <span>{item.label}</span>}
+              </Button>
+            );
+          })}
+        </nav>
+      </ScrollArea>
       {navItems.find(item => item.key === 'settings') && (
-        <div className="mt-auto p-2 border-t border-sidebar-border">
+        <div className={cn("mt-auto p-2 border-t border-sidebar-border", isCollapsed && !isMobile ? "flex flex-col items-center" : "")}>
             <Button
               variant="ghost"
               className={cn(
                 "w-full justify-start text-sm py-2.5 px-3",
                 activeSection === 'settings'
                   ? "bg-sidebar-primary text-sidebar-primary-foreground font-semibold rounded-lg"
-                  : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground rounded-lg"
+                  : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground rounded-lg",
+                isCollapsed && !isMobile ? "justify-center w-auto p-2.5" : ""
               )}
               onClick={() => {
                 onSelectSection('settings');
                 if (isMobile) setIsMobileMenuOpen(false);
               }}
+              title={isCollapsed && !isMobile ? navItems.find(item => item.key === 'settings')?.label : undefined}
             >
-              <SettingsIcon className={cn("mr-3 h-5 w-5", activeSection === 'settings' ? "text-sidebar-primary-foreground" : "text-sidebar-foreground/70 group-hover:text-sidebar-accent-foreground")} />
-              {navItems.find(item => item.key === 'settings')?.label}
+              <SettingsIcon className={cn("h-5 w-5", activeSection === 'settings' ? "text-sidebar-primary-foreground" : "text-sidebar-foreground/70 group-hover:text-sidebar-accent-foreground", isCollapsed && !isMobile ? "mr-0" : "mr-3")} />
+              {(!isCollapsed || isMobile) && <span>{navItems.find(item => item.key === 'settings')?.label}</span>}
             </Button>
         </div>
       )}
@@ -390,9 +421,12 @@ export default function AdminPageLayout({
   return (
     <>
     <div className="flex h-screen bg-background text-foreground">
-      <aside className="hidden md:flex md:flex-shrink-0">
-         <div className="flex flex-col w-64 border-r border-sidebar-border bg-sidebar h-full">
-            <SidebarContent />
+      <aside className={cn(
+        "hidden md:flex md:flex-shrink-0 transition-all duration-300 ease-in-out",
+        isSidebarCollapsed ? "w-20" : "w-64"
+      )}>
+         <div className={cn("flex flex-col border-r border-sidebar-border bg-sidebar h-full w-full")}>
+            <SidebarContent isCollapsed={isSidebarCollapsed}/>
          </div>
       </aside>
 
@@ -407,9 +441,12 @@ export default function AdminPageLayout({
         </SheetContent>
       </Sheet>
 
-      <div className="flex flex-col flex-1 w-full overflow-hidden">
+      <div className={cn(
+        "flex flex-col flex-1 w-full overflow-hidden transition-all duration-300 ease-in-out",
+        !isMobileMenuOpen && (isSidebarCollapsed ? "md:ml-20" : "md:ml-64")
+      )}>
         <header className="sticky top-0 z-40 flex h-16 items-center justify-between border-b border-border bg-card px-4 md:px-6 shrink-0">
-          <div className="md:hidden"></div> {/* Spacer for mobile when menu button is on left */}
+          <div className="md:hidden"></div> 
           <h1 className="text-xl font-semibold text-foreground">{pageTitle}</h1>
           <div className="flex items-center gap-3">
             <Sheet open={isActivitySheetOpen} onOpenChange={setIsActivitySheetOpen}>
@@ -555,7 +592,7 @@ export default function AdminPageLayout({
                         <Trash2 className="mr-2 h-4 w-4" /> Remove Current Photo
                     </Button>
                 )}
-                {!currentDbProfilePhotoUrl && <div className="sm:hidden" />} {/* Spacer for mobile if no remove button */}
+                {!currentDbProfilePhotoUrl && <div className="sm:hidden" />} 
                 <div className="flex gap-2 justify-end">
                     <DialogClose asChild>
                         <Button type="button" variant="outline">Cancel</Button>
@@ -596,3 +633,4 @@ export default function AdminPageLayout({
     </>
   );
 }
+
