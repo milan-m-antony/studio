@@ -1,7 +1,6 @@
 // src/app/page.tsx
-import { use } from 'react'; // Make sure 'use' is imported
+import { use } from 'react';
 
-// Re-import all section components
 import HeroSection from '@/components/sections/HeroSection';
 import AboutSection from '@/components/sections/AboutSection';
 import ProjectsSection from '@/components/sections/ProjectsSection';
@@ -14,10 +13,9 @@ import ContactSection from '@/components/sections/ContactSection';
 import { supabase } from '@/lib/supabaseClient';
 import type { HeroContent, StoredHeroSocialLink, HeroSocialLinkItem } from '@/types/supabase';
 
-// This directive tells Next.js to render this page dynamically on every request.
 export const dynamic = "force-dynamic";
 
-const PRIMARY_HERO_CONTENT_ID = '00000000-0000-0000-0000-000000000004'; // Ensure this is your correct fixed ID
+const PRIMARY_HERO_CONTENT_ID = '00000000-0000-0000-0000-000000000004';
 
 async function getHeroContentData(): Promise<HeroContent | null> {
   console.log('[HomePage] Attempting to fetch hero content...');
@@ -49,16 +47,13 @@ async function getHeroContentData(): Promise<HeroContent | null> {
 
     let mappedSocialLinks: HeroSocialLinkItem[] = [];
     if (data.social_media_links && Array.isArray(data.social_media_links)) {
-      mappedSocialLinks = data.social_media_links.map((link: any, index: number) => { // Using 'any' for raw link from DB
+      mappedSocialLinks = data.social_media_links.map((link: any, index: number): HeroSocialLinkItem => {
         console.log(`[HomePage] Mapping social link ${index} from DB:`, JSON.stringify(link));
-        // Defensive mapping: check for icon_image_url first, then fall back to icon_name if old data structure
-        const iconUrl = link.icon_image_url || (link as StoredHeroSocialLink).icon_image_url || null;
-
         return {
-          id: link.id || crypto.randomUUID(), // Use existing id if available, otherwise generate
+          id: link.id || crypto.randomUUID(), // Use existing DB id if available, or generate client-side UUID
           label: link.label || 'Social Link',
           url: link.url || '#',
-          icon_image_url: iconUrl, // Mapped from either icon_image_url or icon_name
+          icon_image_url: link.icon_image_url || null, // Use icon_image_url
         };
       });
     } else if (data.social_media_links) {
@@ -66,17 +61,22 @@ async function getHeroContentData(): Promise<HeroContent | null> {
     }
     console.log('[HomePage] Mapped social_media_links for HeroSection:', JSON.stringify(mappedSocialLinks));
 
-
+    // Ensure the returned object matches HeroContent, especially social_media_links
     return {
-      ...data, // Spread the original data
-      social_media_links: mappedSocialLinks, // Override with the correctly mapped version
-    } as HeroContent; // Asserting as HeroContent which expects HeroSocialLinkItem[]
+      id: data.id,
+      main_name: data.main_name,
+      subtitles: data.subtitles,
+      social_media_links: mappedSocialLinks, // Use the correctly typed and mapped array
+      updated_at: data.updated_at,
+    } as HeroContent; // Asserting as HeroContent which expects StoredHeroSocialLink[] after mapping if needed.
+                     // For passing to client component, HeroSocialLinkItem[] is fine.
 
   } catch (e: any) {
     console.error('[HomePage] EXCEPTION fetching hero_content:', e.message, e);
     return null;
   }
 }
+
 
 interface HomePageProps {
   params?: { [key: string]: string | string[] | undefined };
@@ -91,8 +91,9 @@ export default async function HomePage(props: HomePageProps) {
   const heroContent = await getHeroContentData();
   console.log('[HomePage] Rendering HomePage. Hero content fetched (main_name):', heroContent?.main_name);
   if (heroContent?.social_media_links) {
-    console.log('[HomePage] Mapped social_media_links for HeroSection (in HomePage render):', JSON.stringify(heroContent.social_media_links));
+    console.log('[HomePage] Passing social_media_links to HeroSection:', JSON.stringify(heroContent.social_media_links));
   }
+
 
   return (
     <>
