@@ -146,23 +146,14 @@ export default function Header() {
   const toggleTheme = () => {
     if (!isClient) return;
     let currentEffectiveTheme = theme;
-    if (theme === 'system' && typeof window !== 'undefined') {
+    if (theme === 'system' && typeof window !== 'undefined') { // Check window for matchMedia
         currentEffectiveTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
     }
     const newThemeToSet = currentEffectiveTheme === 'dark' ? 'light' : 'dark';
     setTheme(newThemeToSet);
   };
-
-  let themeIconNode: ReactNode = <div className="h-5 w-5" />; // Placeholder for SSR and initial client render
-
-  if (isClient) {
-    let effectiveTheme = theme;
-    if (theme === 'system' && typeof window !== 'undefined') {
-      effectiveTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-    }
-    themeIconNode = effectiveTheme === 'dark' ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />;
-  }
   
+  // Conditional rendering for the entire header on admin paths
   if (isClient && pathname.startsWith('/admin')) {
     return null;
   }
@@ -180,8 +171,24 @@ export default function Header() {
         </nav>
 
         <div className="flex items-center gap-2">
-          <Button variant="ghost" size="icon" onClick={toggleTheme} aria-label="Toggle theme" disabled={!isClient}>
-            {themeIconNode}
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={toggleTheme}
+            aria-label="Toggle theme"
+            disabled={!isClient} 
+          >
+            {isClient ? (
+              (() => {
+                let effectiveTheme = theme;
+                if (theme === 'system' && typeof window !== 'undefined') {
+                  effectiveTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+                }
+                return effectiveTheme === 'dark' ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />;
+              })()
+            ) : (
+              <div className="h-5 w-5" /> // Placeholder rendered on server and initial client pass
+            )}
           </Button>
 
           <div className="md:hidden">
