@@ -6,12 +6,19 @@ import { useRouter } from 'next/navigation';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea'; // Added for maintenance message
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { ShieldCheck, LogOut, AlertTriangle, LogIn, Home as HomeIcon, Users, Briefcase, Wrench, MapPin as JourneyIcon, Award, FileText as ResumeIcon, Mail, Settings as SettingsIcon, LayoutDashboard, Gavel as LegalIcon } from 'lucide-react';
+import { Switch } from "@/components/ui/switch"; // Added Switch component
+import { 
+  ShieldCheck, LogOut, AlertTriangle, LogIn, Home as HomeIcon, Users, Briefcase, 
+  Wrench, MapPin as JourneyIcon, Award, FileText as ResumeIcon, Mail, 
+  Settings as SettingsIcon, LayoutDashboard, Gavel as LegalIcon, Loader2 
+} from 'lucide-react';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
-import { supabase } from '@/lib/supabaseClient'; // Added Supabase import
+import { supabase } from '@/lib/supabaseClient'; 
+import type { SiteSettings } from '@/types/supabase'; // Added SiteSettings type
 
 // Import Admin Managers
 import HeroManager from '@/components/admin/HeroManager';
@@ -25,6 +32,7 @@ import ContactManager from '@/components/admin/ContactManager';
 import LegalManager from '@/components/admin/LegalManager';
 import AdminPageLayout, { type AdminNavItem } from '@/components/admin/AdminPageLayout';
 
+const ADMIN_SITE_SETTINGS_ID = 'global_settings'; // Fixed ID for site_settings row
 
 const adminNavItems: AdminNavItem[] = [
   { key: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -37,7 +45,7 @@ const adminNavItems: AdminNavItem[] = [
   { key: 'resume', label: 'Resume', icon: ResumeIcon },
   { key: 'contact', label: 'Contact & Submissions', icon: Mail },
   { key: 'legal', label: 'Legal Pages', icon: LegalIcon },
-  // { key: 'settings', label: 'Settings', icon: SettingsIcon }, // Future
+  { key: 'settings', label: 'Settings', icon: SettingsIcon },
 ];
 
 function getPageTitle(sectionKey: string): string {
@@ -65,15 +73,68 @@ export default function AdminDashboardPage() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
-  const [activeSection, setActiveSection] = useState('dashboard'); // Default section
+  const [activeSection, setActiveSection] = useState('dashboard');
+
+  // State for Site Settings / Maintenance Mode
+  const [isMaintenanceMode, setIsMaintenanceMode] = useState(false);
+  const [isLoadingSettings, setIsLoadingSettings] = useState(false);
+  const [maintenanceMessageInput, setMaintenanceMessageInput] = useState(''); // For editing message
 
   useEffect(() => {
     setIsMounted(true);
     if (typeof window !== 'undefined') {
       const authStatus = localStorage.getItem('isAdminAuthenticated') === 'true';
       setIsAuthenticatedForRender(authStatus);
+      if (authStatus && activeSection === 'settings') {
+        fetchSiteSettings();
+      }
     }
-  }, []);
+  }, [activeSection]); // Re-fetch settings if settings tab becomes active
+
+  const fetchSiteSettings = async () => {
+    setIsLoadingSettings(true);
+    const { data, error } = await supabase
+      .from('site_settings')
+      .select('is_maintenance_mode_enabled, maintenance_message')
+      .eq('id', ADMIN_SITE_SETTINGS_ID)
+      .maybeSingle();
+
+    if (error) {
+      console.error("Error fetching site settings:", error);
+      // toast({ title: "Error", description: "Could not load site settings.", variant: "destructive" });
+    } else if (data) {
+      setIsMaintenanceMode(data.is_maintenance_mode_enabled);
+      setMaintenanceMessageInput(data.maintenance_message || '');
+    }
+    setIsLoadingSettings(false);
+  };
+
+  const handleToggleMaintenanceMode = async (checked: boolean) => {
+    setIsLoadingSettings(true);
+    const { error } = await supabase
+      .from('site_settings')
+      .update({ is_maintenance_mode_enabled: checked, updated_at: new Date().toISOString() })
+      .eq('id', ADMIN_SITE_SETTINGS_ID);
+
+    if (error) {
+      console.error("Error updating maintenance mode:", error);
+      // toast({ title: "Error", description: "Failed to update maintenance mode.", variant: "destructive" });
+    } else {
+      setIsMaintenanceMode(checked);
+      // toast({ title: "Success", description: `Maintenance mode ${checked ? 'enabled' : 'disabled'}.` });
+      // Log activity
+      await supabase.from('admin_activity_log').insert({
+        action_type: checked ? 'MAINTENANCE_MODE_ENABLED' : 'MAINTENANCE_MODE_DISABLED',
+        description: `Admin ${checked ? 'enabled' : 'disabled'} site maintenance mode.`,
+        user_identifier: process.env.NEXT_PUBLIC_ADMIN_USERNAME || 'admin'
+      });
+    }
+    setIsLoadingSettings(false);
+  };
+  
+  // Handler for saving maintenance message (optional future feature)
+  // const handleSaveMaintenanceMessage = async () => { /* ... */ };
+
 
   const handleLoginSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -103,7 +164,6 @@ export default function AdminDashboardPage() {
         window.dispatchEvent(new CustomEvent('authChange'));
       }
       setIsAuthenticatedForRender(true);
-      // Log login success
       try {
         const { error: logError } = await supabase
           .from('admin_activity_log')
@@ -133,8 +193,7 @@ export default function AdminDashboardPage() {
     setIsAuthenticatedForRender(false);
     setUsername('');
     setPassword('');
-    setActiveSection('dashboard'); // Reset to dashboard view on logout
-    // Log logout
+    setActiveSection('dashboard'); 
     try {
       const { error: logError } = await supabase
         .from('admin_activity_log')
@@ -147,13 +206,14 @@ export default function AdminDashboardPage() {
     } catch (e) {
       console.error("Exception during admin logout logging:", e);
     }
-    router.push('/admin/dashboard'); // Ensure redirect to login view
+    router.push('/admin/dashboard'); 
   };
 
   if (!isMounted) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-background p-4">
-        <p className="text-muted-foreground">Loading dashboard...</p>
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <p className="ml-3 text-muted-foreground">Loading dashboard...</p>
       </div>
     );
   }
@@ -214,10 +274,72 @@ export default function AdminDashboardPage() {
       {activeSection === 'legal' && <LegalManager />} 
       {activeSection === 'settings' && (
         <Card>
-          <CardHeader><CardTitle>Settings</CardTitle><CardDescription>Site settings and account actions.</CardDescription></CardHeader>
-          <CardContent><p>Settings management coming soon.</p></CardContent>
+          <CardHeader>
+            <CardTitle>Site Settings</CardTitle>
+            <CardDescription>Manage global site settings and configurations.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-8">
+            {/* Site Availability / Maintenance Mode Card */}
+            <Card className="shadow-md">
+              <CardHeader>
+                <CardTitle className="text-xl">Site Availability</CardTitle>
+                <CardDescription>Control whether your site is live or in maintenance mode.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-center justify-between p-4 border rounded-lg shadow-sm bg-card-foreground/5 dark:bg-card-foreground/10">
+                  <div>
+                    <Label htmlFor="maintenance-mode-switch" className="font-semibold text-lg cursor-pointer">
+                      Maintenance Mode
+                    </Label>
+                    <p className="text-sm text-muted-foreground max-w-md">
+                      When enabled, visitors (excluding logged-in admins, ideally) will see a maintenance page.
+                      You can still access the admin dashboard.
+                    </p>
+                  </div>
+                  {isLoadingSettings ? (
+                    <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                  ) : (
+                    <Switch
+                      id="maintenance-mode-switch"
+                      checked={isMaintenanceMode}
+                      onCheckedChange={handleToggleMaintenanceMode}
+                      aria-label="Toggle maintenance mode"
+                      className="data-[state=checked]:bg-destructive data-[state=unchecked]:bg-muted"
+                    />
+                  )}
+                </div>
+                <p className="text-xs text-muted-foreground mt-3">
+                  {isMaintenanceMode 
+                    ? "Site is currently in maintenance mode. Only admins may see full content." 
+                    : "Site is currently live and accessible to all visitors."}
+                </p>
+                 {/* Placeholder for editing maintenance message - could be another Card or section here */}
+                 {/* 
+                 <div className="mt-6 pt-6 border-t">
+                    <Label htmlFor="maintenanceMessage" className="font-semibold text-lg block mb-2">Maintenance Page Message</Label>
+                    <Textarea 
+                        id="maintenanceMessage"
+                        value={maintenanceMessageInput}
+                        onChange={(e) => setMaintenanceMessageInput(e.target.value)}
+                        placeholder="Our site is currently undergoing scheduled maintenance. We expect to be back online shortly. Thank you for your patience!"
+                        rows={4}
+                        className="mb-2"
+                    />
+                    <Button onClick={handleSaveMaintenanceMessage} disabled={isLoadingSettings}>
+                        {isLoadingSettings ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                        Save Message
+                    </Button>
+                 </div>
+                 */}
+              </CardContent>
+            </Card>
+            {/* Add other settings sections/cards here as needed */}
+          </CardContent>
         </Card>
       )}
     </AdminPageLayout>
   );
 }
+
+
+    
