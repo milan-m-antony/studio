@@ -2,11 +2,11 @@
 "use client";
 
 import Link from 'next/link';
-import { useState, useEffect, type ReactNode, type ComponentType } from 'react'; // Added ComponentType
+import { useState, useEffect, type ReactNode } from 'react';
 import { usePathname } from 'next/navigation';
 import { Menu, X, Sun, Moon, Code2, Home, User, Briefcase, Wrench, Map as MapIcon, Award, FileText, Mail } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { useTheme } from '@/contexts/ThemeProvider';
 import { cn } from '@/lib/utils';
 
@@ -65,35 +65,35 @@ const NavLinks = ({ onClick, activeHref }: { onClick?: () => void; activeHref: s
 
 export default function Header() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [headerIsMounted, setHeaderIsMounted] = useState(false); // Renamed from mounted
+  const [isClient, setIsClient] = useState(false); // Used to delay client-specific rendering
   const { theme, setTheme } = useTheme();
   const [activeLink, setActiveLink] = useState<string>('#hero');
   const pathname = usePathname();
-  const [shouldRenderHeader, setShouldRenderHeader] = useState(true);
-  const [ThemeIcon, setThemeIcon] = useState<ReactNode | null>(null); // State for the icon component
+  const [CurrentThemeIcon, setCurrentThemeIcon] = useState<ReactNode>(<div className="h-5 w-5" />); // Default placeholder
 
   useEffect(() => {
-    setHeaderIsMounted(true);
+    setIsClient(true); // Set to true once component mounts on client
   }, []);
 
   useEffect(() => {
-    if (headerIsMounted) { // Only check pathname after mount
-      if (pathname.startsWith('/admin')) {
-        setShouldRenderHeader(false);
-      } else {
-        setShouldRenderHeader(true);
+    if (isClient) { // Only update theme icon after mount
+      let effectiveTheme = theme;
+      if (theme === 'system') {
+        effectiveTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
       }
+      setCurrentThemeIcon(effectiveTheme === 'dark' ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />);
     }
-  }, [pathname, headerIsMounted]);
-  
+  }, [theme, isClient]);
+
   useEffect(() => {
     const determineActiveLink = () => {
-      if (!headerIsMounted || !shouldRenderHeader || pathname.startsWith('/admin')) {
-        // No active link logic needed if header isn't shown or on admin pages
+      if (!isClient || pathname.startsWith('/admin')) {
         return;
       }
       
       const currentHash = window.location.hash;
+      const currentPath = pathname;
+
       if (currentPath === '/') {
         if (currentHash && currentHash !== '#') {
           if (publicNavItems.some(item => item.href === currentHash)) {
@@ -137,82 +137,25 @@ export default function Header() {
         setActiveLink(newActiveLink);
       }
     };
-
-    const currentPath = pathname;
-
-    if (headerIsMounted && shouldRenderHeader) {
-      determineActiveLink(); 
+    
+    if (isClient) {
+      determineActiveLink();
       window.addEventListener('scroll', determineActiveLink, { passive: true });
       window.addEventListener('hashchange', determineActiveLink);
-      window.addEventListener('resize', determineActiveLink); 
+      window.addEventListener('resize', determineActiveLink);
     }
 
     return () => {
-      if (headerIsMounted && shouldRenderHeader) {
+      if (isClient) {
         window.removeEventListener('scroll', determineActiveLink);
         window.removeEventListener('hashchange', determineActiveLink);
         window.removeEventListener('resize', determineActiveLink);
       }
     };
-  }, [pathname, headerIsMounted, shouldRenderHeader]); 
+  }, [pathname, isClient, activeLink]); 
 
-  // Effect to set the theme icon only after mount and theme is known
-  useEffect(() => {
-    if (headerIsMounted) {
-      let effectiveTheme = theme;
-      if (theme === 'system') {
-        effectiveTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-      }
-      setThemeIcon(effectiveTheme === 'dark' ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />);
-    }
-  }, [theme, headerIsMounted]);
-
-  if (!headerIsMounted || !shouldRenderHeader) {
-    // Return a minimal structure or null if header shouldn't render.
-    // This initial render must match what the server would render for this component
-    // (which is effectively the header structure or nothing if hidden by path).
-    // To ensure no mismatch, if it's an admin path, this should be null.
-    // Otherwise, it can render the header structure but with a placeholder for the icon.
-    if (pathname.startsWith('/admin')) return null;
-    
-    // For non-admin paths, render the header but with a placeholder for the theme icon
-    // to avoid hydration issues with the icon itself before mount.
-    return (
-      <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="container mx-auto flex h-16 max-w-screen-2xl items-center justify-between px-4 sm:px-6 lg:px-8">
-          <Link href="/" className="flex items-center gap-2">
-            <Code2 className="h-7 w-7 text-primary" />
-            <span className="font-bold text-xl">Milan.dev</span>
-          </Link>
-          <nav className="hidden md:flex items-center space-x-1">
-            <NavLinks activeHref={activeLink} />
-          </nav>
-          <div className="flex items-center gap-2">
-            <Button variant="ghost" size="icon" aria-label="Toggle theme">
-              <div className="h-5 w-5" /> {/* Placeholder for icon before mount */}
-            </Button>
-            <div className="md:hidden">
-              {/* Mobile menu SheetTrigger remains, content will also handle icon display after mount */}
-              <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
-                <SheetTrigger asChild>
-                  <Button variant="ghost" size="icon" aria-label="Open menu" className="transition-transform duration-300 ease-in-out hover:rotate-90">
-                    {isMobileMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
-                  </Button>
-                </SheetTrigger>
-                <SheetContent /* ... */ >
-                   {/* ... Sheet Content ... */}
-                </SheetContent>
-              </Sheet>
-            </div>
-          </div>
-        </div>
-      </header>
-    );
-  }
-
-  // This is rendered after headerIsMounted is true
   const toggleTheme = () => {
-    // Recalculate effectiveTheme for toggle, as ThemeIcon state might not be instant
+    if (!isClient) return;
     let currentEffectiveTheme = theme;
     if (theme === 'system') {
         currentEffectiveTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
@@ -221,6 +164,13 @@ export default function Header() {
     setTheme(newThemeToSet);
   };
 
+  if (isClient && pathname.startsWith('/admin')) {
+    // On the client, if it's an admin path, render nothing for the header.
+    return null;
+  }
+
+  // For SSR, or for client-side initial render (before isClient is true),
+  // or for non-admin paths on the client, render the header.
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container mx-auto flex h-16 max-w-screen-2xl items-center justify-between px-4 sm:px-6 lg:px-8">
@@ -230,12 +180,12 @@ export default function Header() {
         </Link>
 
         <nav className="hidden md:flex items-center space-x-1">
-          <NavLinks activeHref={activeLink} />
+          <NavLinks activeHref={activeLink} onClick={() => isMobileMenuOpen && setIsMobileMenuOpen(false)} />
         </nav>
 
         <div className="flex items-center gap-2">
-          <Button variant="ghost" size="icon" onClick={toggleTheme} aria-label="Toggle theme">
-            {ThemeIcon || <div className="h-5 w-5" />} {/* Render stored icon or placeholder */}
+          <Button variant="ghost" size="icon" onClick={toggleTheme} aria-label="Toggle theme" disabled={!isClient}>
+            {CurrentThemeIcon}
           </Button>
 
           <div className="md:hidden">
