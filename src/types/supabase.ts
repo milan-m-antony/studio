@@ -14,7 +14,7 @@ export type Json =
 export interface StoredHeroSocialLink {
   label: string;
   url: string;
-  icon_image_url: string | null; // Changed from icon_name to icon_image_url
+  icon_image_url: string | null; // Changed from icon_name
 }
 
 // Interface for Hero social links when managed in client-side state (includes temporary id)
@@ -25,6 +25,13 @@ export interface HeroSocialLinkItem extends StoredHeroSocialLink {
 export interface AdminProfile {
   id: string;
   profile_photo_url: string | null;
+  updated_at: string;
+}
+
+export interface SiteSettings {
+  id: string; // 'global_settings'
+  is_maintenance_mode_enabled: boolean;
+  maintenance_message: string | null;
   updated_at: string;
 }
 
@@ -50,21 +57,15 @@ export interface Database {
   public: {
     Tables: {
       admin_profile: {
-        Row: {
-          id: string;
-          profile_photo_url: string | null;
-          updated_at: string;
-        }
-        Insert: {
-          id: string;
-          profile_photo_url?: string | null;
-          updated_at?: string;
-        }
-        Update: {
-          id?: string;
-          profile_photo_url?: string | null;
-          updated_at?: string;
-        }
+        Row: AdminProfile
+        Insert: Omit<AdminProfile, 'updated_at'> & { updated_at?: string; }
+        Update: Partial<AdminProfile>
+        Relationships: [];
+      }
+      site_settings: {
+        Row: SiteSettings
+        Insert: Omit<SiteSettings, 'updated_at'> & { updated_at?: string; }
+        Update: Partial<SiteSettings>
         Relationships: [];
       }
       admin_activity_log: {
@@ -73,7 +74,7 @@ export interface Database {
         Update: Partial<AdminActivityLog>
         Relationships: [];
       }
-      legal_documents: { // New table for legal documents
+      legal_documents: {
         Row: LegalDocument
         Insert: Omit<LegalDocument, 'updated_at'> & { updated_at?: string; }
         Update: Partial<LegalDocument>
@@ -85,6 +86,7 @@ export interface Database {
           title: string
           description: string | null
           image_url: string | null
+          // image_hint was removed
           live_demo_url: string | null
           repo_url: string | null
           tags: string[] | null
@@ -122,7 +124,7 @@ export interface Database {
         Row: {
           id: string
           name: string
-          icon_image_url: string | null // Changed from icon_name
+          icon_image_url: string | null // For uploaded image URL
           sort_order: number | null
           created_at: string
         }
@@ -146,7 +148,7 @@ export interface Database {
         Row: {
           id: string
           name: string
-          icon_image_url: string | null // Changed from icon_name
+          icon_image_url: string | null // For uploaded image URL
           description: string | null
           category_id: string | null
           created_at: string;
@@ -449,7 +451,7 @@ export interface Database {
           id: string;
           main_name: string | null;
           subtitles: string[] | null;
-          social_media_links: StoredHeroSocialLink[] | null; // Changed from individual social urls
+          social_media_links: StoredHeroSocialLink[] | null;
           updated_at: string;
         }
         Insert: {
@@ -589,9 +591,9 @@ export interface Project {
   id: string;
   title: string;
   description: string | null;
-  imageUrl: string | null; // Mapped from image_url
-  liveDemoUrl?: string | null; // Mapped from live_demo_url
-  repoUrl?: string | null; // Mapped from repo_url
+  imageUrl: string | null;
+  liveDemoUrl?: string | null;
+  repoUrl?: string | null;
   tags: string[] | null;
   status: ProjectStatus | null;
   progress?: number | null;
@@ -610,7 +612,7 @@ export interface Skill {
 export interface SkillCategory {
   id: string;
   name: string;
-  iconImageUrl?: string | null; // Changed from iconName, iconColor removed
+  iconImageUrl?: string | null; // For uploaded image URL
   skills?: Skill[];
   sort_order?: number | null;
   created_at?: string;
@@ -634,8 +636,8 @@ export interface Certification {
   title: string;
   issuer: string;
   date: string;
-  imageUrl: string | null; // Mapped from image_url
-  verifyUrl?: string | null; // Mapped from verify_url
+  imageUrl: string | null;
+  verifyUrl?: string | null;
   created_at: string;
 }
 
@@ -648,7 +650,7 @@ export interface AboutContent {
   paragraph1: string | null;
   paragraph2: string | null;
   paragraph3: string | null;
-  imageUrl: string | null; // Mapped from image_url
+  imageUrl: string | null;
   image_tagline: string | null;
   updated_at?: string;
 }
@@ -666,7 +668,7 @@ export interface ResumeExperience {
   company_name: string;
   date_range: string | null;
   description_points: string[] | null;
-  icon_image_url: string | null; // Changed from icon_name
+  icon_image_url: string | null;
   sort_order?: number | null;
   created_at: string;
 }
@@ -677,7 +679,7 @@ export interface ResumeEducation {
   institution_name: string;
   date_range: string | null;
   description: string | null;
-  icon_image_url: string | null; // Changed from icon_name
+  icon_image_url: string | null;
   sort_order?: number | null;
   created_at: string;
 }
@@ -686,13 +688,13 @@ export interface ResumeKeySkill {
   id: string;
   skill_name: string;
   category_id?: string | null;
-  // No created_at as per schema
+  // created_at intentionally omitted as per schema
 }
 
 export interface ResumeKeySkillCategory {
   id: string;
   category_name: string;
-  icon_image_url: string | null; // Changed from icon_name
+  icon_image_url: string | null;
   skills?: ResumeKeySkill[];
   sort_order?: number | null;
   created_at: string;
@@ -702,7 +704,7 @@ export interface ResumeLanguage {
   id: string;
   language_name: string;
   proficiency: string | null;
-  icon_image_url: string | null; // Changed from icon_name
+  icon_image_url: string | null;
   sort_order?: number | null;
   created_at: string;
 }
@@ -749,5 +751,3 @@ export interface ContactSubmission {
   submitted_at: string;
   notes?: string | null;
 }
-
-    

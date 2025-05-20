@@ -7,28 +7,14 @@ import { Button, buttonVariants } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
-import { PlusCircle, Edit, Trash2, Mail, Link as LinkIcon, Phone, MapPin, Save, MessageSquare, Star, Eye, Filter } from 'lucide-react';
+import { PlusCircle, Edit, Trash2, Mail, Link as LinkIcon, Phone, MapPin, Save, MessageSquare, Star, Eye, Filter, Send, Image as ImageIcon } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
-import type { ContactPageDetail, SocialLink, ContactSubmission } from '@/types/supabase';
+import type { ContactPageDetail, SocialLink, ContactSubmission, SubmissionStatus } from '@/types/supabase';
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-  DialogFooter,
-  DialogClose,
-  DialogDescription,
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose, DialogDescription,
 } from "@/components/ui/dialog";
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useForm, type SubmitHandler } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -40,6 +26,7 @@ import NextImage from 'next/image';
 import { format, parseISO, isValid } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea'; // For reply modal
 
 const PRIMARY_CONTACT_DETAILS_ID = '00000000-0000-0000-0000-000000000005';
 
@@ -57,14 +44,13 @@ type ContactPageDetailsFormData = z.infer<typeof contactPageDetailsSchema>;
 const socialLinkSchema = z.object({
   id: z.string().uuid().optional(),
   label: z.string().min(1, "Label is required"),
-  icon_image_url: z.string().url("Must be a valid URL if an image URL is provided.").optional().or(z.literal("")).nullable(),
+  icon_image_url: z.string().url("Must be a valid URL if an image URL is provided.").optional().or(z.literal("")).nullable(), // Changed from icon_name
   url: z.string().url("Must be a valid URL"),
   display_text: z.string().optional().nullable(),
   sort_order: z.coerce.number().optional().default(0),
 });
 type SocialLinkFormData = z.infer<typeof socialLinkSchema>;
 
-type SubmissionStatus = 'New' | 'Replied' | 'Archived';
 const submissionStatuses: SubmissionStatus[] = ['New', 'Replied', 'Archived'];
 
 export default function ContactManager() {
@@ -89,7 +75,7 @@ export default function ContactManager() {
     resolver: zodResolver(socialLinkSchema),
     defaultValues: { label: '', icon_image_url: '', url: '', display_text: '', sort_order: 0 }
   });
-  const currentSocialLinkIconUrl = socialLinkForm.watch("icon_image_url");
+  const watchedSocialLinkIconUrlInModal = socialLinkForm.watch("icon_image_url");
 
   // Contact Submissions State
   const [submissions, setSubmissions] = useState<ContactSubmission[]>([]);
@@ -99,6 +85,12 @@ export default function ContactManager() {
   const [submissionToDelete, setSubmissionToDelete] = useState<ContactSubmission | null>(null);
   const [showSubmissionDeleteConfirm, setShowSubmissionDeleteConfirm] = useState(false);
   const [statusFilter, setStatusFilter] = useState<SubmissionStatus | 'All'>('All');
+  
+  // State for Reply Modal
+  const [isReplyModalOpen, setIsReplyModalOpen] = useState(false);
+  const [submissionToReplyTo, setSubmissionToReplyTo] = useState<ContactSubmission | null>(null);
+  const [replyMessage, setReplyMessage] = useState('');
+  const [isSendingReply, setIsSendingReply] = useState(false);
 
 
   // Fetchers
@@ -197,6 +189,13 @@ export default function ContactManager() {
   };
   const triggerSubmissionDeleteConfirmation = (submission: ContactSubmission) => { setSubmissionToDelete(submission); setShowSubmissionDeleteConfirm(true); };
 
+  const handleOpenReplyModal = (submission: ContactSubmission) => {
+    setSubmissionToReplyTo(submission);
+    setReplyMessage(''); // Clear previous reply message
+    setIsReplyModalOpen(true);
+  };
+
+
   return (
     <>
       <Card className="mb-8 shadow-lg">
@@ -223,17 +222,33 @@ export default function ContactManager() {
       <Card className="mb-8 shadow-lg">
         <CardHeader>
           <CardTitle className="flex items-center justify-between">Manage Social Links <LinkIcon className="h-6 w-6 text-primary" /></CardTitle>
-          <CardDescription>Add, edit, or delete social media links.</CardDescription>
+          <CardDescription>Add, edit, or delete social media links. Provide a direct image URL for icons.</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="mb-6 text-right"><Button onClick={() => handleOpenSocialLinkModal()}><PlusCircle className="mr-2 h-4 w-4" /> Add Social Link</Button></div>
-          {isLoadingSocialLinks ? (<p className="text-center text-muted-foreground">Loading social links...</p>) : socialLinks.length === 0 ? (<p className="text-center text-muted-foreground py-8">No social links found.</p>) : (
+          <div className="mb-6 text-right"><Button onClick={() => handleOpenSocialLinkModal()} className="w-full sm:w-auto"><PlusCircle className="mr-2 h-4 w-4" /> Add Social Link</Button></div>
+          {isLoadingSocialLinks ? (<p className="text-center text-muted-foreground">Loading social links...</p>) : socialLinks.length === 0 ? (<p className="text-muted-foreground text-center py-4">No social links found.</p>) : (
             <div className="space-y-4">
               {socialLinks.map((link) => (
-                <Card key={link.id} className="flex flex-col sm:flex-row justify-between items-start sm:items-center p-4 hover:shadow-md transition-shadow">
-                  {link.icon_image_url && (<div className="w-10 h-10 relative mr-4 mb-2 sm:mb-0 flex-shrink-0 rounded-sm overflow-hidden border bg-muted"><NextImage src={link.icon_image_url} alt={`${link.label} icon`} layout="fill" objectFit="contain" className="dark:filter dark:brightness-0 dark:invert" /></div>)}
-                  <div className="flex-grow mb-3 sm:mb-0"><h4 className="font-semibold text-lg">{link.label} <span className="text-xs text-muted-foreground">(Sort: {link.sort_order ?? 0})</span></h4><p className="text-sm text-muted-foreground truncate" title={link.url}>{link.display_text || link.url}</p></div>
-                  <div className="flex space-x-2 self-start sm:self-center shrink-0"><Button variant="outline" size="sm" onClick={() => handleOpenSocialLinkModal(link)}><Edit className="mr-1.5 h-3.5 w-3.5" /> Edit</Button><Button variant="destructive" size="sm" onClick={() => triggerSocialLinkDeleteConfirmation(link)}><Trash2 className="mr-1.5 h-3.5 w-3.5" /> Delete</Button></div>
+                <Card key={link.id} className="p-4 hover:shadow-md transition-shadow">
+                  <div className="flex flex-col sm:flex-row justify-between items-start gap-2">
+                    <div className="flex items-center gap-3 flex-grow min-w-0">
+                      {link.icon_image_url ? (
+                        <div className="relative h-5 w-5 rounded-sm overflow-hidden border bg-muted flex-shrink-0">
+                          <NextImage src={link.icon_image_url} alt={`${link.label} icon`} width={20} height={20} className="object-contain" />
+                        </div>
+                      ) : (
+                        <ImageIcon className="h-5 w-5 text-muted-foreground flex-shrink-0" />
+                      )}
+                      <div className="flex-grow min-w-0">
+                        <h4 className="font-semibold text-sm truncate" title={link.label}>{link.label} <span className="text-xs text-muted-foreground">(Sort: {link.sort_order ?? 0})</span></h4>
+                        <p className="text-xs text-muted-foreground truncate" title={link.url}>{link.display_text || link.url}</p>
+                      </div>
+                    </div>
+                    <div className="flex space-x-2 self-start sm:self-end shrink-0 mt-2 sm:mt-0">
+                      <Button variant="outline" size="sm" onClick={() => handleOpenSocialLinkModal(link)}><Edit className="mr-1.5 h-3.5 w-3.5" /> Edit</Button>
+                      <Button variant="destructive" size="sm" onClick={() => triggerSocialLinkDeleteConfirmation(link)}><Trash2 className="mr-1.5 h-3.5 w-3.5" /> Delete</Button>
+                    </div>
+                  </div>
                 </Card>
               ))}
             </div>
@@ -247,10 +262,10 @@ export default function ContactManager() {
           <CardDescription>View and manage messages submitted through your contact form.</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="mb-6 flex items-center gap-4">
-            <Label htmlFor="statusFilter" className="shrink-0">Filter by status:</Label>
+          <div className="mb-6 flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-4">
+            <Label htmlFor="statusFilter" className="shrink-0 mb-1 sm:mb-0">Filter by status:</Label>
             <Select value={statusFilter} onValueChange={(value) => setStatusFilter(value as SubmissionStatus | 'All')}>
-              <SelectTrigger id="statusFilter" className="w-[180px]">
+              <SelectTrigger id="statusFilter" className="w-full sm:w-[180px]">
                 <SelectValue placeholder="Select status" />
               </SelectTrigger>
               <SelectContent>
@@ -258,12 +273,12 @@ export default function ContactManager() {
                 {submissionStatuses.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
               </SelectContent>
             </Select>
-             <Button variant="outline" onClick={fetchSubmissions} disabled={isLoadingSubmissions}>
+             <Button variant="outline" onClick={fetchSubmissions} disabled={isLoadingSubmissions} className="w-full sm:w-auto">
               <Filter className="mr-2 h-4 w-4"/> Apply Filter
             </Button>
           </div>
 
-          {isLoadingSubmissions ? (<p className="text-center text-muted-foreground py-8">Loading submissions...</p>) : submissions.length === 0 ? (<p className="text-center text-muted-foreground py-8">No submissions found{statusFilter !== 'All' ? ` with status "${statusFilter}"` : ''}.</p>) : (
+          {isLoadingSubmissions ? (<p className="text-center text-muted-foreground py-8">Loading submissions...</p>) : submissions.length === 0 ? (<p className="text-muted-foreground text-center py-4">No submissions found{statusFilter !== 'All' ? ` with status "${statusFilter}"` : ''}.</p>) : (
             <ScrollArea className="h-[600px] pr-4">
               <div className="space-y-4">
                 {submissions.map((sub) => (
@@ -274,7 +289,7 @@ export default function ContactManager() {
                           <Button variant="ghost" size="icon" className="h-7 w-7 p-0" onClick={() => handleToggleStar(sub)} aria-label={sub.is_starred ? "Unstar submission" : "Star submission"}>
                             <Star className={cn("h-5 w-5", sub.is_starred ? "fill-yellow-400 text-yellow-500" : "text-muted-foreground hover:text-yellow-500")} />
                           </Button>
-                          <h4 className="font-semibold text-lg" title={sub.subject || 'No Subject'}>{sub.subject || '(No Subject)'}</h4>
+                          <h4 className="font-semibold text-lg truncate" title={sub.subject || 'No Subject'}>{sub.subject || '(No Subject)'}</h4>
                           <Badge variant={sub.status === 'New' ? 'default' : sub.status === 'Replied' ? 'secondary' : 'outline'}>{sub.status}</Badge>
                         </div>
                         <p className="text-sm text-muted-foreground">From: {sub.name} &lt;{sub.email}&gt;</p>
@@ -283,7 +298,7 @@ export default function ContactManager() {
                           Received: {isValid(parseISO(sub.submitted_at)) ? format(parseISO(sub.submitted_at), "PPpp") : 'Invalid Date'}
                         </p>
                       </div>
-                      <div className="flex flex-col sm:flex-row sm:items-center gap-2 mt-2 sm:mt-0 self-start sm:self-center shrink-0">
+                      <div className="flex flex-col sm:flex-row sm:items-center gap-2 mt-2 sm:mt-0 self-start sm:self-center shrink-0 w-full sm:w-auto">
                         <Select
                           value={sub.status || 'New'}
                           onValueChange={(newStatus) => handleUpdateSubmissionStatus(sub.id, newStatus as SubmissionStatus)}
@@ -295,8 +310,9 @@ export default function ContactManager() {
                             {submissionStatuses.map(s => <SelectItem key={s} value={s} className="text-xs">{s}</SelectItem>)}
                           </SelectContent>
                         </Select>
-                        <Button variant="outline" size="sm" onClick={() => handleViewMessage(sub)}><Eye className="mr-1.5 h-3.5 w-3.5" /> View</Button>
-                        <Button variant="destructive" size="sm" onClick={() => triggerSubmissionDeleteConfirmation(sub)}><Trash2 className="mr-1.5 h-3.5 w-3.5" /> Delete</Button>
+                        <Button variant="outline" size="sm" onClick={() => handleViewMessage(sub)} className="w-full sm:w-auto"><Eye className="mr-1.5 h-3.5 w-3.5" /> View</Button>
+                        <Button variant="outline" size="sm" onClick={() => handleOpenReplyModal(sub)} className="w-full sm:w-auto"><Send className="mr-1.5 h-3.5 w-3.5" /> Reply</Button>
+                        <Button variant="destructive" size="sm" onClick={() => triggerSubmissionDeleteConfirmation(sub)} className="w-full sm:w-auto"><Trash2 className="mr-1.5 h-3.5 w-3.5" /> Delete</Button>
                       </div>
                     </div>
                   </Card>
@@ -313,7 +329,19 @@ export default function ContactManager() {
           <form onSubmit={socialLinkForm.handleSubmit(onSocialLinkSubmit)} className="grid gap-4 py-4">
             <ScrollArea className="max-h-[70vh] p-1"><div className="grid gap-4 p-3">
               <div><Label htmlFor="social_label">Label <span className="text-destructive">*</span></Label><Input id="social_label" {...socialLinkForm.register("label")} placeholder="e.g., LinkedIn, GitHub" />{socialLinkForm.formState.errors.label && <p className="text-destructive text-sm mt-1">{socialLinkForm.formState.errors.label.message}</p>}</div>
-              <div><Label htmlFor="social_icon_image_url">Icon Image URL (Optional)</Label><Input id="social_icon_image_url" {...socialLinkForm.register("icon_image_url")} placeholder="https://example.com/icon.png" />{socialLinkForm.formState.errors.icon_image_url && <p className="text-destructive text-sm mt-1">{socialLinkForm.formState.errors.icon_image_url.message}</p>}{currentSocialLinkIconUrl && (<div className="mt-2 w-16 h-16 relative border rounded-md bg-muted overflow-hidden"><NextImage src={currentSocialLinkIconUrl} alt="Icon Preview" layout="fill" objectFit="contain" className="dark:filter dark:brightness-0 dark:invert" /></div>)}</div>
+              <div>
+                <Label htmlFor="social_icon_image_url">Icon Image URL (Optional)</Label>
+                <Input id="social_icon_image_url" {...socialLinkForm.register("icon_image_url")} placeholder="https://example.com/icon.png" />
+                {socialLinkForm.formState.errors.icon_image_url && <p className="text-destructive text-sm mt-1">{socialLinkForm.formState.errors.icon_image_url.message}</p>}
+                {watchedSocialLinkIconUrlInModal && typeof watchedSocialLinkIconUrlInModal === 'string' && watchedSocialLinkIconUrlInModal.trim() !== '' ? (
+                    <div className="mt-2 flex items-center gap-2">
+                        <span className="text-xs text-muted-foreground">Preview:</span>
+                        <img src={watchedSocialLinkIconUrlInModal} alt="Icon Preview" className="h-6 w-6 object-contain border rounded-sm bg-muted" />
+                    </div>
+                ) : (
+                    <div className="mt-2 text-xs text-muted-foreground">No preview available. Enter a valid image URL.</div>
+                )}
+              </div>
               <div><Label htmlFor="social_url">URL <span className="text-destructive">*</span></Label><Input id="social_url" type="url" {...socialLinkForm.register("url")} placeholder="https://www.example.com" />{socialLinkForm.formState.errors.url && <p className="text-destructive text-sm mt-1">{socialLinkForm.formState.errors.url.message}</p>}</div>
               <div><Label htmlFor="social_display_text">Display Text (Optional)</Label><Input id="social_display_text" {...socialLinkForm.register("display_text")} placeholder="e.g., Follow me on X" /></div>
               <div><Label htmlFor="social_sort_order">Sort Order</Label><Input id="social_sort_order" type="number" {...socialLinkForm.register("sort_order")} /></div>
@@ -347,6 +375,41 @@ export default function ContactManager() {
           </DialogContent>
         </Dialog>
       )}
+
+      {/* Reply Modal */}
+      {submissionToReplyTo && (
+        <Dialog open={isReplyModalOpen} onOpenChange={(isOpen) => { if(!isOpen) setSubmissionToReplyTo(null); setIsReplyModalOpen(isOpen); }}>
+          <DialogContent className="sm:max-w-lg">
+            <DialogHeader>
+              <DialogTitle>Reply to: {submissionToReplyTo.name}</DialogTitle>
+              <DialogDescription>Replying to: {submissionToReplyTo.email}</DialogDescription>
+            </DialogHeader>
+            <div className="py-4 space-y-4">
+              <div>
+                <Label htmlFor="replyMessage">Your Reply</Label>
+                <Textarea
+                  id="replyMessage"
+                  value={replyMessage}
+                  onChange={(e) => setReplyMessage(e.target.value)}
+                  rows={8}
+                  placeholder="Compose your reply..."
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <DialogClose asChild><Button type="button" variant="outline">Cancel</Button></DialogClose>
+              {/* The handleSendReply function and the actual Send button were removed in a previous step.
+                  This modal now only allows composing a message but not sending it via the Edge Function.
+                  To re-enable, the handleSendReply function and the "Send Reply" button need to be restored.
+              */}
+               <Button type="button" disabled={true} className="bg-muted hover:bg-muted text-muted-foreground cursor-not-allowed">
+                Send Reply (Disabled)
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
+
       {/* Delete Submission Confirmation Dialog */}
       <AlertDialog open={showSubmissionDeleteConfirm} onOpenChange={setShowSubmissionDeleteConfirm}><AlertDialogContent className="bg-destructive border-destructive text-destructive-foreground"><AlertDialogHeader><AlertDialogTitle className="text-destructive-foreground">Delete Submission from: {submissionToDelete?.name}?</AlertDialogTitle><AlertDialogDescription className="text-destructive-foreground/90">This action cannot be undone and will permanently delete this message.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel onClick={() => { setShowSubmissionDeleteConfirm(false); setSubmissionToDelete(null); }} className={cn(buttonVariants({ variant: "outline" }), "border-destructive-foreground/40 text-destructive-foreground hover:bg-destructive-foreground/10 hover:text-destructive-foreground hover:border-destructive-foreground/60")}>Cancel</AlertDialogCancel><AlertDialogAction onClick={handleDeleteSubmission} className={cn(buttonVariants({ variant: "default" }), "bg-destructive-foreground text-destructive hover:bg-destructive-foreground/90")}>Delete Message</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
     </>

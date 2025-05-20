@@ -52,7 +52,7 @@ export default function ContactSectionClientView({ contactDetails, socialLinks }
               <LucideIcons.Phone className="h-6 w-6 text-primary mt-1 flex-shrink-0" />
               <div>
                 <p className="font-medium text-foreground">Phone</p>
-                <Link href={currentPhoneHref} className="text-muted-foreground hover:text-[hsl(var(--primary-hover))] transition-colors break-all">
+                <Link href={currentPhoneHref} className="text-muted-foreground hover:text-primary transition-colors break-all">
                   {currentPhone}
                 </Link>
               </div>
@@ -62,7 +62,7 @@ export default function ContactSectionClientView({ contactDetails, socialLinks }
               <LucideIcons.Mail className="h-6 w-6 text-primary mt-1 flex-shrink-0" />
               <div>
                 <p className="font-medium text-foreground">Email</p>
-                <Link href={currentEmailHref} className="text-muted-foreground hover:text-[hsl(var(--primary-hover))] transition-colors break-all">
+                <Link href={currentEmailHref} className="text-muted-foreground hover:text-primary transition-colors break-all">
                   {currentEmail}
                 </Link>
               </div>
@@ -81,15 +81,15 @@ export default function ContactSectionClientView({ contactDetails, socialLinks }
                           <NextImage 
                             src={social.icon_image_url} 
                             alt={`${social.label} icon`} 
-                            layout="fill" 
-                            objectFit="contain" 
-                            className="dark:filter dark:brightness-0 dark:invert"
+                            width={20}
+                            height={20}
+                            className="object-contain dark:filter dark:brightness-0 dark:invert" // Keeping invert for social icons if they are dark
                           />
                         </div>
                       ) : (
                         <DefaultSocialIcon className="h-5 w-5 text-primary flex-shrink-0" />
                       )}
-                      <Link href={social.url} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-[hsl(var(--primary-hover))] transition-colors text-sm break-all">
+                      <Link href={social.url} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-primary transition-colors text-sm break-all">
                         {social.display_text || social.label}
                       </Link>
                     </div>
@@ -112,5 +112,3 @@ export default function ContactSectionClientView({ contactDetails, socialLinks }
     </Card>
   );
 }
-
-    
