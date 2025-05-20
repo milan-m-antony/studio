@@ -10,7 +10,7 @@ import {
 } from '@/components/ui/sheet';
 import {
   Menu, X, Sun, Moon,
-  LogOut as LogoutIcon, LayoutDashboard, Bell as BellIcon, UserCircle, Settings as SettingsIcon, 
+  LogOut as LogoutIcon, Bell as BellIcon, UserCircle, Settings as SettingsIcon, 
   UploadCloud, Trash2, History, FileText, ChevronRight, ChevronLeft
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
@@ -144,7 +144,7 @@ export default function AdminPageLayout({
       .from('admin_activity_log')
       .select('*')
       .order('timestamp', { ascending: false })
-      .limit(50);
+      .limit(50); // Fetch latest 50 activities
 
     if (error) {
       console.error("Error fetching admin activities:", error);
@@ -161,20 +161,21 @@ export default function AdminPageLayout({
     const { error } = await supabase
       .from('admin_activity_log')
       .delete()
-      .neq('id', '00000000-0000-0000-0000-000000000000'); 
+      .neq('id', '00000000-0000-0000-0000-000000000000'); // Placeholder ID not to delete if needed
 
     if (error) {
       console.error("Error clearing activity log:", error);
       toast({ title: "Error", description: "Failed to clear activity log.", variant: "destructive" });
     } else {
       toast({ title: "Success", description: "Activity log cleared." });
-      setActivities([]);
+      setActivities([]); // Clear local state
+      // Optionally log the clear action itself
       await supabase.from('admin_activity_log').insert({
         action_type: 'ACTIVITY_LOG_CLEARED',
         description: 'Admin cleared the activity log.',
         user_identifier: username
       });
-      fetchActivities();
+      fetchActivities(); // Re-fetch to show the "log cleared" message if any
     }
     setShowClearLogConfirm(false);
     setIsLoadingActivities(false);
@@ -189,37 +190,39 @@ export default function AdminPageLayout({
   useEffect(() => {
     if (headerIsMounted) {
       let currentEffectiveTheme = theme;
-      if (theme === 'system') {
+      if (theme === 'system' && typeof window !== 'undefined') {
         currentEffectiveTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
       }
       setCurrentThemeIcon(currentEffectiveTheme === 'dark' ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />);
     }
   }, [theme, headerIsMounted]);
 
+  // Fetch activities when the sheet is opened
   useEffect(() => {
-    if (isActivitySheetOpen && !isLoadingActivities) { 
+    if (isActivitySheetOpen && !isLoadingActivities) { // Check isLoading to prevent multiple fetches
       fetchActivities();
     }
-  }, [isActivitySheetOpen]);
+  }, [isActivitySheetOpen]); // Only re-run if isActivitySheetOpen changes
 
 
   useEffect(() => {
+    // Update preview if a new file is selected, or revert to DB URL if file is deselected
     if (profilePhotoFile) {
       const reader = new FileReader();
       reader.onloadend = () => {
         setProfilePhotoPreview(reader.result as string);
       };
       reader.readAsDataURL(profilePhotoFile);
-    } else if (currentDbProfilePhotoUrl) {
+    } else if (currentDbProfilePhotoUrl) { // If no file, and DB URL exists
       setProfilePhotoPreview(currentDbProfilePhotoUrl);
-    } else {
+    } else { // No file, no DB URL
       setProfilePhotoPreview(null);
     }
   }, [profilePhotoFile, currentDbProfilePhotoUrl]);
 
 
   const toggleTheme = () => {
-    if (!headerIsMounted) return;
+    if (!headerIsMounted) return; // Ensure component is mounted
     let currentEffectiveTheme = theme;
     if (theme === 'system' && typeof window !== 'undefined') {
         currentEffectiveTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
@@ -229,14 +232,17 @@ export default function AdminPageLayout({
   };
 
   const getUserInitials = (name: string) => {
-    if (!name) return "A";
-    const parts = name.split(/[\s@.]+/);
+    if (!name) return "A"; // Default initial if name is somehow empty
+    const parts = name.split(/[\s@.]+/); // Split by space, @, or .
     if (parts.length > 0 && parts[0]) {
         if (parts.length > 1 && parts[1] && parts[1].length > 0) {
+             // Use first letter of first two parts (e.g., "Milan Antony" -> "MA")
              return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
         }
+        // If only one part or second part is very short/empty, use first two letters of first part
         return parts[0].substring(0, 2).toUpperCase();
     }
+    // Fallback if parsing fails significantly
     return name.substring(0, 2).toUpperCase();
   };
 
@@ -246,22 +252,25 @@ export default function AdminPageLayout({
       setProfilePhotoFile(event.target.files[0]);
     } else {
       setProfilePhotoFile(null);
+      // If file is deselected, preview should revert to DB URL or null
+      // setProfilePhotoPreview(currentDbProfilePhotoUrl); // This is handled by useEffect above
     }
   };
 
   const handleSaveProfilePhoto = async () => {
     setIsUploadingPhoto(true);
-    let newPhotoUrlToSave: string | null = currentDbProfilePhotoUrl;
+    let newPhotoUrlToSave: string | null = currentDbProfilePhotoUrl; // Start with the current DB URL
 
+    // If a new file is selected for upload
     if (profilePhotoFile) {
       const fileExt = profilePhotoFile.name.split('.').pop();
       const fileName = `admin_avatar_${Date.now()}.${fileExt}`;
-      const filePath = `${fileName}`;
+      const filePath = `${fileName}`; // Path within the bucket
 
       toast({ title: "Uploading Profile Photo", description: "Please wait..." });
       const { data: uploadData, error: uploadError } = await supabase.storage
-        .from('admin-profile-photos')
-        .upload(filePath, profilePhotoFile, { cacheControl: '3600', upsert: true });
+        .from('admin-profile-photos') // Your bucket name
+        .upload(filePath, profilePhotoFile, { cacheControl: '3600', upsert: true }); // Upsert true to overwrite if same path (e.g. fixed filename)
 
       if (uploadError) {
         toast({ title: "Upload Error", description: `Failed to upload photo: ${uploadError.message}`, variant: "destructive" });
@@ -269,18 +278,22 @@ export default function AdminPageLayout({
         return;
       }
 
+      // Get the public URL of the newly uploaded file
       const { data: publicUrlData } = supabase.storage.from('admin-profile-photos').getPublicUrl(filePath);
       newPhotoUrlToSave = publicUrlData?.publicUrl || null;
 
+      // If there was an old photo in DB and it's different from the new one, delete the old one from storage
       if (currentDbProfilePhotoUrl && currentDbProfilePhotoUrl !== newPhotoUrlToSave) {
         const oldPathParts = currentDbProfilePhotoUrl.split('/admin-profile-photos/');
-        if (oldPathParts.length > 1 && !oldPathParts[1].startsWith('http')) {
+        if (oldPathParts.length > 1 && !oldPathParts[1].startsWith('http')) { // Basic check to ensure it's a storage path
             const { error: deleteStorageError } = await supabase.storage.from('admin-profile-photos').remove([oldPathParts[1]]);
             if (deleteStorageError) console.warn("Error deleting old profile photo from storage:", deleteStorageError);
         }
       }
     }
+    // If no new file, newPhotoUrlToSave remains as currentDbProfilePhotoUrl (no change unless cleared by delete)
 
+    // Update the admin_profile table with the new (or existing/cleared) photo URL
     const { error: dbError } = await supabase
       .from('admin_profile')
       .update({ profile_photo_url: newPhotoUrlToSave, updated_at: new Date().toISOString() })
@@ -290,32 +303,34 @@ export default function AdminPageLayout({
       toast({ title: "Database Error", description: `Failed to save profile photo URL: ${dbError.message}`, variant: "destructive" });
     } else {
       toast({ title: "Success", description: "Profile photo updated." });
-      setProfilePhotoUrl(newPhotoUrlToSave);
-      setCurrentDbProfilePhotoUrl(newPhotoUrlToSave);
-      setProfilePhotoFile(null);
+      setProfilePhotoUrl(newPhotoUrlToSave); // Update display
+      setCurrentDbProfilePhotoUrl(newPhotoUrlToSave); // Update tracker for next change
+      setProfilePhotoFile(null); // Clear file input
       setIsPhotoModalOpen(false);
     }
     setIsUploadingPhoto(false);
   };
 
   const handleDeleteProfilePhoto = async () => {
-    if (!currentDbProfilePhotoUrl) {
+    if (!currentDbProfilePhotoUrl) { // Check against the actual DB URL
         toast({ title: "No Photo", description: "There is no profile photo to delete.", variant: "default" });
-        setIsPhotoModalOpen(false);
+        setIsPhotoModalOpen(false); // Close modal as there's nothing to do
         return;
     }
-    setIsUploadingPhoto(true);
+    setIsUploadingPhoto(true); // Use same loading state
 
+    // Delete from storage
     const pathParts = currentDbProfilePhotoUrl.split('/admin-profile-photos/');
     if (pathParts.length > 1 && !pathParts[1].startsWith('http')) {
         const { error: deleteStorageError } = await supabase.storage.from('admin-profile-photos').remove([pathParts[1]]);
         if (deleteStorageError) {
             toast({ title: "Storage Error", description: `Failed to delete photo from storage: ${deleteStorageError.message}. Please try saving to clear the URL.`, variant: "destructive" });
             setIsUploadingPhoto(false);
-            return;
+            return; // Don't proceed if storage delete fails, user might want to retry or fix
         }
     }
 
+    // Clear URL in database
     const { error: dbError } = await supabase
       .from('admin_profile')
       .update({ profile_photo_url: null, updated_at: new Date().toISOString() })
@@ -336,8 +351,9 @@ export default function AdminPageLayout({
 
   const SidebarContent = ({ isMobile = false, isCollapsed = false }: { isMobile?: boolean, isCollapsed?: boolean }) => (
     <div className={cn("flex flex-col h-full bg-sidebar text-sidebar-foreground", isMobile ? "w-full" : "")}>
+      {/* Logo and Toggle Button Area */}
       <div className={cn(
-        "px-4 border-b border-sidebar-border flex items-center h-16",
+        "px-4 border-b border-sidebar-border flex items-center h-16", // Standard height
         isCollapsed && !isMobile ? "justify-center" : "justify-between" 
       )}>
         <Link
@@ -351,19 +367,21 @@ export default function AdminPageLayout({
             isCollapsed && !isMobile ? "h-8 w-8" : "h-10 w-10" 
           )}>
             <NextImage
-              src="/logo.png"
+              src="/logo.png" // Assuming logo is in public folder
               alt="Portfolio Logo"
               layout="fill"
-              objectFit="contain"
+              objectFit="contain" // Ensures entire logo is visible within the circle
             />
           </div>
         </Link>
+        {/* Collapse/Expand Toggle Button - only on desktop */}
         {!isMobile && (
            <Button variant="ghost" size="icon" onClick={toggleSidebarCollapse} className="h-8 w-8 text-sidebar-foreground/70 hover:text-sidebar-foreground">
             {isCollapsed ? <ChevronRight className="h-5 w-5" /> : <ChevronLeft className="h-5 w-5" />}
           </Button>
         )}
       </div>
+
       <ScrollArea className="flex-grow">
         <nav className={cn("p-2 space-y-1", isCollapsed && !isMobile ? "flex flex-col items-center" : "")}>
           {navItems.filter(item => item.key !== 'settings').map((item) => {
@@ -374,44 +392,59 @@ export default function AdminPageLayout({
                 key={item.key}
                 variant="ghost"
                 className={cn(
-                  "w-full justify-start text-sm py-2.5 px-3",
+                  "w-full text-sm py-2.5 px-3", // Standard padding for expanded
                   isActive
                     ? "bg-sidebar-primary text-sidebar-primary-foreground font-semibold rounded-lg"
                     : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground rounded-lg",
-                  isCollapsed && !isMobile ? "justify-center w-auto p-2.5" : ""
+                  isCollapsed && !isMobile ? "justify-center w-auto p-2.5" : "justify-start" // Styles for collapsed
                 )}
                 onClick={() => {
                   onSelectSection(item.key);
                   if (isMobile) setIsMobileMenuOpen(false);
                 }}
-                title={isCollapsed && !isMobile ? item.label : undefined}
+                title={isCollapsed && !isMobile ? item.label : undefined} // Show tooltip when collapsed
               >
-                <Icon className={cn("h-5 w-5", isActive ? "text-sidebar-primary-foreground" : "text-sidebar-foreground/70 group-hover:text-sidebar-accent-foreground", isCollapsed && !isMobile ? "mr-0" : "mr-3")} />
-                {(!isCollapsed || isMobile) && <span>{item.label}</span>}
+                <Icon className={cn(
+                  "h-5 w-5",
+                  isActive ? "text-sidebar-primary-foreground" : "text-sidebar-foreground/70 group-hover:text-sidebar-accent-foreground",
+                  isCollapsed && !isMobile ? "mr-0" : "mr-2" // Reduced margin
+                )} />
+                {(!isCollapsed || isMobile) && (
+                  <span className="overflow-hidden whitespace-nowrap text-ellipsis">{item.label}</span> // Added truncation
+                )}
               </Button>
             );
           })}
         </nav>
       </ScrollArea>
+      {/* Settings Link at the Bottom */}
       {navItems.find(item => item.key === 'settings') && (
         <div className={cn("mt-auto p-2 border-t border-sidebar-border", isCollapsed && !isMobile ? "flex flex-col items-center" : "")}>
             <Button
               variant="ghost"
               className={cn(
-                "w-full justify-start text-sm py-2.5 px-3",
+                "w-full text-sm py-2.5 px-3", // Standard padding for expanded
                 activeSection === 'settings'
                   ? "bg-sidebar-primary text-sidebar-primary-foreground font-semibold rounded-lg"
                   : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground rounded-lg",
-                isCollapsed && !isMobile ? "justify-center w-auto p-2.5" : ""
+                isCollapsed && !isMobile ? "justify-center w-auto p-2.5" : "justify-start" // Styles for collapsed
               )}
               onClick={() => {
                 onSelectSection('settings');
                 if (isMobile) setIsMobileMenuOpen(false);
               }}
-              title={isCollapsed && !isMobile ? navItems.find(item => item.key === 'settings')?.label : undefined}
+              title={isCollapsed && !isMobile ? navItems.find(item => item.key === 'settings')?.label : undefined} // Show tooltip when collapsed
             >
-              <SettingsIcon className={cn("h-5 w-5", activeSection === 'settings' ? "text-sidebar-primary-foreground" : "text-sidebar-foreground/70 group-hover:text-sidebar-accent-foreground", isCollapsed && !isMobile ? "mr-0" : "mr-3")} />
-              {(!isCollapsed || isMobile) && <span>{navItems.find(item => item.key === 'settings')?.label}</span>}
+              <SettingsIcon className={cn(
+                "h-5 w-5",
+                activeSection === 'settings' ? "text-sidebar-primary-foreground" : "text-sidebar-foreground/70 group-hover:text-sidebar-accent-foreground",
+                isCollapsed && !isMobile ? "mr-0" : "mr-2" // Reduced margin
+              )} />
+              {(!isCollapsed || isMobile) && (
+                <span className="overflow-hidden whitespace-nowrap text-ellipsis"> {/* Added truncation */}
+                  {navItems.find(item => item.key === 'settings')?.label}
+                </span>
+              )}
             </Button>
         </div>
       )}
@@ -421,15 +454,17 @@ export default function AdminPageLayout({
   return (
     <>
     <div className="flex h-screen bg-background text-foreground">
+      {/* Desktop Sidebar */}
       <aside className={cn(
         "hidden md:flex md:flex-shrink-0 transition-all duration-300 ease-in-out",
-        isSidebarCollapsed ? "w-20" : "w-64"
+        isSidebarCollapsed ? "w-20" : "w-64" // Dynamic width
       )}>
          <div className={cn("flex flex-col border-r border-sidebar-border bg-sidebar h-full w-full")}>
             <SidebarContent isCollapsed={isSidebarCollapsed}/>
          </div>
       </aside>
 
+      {/* Mobile Sidebar Toggle */}
        <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
         <SheetTrigger asChild className="md:hidden fixed top-4 left-4 z-50">
           <Button variant="outline" size="icon">
@@ -441,14 +476,20 @@ export default function AdminPageLayout({
         </SheetContent>
       </Sheet>
 
+      {/* Main Content Area */}
       <div className={cn(
         "flex flex-col flex-1 w-full overflow-hidden transition-all duration-300 ease-in-out",
+        // Adjust margin based on sidebar state, only if mobile menu is NOT open
         !isMobileMenuOpen && (isSidebarCollapsed ? "md:ml-20" : "md:ml-64")
       )}>
         <header className="sticky top-0 z-40 flex h-16 items-center justify-between border-b border-border bg-card px-4 md:px-6 shrink-0">
-          <div className="md:hidden"></div> 
+          {/* Empty div to push title to center on mobile when sidebar toggle is present */}
+          <div className="md:hidden">
+            {/* Placeholder for spacing, or can be empty if SheetTrigger handles layout well */}
+          </div> 
           <h1 className="text-xl font-semibold text-foreground">{pageTitle}</h1>
           <div className="flex items-center gap-3">
+            {/* Bell Notification Icon and Sheet */}
             <Sheet open={isActivitySheetOpen} onOpenChange={setIsActivitySheetOpen}>
               <SheetTrigger asChild>
                 <Button variant="ghost" size="icon" aria-label="View Recent Activity" className="hover:text-primary">
@@ -493,10 +534,12 @@ export default function AdminPageLayout({
               </SheetContent>
             </Sheet>
 
+            {/* Theme Toggle Button */}
             <Button variant="ghost" size="icon" onClick={toggleTheme} aria-label="Toggle theme" className="hover:text-primary" disabled={!headerIsMounted}>
               {CurrentThemeIcon}
             </Button>
 
+            {/* User Profile Dropdown */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="relative h-8 w-8 rounded-full p-0">
@@ -517,8 +560,9 @@ export default function AdminPageLayout({
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={() => {
-                  setProfilePhotoPreview(currentDbProfilePhotoUrl);
-                  setProfilePhotoFile(null);
+                  // Reset preview for modal consistency
+                  setProfilePhotoPreview(currentDbProfilePhotoUrl); // Show current DB photo on modal open
+                  setProfilePhotoFile(null); // Clear any stale file selection
                   setIsPhotoModalOpen(true);
                 }}>
                   <UserCircle className="mr-2 h-4 w-4" />
@@ -540,11 +584,13 @@ export default function AdminPageLayout({
       </div>
     </div>
 
+    {/* Profile Photo Management Modal */}
     <Dialog open={isPhotoModalOpen} onOpenChange={(isOpen) => {
       setIsPhotoModalOpen(isOpen);
       if (!isOpen) {
+        // Reset preview and file state when modal is closed without saving
         setProfilePhotoFile(null);
-        setProfilePhotoPreview(currentDbProfilePhotoUrl);
+        setProfilePhotoPreview(currentDbProfilePhotoUrl); // Revert to current DB photo
       }
     }}>
         <DialogContent className="sm:max-w-[480px]">
@@ -569,31 +615,34 @@ export default function AdminPageLayout({
                     </div>
                 </div>
 
+                {/* Image Preview Area */}
                 {profilePhotoPreview && (
                     <div className="mt-2 p-2 border rounded-full bg-muted aspect-square relative w-40 h-40 mx-auto overflow-hidden">
                         <NextImage
                             src={profilePhotoPreview}
                             alt="Profile photo preview"
                             fill
-                            className="object-cover"
-                            sizes="160px"
+                            className="object-cover" // Ensure image covers the circular area
+                            sizes="160px" // Provide sizes for `fill`
                         />
                     </div>
                 )}
-                 {!profilePhotoPreview && !profilePhotoFile && (
+                 {!profilePhotoPreview && !profilePhotoFile && ( // Show placeholder if no preview and no new file
                     <div className="mt-2 p-2 border rounded-full bg-muted aspect-square w-40 h-40 mx-auto flex items-center justify-center">
                         <UserCircle className="h-20 w-20 text-muted-foreground" />
                     </div>
                 )}
             </div>
             <DialogFooter className="sm:justify-between gap-2 flex-col-reverse sm:flex-row">
+                {/* Delete button only if there's a photo currently in DB */}
                 {currentDbProfilePhotoUrl && (
                      <Button type="button" variant="destructive" onClick={handleDeleteProfilePhoto} disabled={isUploadingPhoto}>
                         <Trash2 className="mr-2 h-4 w-4" /> Remove Current Photo
                     </Button>
                 )}
-                {!currentDbProfilePhotoUrl && <div className="sm:hidden" />} 
-                <div className="flex gap-2 justify-end">
+                {/* Add a spacer if delete button isn't shown to keep layout consistent */}
+                {!currentDbProfilePhotoUrl && <div className="sm:hidden" /> /* Spacer for mobile */ }
+                <div className="flex gap-2 justify-end"> {/* Group cancel and save buttons */}
                     <DialogClose asChild>
                         <Button type="button" variant="outline">Cancel</Button>
                     </DialogClose>
@@ -605,6 +654,7 @@ export default function AdminPageLayout({
         </DialogContent>
     </Dialog>
 
+    {/* Clear Activity Log Confirmation Dialog */}
     <AlertDialog open={showClearLogConfirm} onOpenChange={setShowClearLogConfirm}>
       <AlertDialogContent className="bg-destructive border-destructive text-destructive-foreground">
         <AlertDialogHeader>
@@ -634,3 +684,5 @@ export default function AdminPageLayout({
   );
 }
 
+
+    
