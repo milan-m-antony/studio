@@ -13,14 +13,15 @@ import { useForm, type SubmitHandler } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useToast } from '@/hooks/use-toast';
-import { Input } from '@/components/ui/input'; // For Title input
+import { Input } from '@/components/ui/input';
 import { Save } from 'lucide-react';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 const TERMS_DOC_ID = 'terms-and-conditions';
 const PRIVACY_DOC_ID = 'privacy-policy';
 
 const legalDocumentSchema = z.object({
-  id: z.string(), // 'terms-and-conditions' or 'privacy-policy'
+  id: z.string(), 
   title: z.string().min(3, "Title must be at least 3 characters."),
   content: z.string().min(20, "Content must be at least 20 characters.").nullable(),
 });
@@ -67,7 +68,7 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ documentId, initialTitl
       } else {
          form.reset({
           id: documentId,
-          title: initialTitle, // Use initialTitle if no data found
+          title: initialTitle, 
           content: '',
         });
       }
@@ -91,7 +92,13 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ documentId, initialTitl
       toast({ title: "Error", description: `Failed to save ${sectionTitle}: ${error.message}`, variant: "destructive" });
     } else {
       toast({ title: "Success", description: `${sectionTitle} saved successfully.` });
-      router.refresh(); // Revalidate relevant paths if your public pages fetch this
+       await supabase.from('admin_activity_log').insert({
+            action_type: 'LEGAL_DOC_UPDATED',
+            description: `Admin updated the "${formData.title}" document.`,
+            user_identifier: process.env.NEXT_PUBLIC_ADMIN_USERNAME || 'admin',
+            details: { documentId: formData.id }
+        });
+      router.refresh(); 
     }
     setIsLoading(false);
   };
@@ -104,7 +111,7 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ documentId, initialTitl
       </CardHeader>
       <CardContent>
         {isLoading ? (
-          <p>Loading content...</p>
+          <p className="text-center text-muted-foreground">Loading content...</p>
         ) : (
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
             <div>
@@ -131,7 +138,7 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ documentId, initialTitl
                 <p className="mt-1 text-sm text-destructive">{form.formState.errors.content.message}</p>
               )}
             </div>
-            <Button type="submit" disabled={isLoading}>
+            <Button type="submit" disabled={isLoading} className="w-full sm:w-auto">
               <Save className="mr-2 h-4 w-4" /> {isLoading ? 'Saving...' : `Save ${sectionTitle}`}
             </Button>
           </form>
@@ -144,21 +151,21 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ documentId, initialTitl
 
 export default function LegalManager() {
   return (
-    <div className="space-y-8">
-      <DocumentEditor
-        documentId={TERMS_DOC_ID}
-        initialTitle="Terms & Conditions"
-        sectionTitle="Terms & Conditions"
-        sectionDescription="Manage the content for your Terms & Conditions page."
-      />
-      <DocumentEditor
-        documentId={PRIVACY_DOC_ID}
-        initialTitle="Privacy Policy"
-        sectionTitle="Privacy Policy"
-        sectionDescription="Manage the content for your Privacy Policy page."
-      />
-    </div>
+    <ScrollArea className="h-[calc(100vh-10rem)]"> {/* Adjust height as needed */}
+      <div className="space-y-8 p-1 pr-3"> {/* Added padding for scrollbar */}
+        <DocumentEditor
+          documentId={TERMS_DOC_ID}
+          initialTitle="Terms & Conditions"
+          sectionTitle="Terms & Conditions"
+          sectionDescription="Manage the content for your Terms & Conditions page."
+        />
+        <DocumentEditor
+          documentId={PRIVACY_DOC_ID}
+          initialTitle="Privacy Policy"
+          sectionTitle="Privacy Policy"
+          sectionDescription="Manage the content for your Privacy Policy page."
+        />
+      </div>
+    </ScrollArea>
   );
 }
-
-    

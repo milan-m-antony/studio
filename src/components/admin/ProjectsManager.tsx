@@ -38,7 +38,7 @@ import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { Badge } from "@/components/ui/badge";
 import { Progress } from '@/components/ui/progress';
-import { ScrollArea } from '@/components/ui/scroll-area'; // Added ScrollArea
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 const projectSchema = z.object({
   id: z.string().uuid().optional(),
@@ -47,7 +47,7 @@ const projectSchema = z.object({
   image_url: z.string().url("Must be a valid URL if provided, or will be set by upload.").optional().or(z.literal("")).nullable(),
   live_demo_url: z.string().url("Must be a valid URL").optional().or(z.literal("")).nullable(),
   repo_url: z.string().url("Must be a valid URL").optional().or(z.literal("")).nullable(),
-  tags: z.string().transform(val => val.split(',').map(tag => tag.trim()).filter(Boolean)), // string in form, array in DB
+  tags: z.string().transform(val => val.split(',').map(tag => tag.trim()).filter(Boolean)),
   status: z.enum(['Deployed', 'In Progress', 'Prototype', 'Archived', 'Concept', 'Completed']),
   progress: z.coerce.number().min(0).max(100).optional().nullable(),
 });
@@ -114,9 +114,9 @@ export default function ProjectsManager() {
         id: p.id,
         title: p.title,
         description: p.description || null,
-        imageUrl: p.image_url || null,
-        liveDemoUrl: p.live_demo_url || null,
-        repoUrl: p.repo_url || null,
+        imageUrl: p.image_url || null, // Mapped for client-side use
+        liveDemoUrl: p.live_demo_url || null, // Mapped
+        repoUrl: p.repo_url || null, // Mapped
         tags: p.tags || [],
         status: p.status as ProjectStatus | null || 'Concept',
         progress: p.progress === null || p.progress === undefined ? null : Number(p.progress),
@@ -143,10 +143,12 @@ export default function ProjectsManager() {
   const onProjectSubmit: SubmitHandler<ProjectFormData> = async (formData) => {
     let imageUrlToSaveInDb = formData.image_url; 
     let oldImageStoragePathToDelete: string | null = null;
+    const existingProjectImageUrlForDeletion = currentProject?.imageUrl;
 
-    if (currentDbProjectImageUrl) {
+
+    if (existingProjectImageUrlForDeletion) {
         try {
-            const url = new URL(currentDbProjectImageUrl);
+            const url = new URL(existingProjectImageUrlForDeletion);
             if (url.pathname.includes('/project-images/')) {
                 const pathParts = url.pathname.split('/project-images/');
                 if (pathParts.length > 1 && !pathParts[1].startsWith('http')) { 
@@ -154,7 +156,7 @@ export default function ProjectsManager() {
                 }
             }
         } catch (e) {
-            console.warn("[ProjectsManager] Could not parse currentDbProjectImageUrl for old path:", currentDbProjectImageUrl);
+            console.warn("[ProjectsManager] Could not parse existingProjectImageUrlForDeletion for old path:", existingProjectImageUrlForDeletion);
         }
     }
     
@@ -179,6 +181,9 @@ export default function ProjectsManager() {
         return;
       }
       imageUrlToSaveInDb = publicUrlData.publicUrl;
+    } else if (formData.image_url === '' && existingProjectImageUrlForDeletion) {
+        // User cleared the URL field and there was an existing image
+        imageUrlToSaveInDb = null; // Ensure DB is updated to null
     }
     
     const dataForSupabase = {
@@ -187,13 +192,13 @@ export default function ProjectsManager() {
       image_url: imageUrlToSaveInDb || null,
       live_demo_url: formData.live_demo_url || null,
       repo_url: formData.repo_url || null,
-      tags: formData.tags || [], // Ensure tags are an array
+      tags: formData.tags || [], 
       status: formData.status,
       progress: formData.progress === undefined || formData.progress === null ? null : Number(formData.progress),
     };
     
     let upsertResponse;
-    if (formData.id) { // Update existing project
+    if (formData.id) { 
       upsertResponse = await supabase
         .from('projects')
         .update(dataForSupabase)
@@ -205,18 +210,20 @@ export default function ProjectsManager() {
         toast({ title: "Error", description: `Failed to update project: ${upsertResponse.error.message}`, variant: "destructive" });
       } else {
         toast({ title: "Success", description: "Project updated successfully." });
-        await supabase.from('admin_activity_log').insert({
-          action_type: 'PROJECT_UPDATED',
-          description: `Project "${formData.title}" was updated.`,
-          details: { projectId: formData.id }
-        });
-        if (oldImageStoragePathToDelete && imageUrlToSaveInDb !== currentDbProjectImageUrl) {
+         await supabase.from('admin_activity_log').insert({
+            action_type: 'PROJECT_UPDATED',
+            description: `Project "${formData.title}" was updated.`,
+            user_identifier: process.env.NEXT_PUBLIC_ADMIN_USERNAME || 'admin',
+            details: { projectId: formData.id }
+          });
+        // Delete old image from storage if a new one was uploaded OR if the URL was cleared
+        if (oldImageStoragePathToDelete && (projectImageFile || imageUrlToSaveInDb !== existingProjectImageUrlForDeletion)) {
             console.log("[ProjectsManager] Attempting to delete old project image from storage:", oldImageStoragePathToDelete);
             const { error: storageDeleteError } = await supabase.storage.from('project-images').remove([oldImageStoragePathToDelete]);
             if (storageDeleteError) console.warn("[ProjectsManager] Error deleting old project image from storage:", JSON.stringify(storageDeleteError, null, 2));
         }
       }
-    } else { // Add new project
+    } else { 
       upsertResponse = await supabase
         .from('projects')
         .insert(dataForSupabase)
@@ -227,10 +234,11 @@ export default function ProjectsManager() {
         toast({ title: "Error", description: `Failed to add project: ${upsertResponse.error.message || 'Supabase returned an error. Check RLS or console.'}`, variant: "destructive" });
       } else {
         toast({ title: "Success", description: "Project added successfully." });
-        if (upsertResponse.data) {
+         if (upsertResponse.data) {
           await supabase.from('admin_activity_log').insert({
             action_type: 'PROJECT_CREATED',
             description: `Project "${formData.title}" was created.`,
+            user_identifier: process.env.NEXT_PUBLIC_ADMIN_USERNAME || 'admin',
             details: { projectId: upsertResponse.data.id }
           });
         }
@@ -246,37 +254,34 @@ export default function ProjectsManager() {
   };
   
   const handleDeleteProject = async () => {
-    if (!projectToDelete) {
-      console.log("[ProjectsManager] handleDeleteProject called but projectToDelete is null.");
-      return;
-    }
-    console.log("[ProjectsManager] Attempting to delete project ID:", projectToDelete.id);
+    if (!projectToDelete) return;
+    console.log("[AdminDashboard][ProjectsManager] Deleting project ID:", projectToDelete.id);
     
     if (projectToDelete.imageUrl) {
         const imagePath = projectToDelete.imageUrl.substring(projectToDelete.imageUrl.indexOf('/project-images/') + '/project-images/'.length);
         if (imagePath && !imagePath.startsWith('http')) {
-            console.log("[ProjectsManager] Deleting image from storage:", imagePath);
+            console.log("[AdminDashboard][ProjectsManager] Deleting image from storage:", imagePath);
             const { error: storageError } = await supabase.storage.from('project-images').remove([imagePath]);
             if (storageError) {
-                console.warn("[ProjectsManager] Error deleting project image from storage, proceeding with DB delete:", JSON.stringify(storageError, null, 2));
+                console.warn("[AdminDashboard][ProjectsManager] Error deleting project image from storage, proceeding with DB delete:", JSON.stringify(storageError, null, 2));
             }
         }
     }
     
-    console.log("[ProjectsManager] Deleting project from database...");
     const { error: deleteError } = await supabase
       .from('projects')
       .delete()
       .eq('id', projectToDelete.id);
 
     if (deleteError) {
-      console.error("[ProjectsManager] Error deleting project from DB (raw Supabase error):", JSON.stringify(deleteError, null, 2));
+      console.error("[AdminDashboard][ProjectsManager] Error deleting project from DB:", JSON.stringify(deleteError, null, 2));
       toast({ title: "Error", description: `Failed to delete project: ${deleteError.message || 'An unexpected error occurred.'}`, variant: "destructive" });
     } else {
       toast({ title: "Success", description: "Project deleted successfully." });
-      await supabase.from('admin_activity_log').insert({
+       await supabase.from('admin_activity_log').insert({
         action_type: 'PROJECT_DELETED',
         description: `Project "${projectToDelete.title}" was deleted.`,
+        user_identifier: process.env.NEXT_PUBLIC_ADMIN_USERNAME || 'admin',
         details: { projectId: projectToDelete.id }
       });
       fetchProjects();
@@ -287,7 +292,6 @@ export default function ProjectsManager() {
   };
 
   const triggerDeleteConfirmation = (project: Project) => {
-    console.log("[ProjectsManager] Triggering delete confirmation for project:", project.title);
     setProjectToDelete(project);
     setShowProjectDeleteConfirm(true);
   };
@@ -295,7 +299,7 @@ export default function ProjectsManager() {
   const handleOpenProjectModal = (project?: Project) => {
     if (project) {
       setCurrentProject(project);
-      setCurrentDbProjectImageUrl(project.imageUrl || null);
+      setCurrentDbProjectImageUrl(project.imageUrl || null); // Store DB image URL for comparison on save
       projectForm.reset({
         id: project.id,
         title: project.title,
@@ -319,7 +323,7 @@ export default function ProjectsManager() {
   };
 
   return (
-    <Card className="mb-8 shadow-lg">
+    <Card className="shadow-lg">
       <CardHeader>
         <CardTitle className="flex justify-between items-center">
           Manage Projects
@@ -348,7 +352,7 @@ export default function ProjectsManager() {
                         <Image src={project.imageUrl} alt={project.title || "Project image"} fill className="object-cover" sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw" />
                         </div>
                     )}
-                    <div className="flex-grow mb-3 sm:mb-0 min-w-0"> {/* Added min-w-0 here for better truncation */}
+                    <div className="flex-grow mb-3 sm:mb-0 min-w-0">
                         <h4 className="font-semibold text-lg truncate" title={project.title}>{project.title}</h4>
                         <p className="text-sm text-muted-foreground">Status: <span className={`font-medium ${project.status === 'Deployed' ? 'text-green-600 dark:text-green-400' : project.status === 'In Progress' ? 'text-blue-600 dark:text-blue-400' : 'text-gray-600 dark:text-gray-400'}`}>{project.status}</span>{project.status === 'In Progress' && project.progress != null && ` (${project.progress}%)`}</p>
                         {project.tags && project.tags.length > 0 && (<p className="text-xs text-muted-foreground mt-1 truncate" title={(project.tags || []).join(', ')}>Tags: {(project.tags || []).join(', ')}</p>)}
@@ -376,17 +380,17 @@ export default function ProjectsManager() {
           <DialogHeader><DialogTitle>{currentProject?.id ? 'Edit Project' : 'Add New Project'}</DialogTitle></DialogHeader>
           <form onSubmit={projectForm.handleSubmit(onProjectSubmit)} className="grid gap-4 py-4">
             <ScrollArea className="max-h-[70vh] p-1">
-              <div className="grid gap-4 p-3"> {/* Added padding inside scroll area */}
+              <div className="grid gap-4 p-3">
                 <div><Label htmlFor="title">Title</Label><Input id="title" {...projectForm.register("title")} />{projectForm.formState.errors.title && <p className="text-destructive text-sm mt-1">{projectForm.formState.errors.title.message}</p>}</div>
                 <div><Label htmlFor="description">Description</Label><Textarea id="description" {...projectForm.register("description")} />{projectForm.formState.errors.description && <p className="text-destructive text-sm mt-1">{projectForm.formState.errors.description.message}</p>}</div>
                 <div className="space-y-2">
                   <Label htmlFor="project_image_file">Project Image File</Label>
                   <div className="flex items-center gap-3"><Input id="project_image_file" type="file" accept="image/*" onChange={handleProjectImageFileChange} className="flex-grow" /><UploadCloud className="h-6 w-6 text-muted-foreground" /></div>
-                  {projectImagePreview && (<div className="mt-2 p-2 border rounded-md bg-muted aspect-video relative w-full max-w-xs mx-auto"><Image src={projectImagePreview} alt="Image preview" fill objectFit="contain" className="rounded"/></div>)}
+                  {projectImagePreview && (<div className="mt-2 p-2 border rounded-md bg-muted aspect-video relative w-full max-w-xs mx-auto"><Image src={projectImagePreview} alt="Image preview" fill className="object-contain rounded"/></div>)}
                   <div><Label htmlFor="image_url_project" className="text-xs text-muted-foreground">Or enter Image URL (upload will override)</Label><Input id="image_url_project" {...projectForm.register("image_url")} placeholder="https://example.com/image.png" />{projectForm.formState.errors.image_url && <p className="text-destructive text-sm mt-1">{projectForm.formState.errors.image_url.message}</p>}</div>
                 </div>
-                <div><Label htmlFor="live_demo_url">Live Demo URL (Optional)</Label><Input id="live_demo_url" {...projectForm.register("live_demo_url")} placeholder="https://example.com/demo" />{projectForm.formState.errors.live_demo_url && <p className="text-destructive text-sm mt-1">{projectForm.formState.errors.live_demo_url.message}</p>}</div>
-                <div><Label htmlFor="repo_url">Repository URL (Optional)</Label><Input id="repo_url" {...projectForm.register("repo_url")} placeholder="https://github.com/user/repo" />{projectForm.formState.errors.repo_url && <p className="text-destructive text-sm mt-1">{projectForm.formState.errors.repo_url.message}</p>}</div>
+                <div><Label htmlFor="live_demo_url">Live Demo URL</Label><Input id="live_demo_url" {...projectForm.register("live_demo_url")} placeholder="https://example.com/demo" />{projectForm.formState.errors.live_demo_url && <p className="text-destructive text-sm mt-1">{projectForm.formState.errors.live_demo_url.message}</p>}</div>
+                <div><Label htmlFor="repo_url">Repository URL</Label><Input id="repo_url" {...projectForm.register("repo_url")} placeholder="https://github.com/user/repo" />{projectForm.formState.errors.repo_url && <p className="text-destructive text-sm mt-1">{projectForm.formState.errors.repo_url.message}</p>}</div>
                 <div><Label htmlFor="tags">Tags (comma-separated)</Label><Input id="tags" {...projectForm.register("tags")} placeholder="React, Next.js, Supabase" /></div>
                 <div><Label htmlFor="status">Status</Label>
                   <select id="status" {...projectForm.register("status")} className={cn("flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50")}>
@@ -396,7 +400,10 @@ export default function ProjectsManager() {
                 <div><Label htmlFor="progress">Progress (0-100, for 'In Progress')</Label><Input id="progress" type="number" {...projectForm.register("progress", { setValueAs: (v) => (v === '' || v === null || v === undefined ? null : Number(v)) })} />{projectForm.formState.errors.progress && <p className="text-destructive text-sm mt-1">{projectForm.formState.errors.progress.message}</p>}</div>
               </div>
             </ScrollArea>
-            <DialogFooter><DialogClose asChild><Button type="button" variant="outline" onClick={() => { setCurrentProject(null); setCurrentDbProjectImageUrl(null); setProjectImageFile(null); projectForm.reset(); }}>Cancel</Button></DialogClose><Button type="submit">{currentProject?.id ? 'Save Changes' : 'Add Project'}</Button></DialogFooter>
+            <DialogFooter className="flex-col-reverse sm:flex-row sm:justify-end sm:space-x-2">
+                <DialogClose asChild><Button type="button" variant="outline" className="w-full sm:w-auto">Cancel</Button></DialogClose>
+                <Button type="submit" className="w-full sm:w-auto">{currentProject?.id ? 'Save Changes' : 'Add Project'}</Button>
+            </DialogFooter>
           </form>
         </DialogContent>
       </Dialog>
@@ -416,3 +423,4 @@ export default function ProjectsManager() {
     </Card>
   );
 }
+
