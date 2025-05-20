@@ -21,7 +21,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Milan's Portfolio - Creative Developer",
+  title: "Milan M Antony | Portfolio",
   description: 'Personal portfolio of Milan, a creative developer showcasing projects, skills, and journey.',
 };
 
