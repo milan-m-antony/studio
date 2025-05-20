@@ -3,11 +3,11 @@
 
 import Link from 'next/link';
 import NextImage from 'next/image';
-import { Button } from '@/components/ui/button';
-import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
+import { Button, buttonVariants } from '@/components/ui/button';
+import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle, SheetDescription, SheetFooter } from '@/components/ui/sheet';
 import {
   Menu, X, Sun, Moon,
-  LogOut as LogoutIcon, LayoutDashboard, Bell as BellIcon, UserCircle, Settings as SettingsIcon, UploadCloud, Trash2, History
+  LogOut as LogoutIcon, LayoutDashboard, Bell as BellIcon, UserCircle, Settings as SettingsIcon, UploadCloud, Trash2, History, FileText
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { useTheme } from '@/contexts/ThemeProvider';
@@ -23,6 +23,16 @@ import {
   DialogTitle,
   DialogClose
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
@@ -83,6 +93,7 @@ export default function AdminPageLayout({
   const [isActivitySheetOpen, setIsActivitySheetOpen] = useState(false);
   const [activities, setActivities] = useState<AdminActivityLog[]>([]);
   const [isLoadingActivities, setIsLoadingActivities] = useState(false);
+  const [showClearLogConfirm, setShowClearLogConfirm] = useState(false);
 
   const fetchAdminProfile = async () => {
     const { data, error } = await supabase
@@ -105,13 +116,13 @@ export default function AdminPageLayout({
   };
 
   const fetchActivities = async () => {
-    if (!isActivitySheetOpen) return;
+    // No check for isActivitySheetOpen here as it's handled by useEffect
     setIsLoadingActivities(true);
     const { data, error } = await supabase
       .from('admin_activity_log')
       .select('*')
       .order('timestamp', { ascending: false })
-      .limit(20);
+      .limit(50); // Fetch latest 50 activities
 
     if (error) {
       console.error("Error fetching admin activities:", error);
@@ -122,6 +133,30 @@ export default function AdminPageLayout({
     }
     setIsLoadingActivities(false);
   };
+
+  const handleClearActivityLog = async () => {
+    setIsLoadingActivities(true);
+    // Delete all rows. A common way is to use a filter that always evaluates to true for all relevant rows.
+    // Supabase client allows deleting without a filter to delete all.
+    const { error } = await supabase
+      .from('admin_activity_log')
+      .delete()
+      .neq('id', '00000000-0000-0000-0000-000000000000'); // A non-existent UUID to target all rows
+
+    if (error) {
+      console.error("Error clearing activity log:", error);
+      toast({ title: "Error", description: "Failed to clear activity log.", variant: "destructive" });
+    } else {
+      toast({ title: "Success", description: "Activity log cleared." });
+      setActivities([]); // Clear local state
+      // Optionally, log this specific action if desired, though it might seem counter-intuitive
+      // await supabase.from('admin_activity_log').insert({ action_type: 'ACTIVITY_LOG_CLEARED', description: 'Admin cleared the activity log.', user_identifier: username });
+      // fetchActivities(); // Re-fetch, which should show an empty list or the new "cleared" log
+    }
+    setShowClearLogConfirm(false);
+    setIsLoadingActivities(false);
+  };
+
 
   useEffect(() => {
     setMounted(true);
@@ -267,12 +302,14 @@ export default function AdminPageLayout({
   const settingsNavItem = navItems.find(item => item.key === 'settings');
 
   const SidebarContent = ({ isMobile = false }: { isMobile?: boolean }) => (
-    <div className={cn("flex flex-col h-full text-sidebar-foreground", isMobile ? "w-full" : "w-64")}>
-      <div className="p-4 border-b border-sidebar-border">
+    <div className={cn("flex flex-col h-full bg-sidebar text-sidebar-foreground", isMobile ? "w-full" : "w-64")}>
+      <div className="p-4 border-b border-sidebar-border flex items-center justify-between">
         <Link href="/admin/dashboard" className="flex items-center gap-2" onClick={() => { onSelectSection('dashboard'); if(isMobile) setIsMobileMenuOpen(false);}}>
           <LayoutDashboard className="h-7 w-7 text-primary" />
           <span className="font-bold text-xl">Admin</span>
         </Link>
+        {/* Placeholder for future sidebar collapse button - only show on desktop */}
+        {/* {!isMobile && <Button variant="ghost" size="icon" className="h-7 w-7 text-sidebar-foreground/70 hover:text-sidebar-foreground"><ChevronRight className="h-5 w-5" /></Button>} */}
       </div>
       <nav className="flex-grow p-2 space-y-1 overflow-y-auto">
         {navItems.filter(item => item.key !== 'settings').map((item) => { // Filter out 'settings'
@@ -345,21 +382,21 @@ export default function AdminPageLayout({
 
       <div className="flex flex-col flex-1 w-full overflow-hidden">
         <header className="sticky top-0 z-40 flex h-16 items-center justify-between border-b border-border bg-card px-4 md:px-6 shrink-0">
-          <div className="md:hidden"></div>
+          <div className="md:hidden"></div> {/* Spacer for mobile when menu button is on left */}
           <h1 className="text-xl font-semibold text-foreground">{pageTitle}</h1>
           <div className="flex items-center gap-3">
             <Sheet open={isActivitySheetOpen} onOpenChange={setIsActivitySheetOpen}>
               <SheetTrigger asChild>
-                <Button variant="ghost" size="icon" aria-label="Notifications" className="hover:text-primary">
+                <Button variant="ghost" size="icon" aria-label="View Recent Activity" className="hover:text-primary">
                   <BellIcon className="h-5 w-5" />
                 </Button>
               </SheetTrigger>
-              <SheetContent side="right" className="w-[350px] sm:w-[400px] p-0">
+              <SheetContent side="right" className="w-[350px] sm:w-[400px] p-0 flex flex-col">
                 <SheetHeader className="p-4 border-b">
                   <SheetTitle className="flex items-center"><History className="mr-2 h-5 w-5"/>Recent Activity</SheetTitle>
                   <SheetDescription>Latest updates and actions in the admin panel.</SheetDescription>
                 </SheetHeader>
-                <ScrollArea className="h-[calc(100vh-100px)] p-4">
+                <ScrollArea className="flex-grow p-4"> {/* flex-grow to take available space */}
                   {isLoadingActivities ? (
                     <p className="text-muted-foreground text-center py-4">Loading activities...</p>
                   ) : activities.length === 0 ? (
@@ -382,6 +419,13 @@ export default function AdminPageLayout({
                     </ul>
                   )}
                 </ScrollArea>
+                {activities.length > 0 && (
+                  <SheetFooter className="p-4 border-t">
+                    <Button variant="outline" size="sm" onClick={() => setShowClearLogConfirm(true)} disabled={isLoadingActivities}>
+                      <Trash2 className="mr-2 h-4 w-4"/> Clear Log
+                    </Button>
+                  </SheetFooter>
+                )}
               </SheetContent>
             </Sheet>
 
@@ -486,6 +530,32 @@ export default function AdminPageLayout({
             </DialogFooter>
         </DialogContent>
     </Dialog>
+
+    <AlertDialog open={showClearLogConfirm} onOpenChange={setShowClearLogConfirm}>
+      <AlertDialogContent className="bg-destructive border-destructive text-destructive-foreground">
+        <AlertDialogHeader>
+          <AlertDialogTitle className="text-destructive-foreground">Clear Entire Activity Log?</AlertDialogTitle>
+          <AlertDialogDescription className="text-destructive-foreground/90">
+            This action cannot be undone. All activity log entries will be permanently deleted.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel 
+            onClick={() => setShowClearLogConfirm(false)} 
+            className={cn(buttonVariants({ variant: "outline" }), "border-destructive-foreground/40 text-destructive-foreground", "hover:bg-destructive-foreground/10 hover:text-destructive-foreground hover:border-destructive-foreground/60")}
+          >
+            Cancel
+          </AlertDialogCancel>
+          <AlertDialogAction 
+            onClick={handleClearActivityLog} 
+            disabled={isLoadingActivities}
+            className={cn(buttonVariants({ variant: "default" }), "bg-destructive-foreground text-destructive", "hover:bg-destructive-foreground/90")}
+          >
+            {isLoadingActivities ? "Clearing..." : "Clear Log"}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
     </>
   );
 }
