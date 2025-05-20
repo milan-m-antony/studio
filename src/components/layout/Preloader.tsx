@@ -4,27 +4,35 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { cn } from '@/lib/utils';
 
-const FALLBACK_TIMEOUT = 7000; // 7 seconds
-const FADE_OUT_DURATION = 500; // ms, for main overlay fade
+const FALLBACK_TIMEOUT = 7000; // 7 seconds for the preloader to hide if window.load doesn't fire
+const CONTENT_FADE_IN_DELAY = 200; // ms, delay before text starts fading in
+const PRELOADER_FADE_OUT_DURATION = 500; // ms, for the entire preloader to fade out
 
 export default function Preloader() {
-  const [isLoading, setIsLoading] = useState(true);
-  const [isFadingOut, setIsFadingOut] = useState(false);
+  const [isLoading, setIsLoading] = useState(true); // Controls if the preloader is in the DOM
+  const [isFadingOut, setIsFadingOut] = useState(false); // Controls the fade-out animation of the whole preloader
+  const [isContentLoaded, setIsContentLoaded] = useState(false); // Controls fade-in of text content
   const fallbackTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const contentFadeInTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   const startFadeOut = useCallback(() => {
-    if (isFadingOut || !isLoading) return; // Prevent multiple calls or if already hidden
+    if (isFadingOut || !isLoading) return;
 
     console.log("[Preloader] Starting fade out sequence.");
-    setIsFadingOut(true);
+    setIsFadingOut(true); // Trigger fade-out class for the preloader overlay
     setTimeout(() => {
-      console.log("[Preloader] Fade out complete, hiding preloader.");
-      setIsLoading(false);
-    }, FADE_OUT_DURATION);
+      console.log("[Preloader] Fade out complete, hiding preloader from DOM.");
+      setIsLoading(false); // Remove from DOM after fade
+    }, PRELOADER_FADE_OUT_DURATION);
   }, [isLoading, isFadingOut]);
 
   useEffect(() => {
-    // Ensure fade-out starts if component is still loading after fallback
+    // Timer to trigger fade-in of preloader content (MMA, Loading text)
+    contentFadeInTimerRef.current = setTimeout(() => {
+      setIsContentLoaded(true);
+    }, CONTENT_FADE_IN_DELAY);
+
+    // Fallback timer to ensure preloader hides eventually
     fallbackTimerRef.current = setTimeout(() => {
       console.log("[Preloader] Fallback timeout reached.");
       startFadeOut();
@@ -40,7 +48,9 @@ export default function Preloader() {
     };
 
     if (document.readyState === 'complete') {
-      handleWindowLoad();
+      // If already loaded (e.g., fast connection, cached resources), start fade out almost immediately
+      // but ensure content has a chance to fade in briefly if desired
+      setTimeout(handleWindowLoad, CONTENT_FADE_IN_DELAY + 100);
     } else {
       window.addEventListener('load', handleWindowLoad);
     }
@@ -50,8 +60,11 @@ export default function Preloader() {
       if (fallbackTimerRef.current) {
         clearTimeout(fallbackTimerRef.current);
       }
+      if (contentFadeInTimerRef.current) {
+        clearTimeout(contentFadeInTimerRef.current);
+      }
     };
-  }, [startFadeOut]); // Add startFadeOut to dependencies
+  }, [startFadeOut]);
 
   if (!isLoading) {
     return null;
@@ -61,29 +74,23 @@ export default function Preloader() {
     <div
       id="preloader-overlay"
       className={cn(
-        "fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-black transition-opacity duration-500 ease-in-out",
+        "fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-black/95 backdrop-blur-sm transition-opacity duration-500 ease-in-out",
         isFadingOut ? "opacity-0" : "opacity-100"
       )}
       aria-hidden={!isLoading || isFadingOut}
       role="status"
     >
-      <div className="relative flex h-24 w-24 items-center justify-center">
-        {/* Pulsing Circles */}
-        {[0, 1, 2].map((i) => (
-          <div
-            key={i}
-            className={cn(
-              "absolute h-full w-full rounded-full bg-primary opacity-60",
-              "animate-pulseCircle"
-            )}
-            style={{
-              animationDelay: `${i * 0.3}s`,
-              // Note: Tailwind's animate-pulse is different. We use custom animate-pulseCircle.
-            }}
-          />
-        ))}
+      <div className={cn(
+        "text-center transition-opacity duration-700 ease-in-out",
+        isContentLoaded ? "opacity-100" : "opacity-0"
+      )}>
+        <div className="text-7xl md:text-8xl lg:text-9xl font-bold text-white tracking-widest">
+          MMA
+        </div>
+        <p className="mt-6 text-lg font-medium text-white/80">
+          Loading Portfolio...
+        </p>
       </div>
-      <p className="mt-8 text-lg font-medium text-white/80">Loading Portfolio...</p>
     </div>
   );
 }
