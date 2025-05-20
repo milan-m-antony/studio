@@ -2,119 +2,135 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Loader2 } from 'lucide-react';
+import { cn } from '@/lib/utils';
+
+const COUNTDOWN_MAX = 100;
+const COUNTDOWN_INTERVAL = 30; // ms, for ~3 second countdown (30ms * 100 = 3000ms)
+const FALLBACK_TIMEOUT = 7000; // 7 seconds
+const FADE_DURATION = 500; // ms, for main overlay fade
+
+type PreloaderStage = 'counting' | 'covering' | 'uncovering' | 'fadingOutOverlay' | 'hidden';
 
 export default function Preloader() {
-  const [loading, setLoading] = useState(true);
-  const [fadingOut, setFadingOut] = useState(false);
-  const [progress, setProgress] = useState(1); // Start count from 1
+  const [stage, setStage] = useState<PreloaderStage>('counting');
+  const [progress, setProgress] = useState(1);
+  const [mainOverlayOpacity, setMainOverlayOpacity] = useState(1);
 
-  const fallbackTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
-  const fadingOutRef = useRef(false);
+  const fallbackTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const revealPaneRef = useRef<HTMLDivElement>(null);
 
-  const clearAllTimers = useCallback(() => {
-    if (fallbackTimeoutRef.current) {
-      clearTimeout(fallbackTimeoutRef.current);
-      fallbackTimeoutRef.current = null;
-    }
-    if (intervalRef.current) {
-      clearInterval(intervalRef.current);
-      intervalRef.current = null;
-    }
+  const clearTimers = useCallback(() => {
+    if (intervalRef.current) clearInterval(intervalRef.current);
+    if (fallbackTimerRef.current) clearTimeout(fallbackTimerRef.current);
   }, []);
 
-  const startFadeOut = useCallback(() => {
-    if (fadingOutRef.current) return;
-    fadingOutRef.current = true;
+  const startRevealSequence = useCallback(() => {
+    clearTimers();
+    setProgress(COUNTDOWN_MAX); // Ensure counter shows 100
+    if (stage === 'counting') {
+      setStage('covering');
+    }
+  }, [stage, clearTimers]);
 
-    clearAllTimers();
-    setProgress(100); // Ensure counter hits 100
-    setFadingOut(true);
-    
-    setTimeout(() => {
-      setLoading(false);
-    }, 500); // Match CSS transition duration for opacity
-  }, [clearAllTimers]);
-
+  // Effect for the countdown
   useEffect(() => {
-    fadingOutRef.current = false; 
+    if (stage === 'counting') {
+      intervalRef.current = setInterval(() => {
+        setProgress((prev) => {
+          if (prev < COUNTDOWN_MAX) {
+            return prev + 1;
+          }
+          clearInterval(intervalRef.current!);
+          // The startRevealSequence will be called by onload or fallback
+          return COUNTDOWN_MAX;
+        });
+      }, COUNTDOWN_INTERVAL);
+    }
+    return () => {
+      if (intervalRef.current) clearInterval(intervalRef.current);
+    };
+  }, [stage]);
+
+  // Effect for window.onload and fallback timeout
+  useEffect(() => {
+    if (stage !== 'counting') return;
 
     const handleWindowLoad = () => {
-      console.log("[Preloader] Window loaded, starting fade out.");
-      startFadeOut();
+      console.log("[Preloader] Window loaded, starting reveal sequence.");
+      startRevealSequence();
     };
 
-    fallbackTimeoutRef.current = setTimeout(() => {
-      console.log("[Preloader] Fallback timeout reached, starting fade out.");
-      startFadeOut();
-    }, 7000); // Fallback after 7 seconds
-
     if (document.readyState === 'complete') {
-      console.log("[Preloader] Document already complete, starting fade out.");
-      startFadeOut();
+      handleWindowLoad();
     } else {
       window.addEventListener('load', handleWindowLoad);
-      console.log("[Preloader] Event listener for 'load' added.");
+      fallbackTimerRef.current = setTimeout(() => {
+        console.log("[Preloader] Fallback timeout, starting reveal sequence.");
+        handleWindowLoad(); // Also call handleWindowLoad to ensure sequence starts
+      }, FALLBACK_TIMEOUT);
     }
 
     return () => {
       window.removeEventListener('load', handleWindowLoad);
-      clearAllTimers();
-      console.log("[Preloader] Cleanup: Event listener removed, timers cleared.");
+      if (fallbackTimerRef.current) clearTimeout(fallbackTimerRef.current);
     };
-  }, [startFadeOut, clearAllTimers]);
-
-  useEffect(() => {
-    if (fadingOutRef.current) return; // Don't start new interval if already fading out
-
-    intervalRef.current = setInterval(() => {
-      setProgress((prevProgress) => {
-        if (prevProgress >= 100) {
-          if (intervalRef.current) clearInterval(intervalRef.current);
-          // The startFadeOut should be triggered by onload or fallback,
-          // but if counter reaches 100 naturally first, ensure fadeOut starts.
-          if (!fadingOutRef.current) startFadeOut();
-          return 100;
-        }
-        return prevProgress + 1;
-      });
-    }, 30); // Adjust speed as needed (30ms for a quick count to 100)
-
-    return () => {
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
-      }
-    };
-  }, [startFadeOut]);
+  }, [stage, startRevealSequence]);
 
 
-  if (!loading) {
+  const handleRevealPaneAnimationEnd = () => {
+    if (stage === 'covering') {
+      setStage('uncovering');
+    } else if (stage === 'uncovering') {
+      // After uncover animation, start fading out the main overlay
+      setStage('fadingOutOverlay');
+      setMainOverlayOpacity(0);
+      setTimeout(() => {
+        setStage('hidden');
+      }, FADE_DURATION); // Match CSS transition duration
+    }
+  };
+
+  if (stage === 'hidden') {
     return null;
   }
 
   return (
-    <div
-      className={`fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-black text-white transition-opacity duration-500 ease-in-out ${
-        fadingOut ? 'opacity-0' : 'opacity-100'
-      }`}
-      aria-hidden={!loading}
-      role="status"
-      aria-live="polite"
-    >
-      <div className="text-center mb-8">
-        {/* Display the animated number */}
-        <span
-          key={progress} // Re-trigger animation on progress change
-          className="animate-preloaderPulse text-7xl md:text-8xl lg:text-9xl font-bold"
-          style={{ animationDelay: '0s', animationDuration: '0.2s' }} // Ensure animation plays quickly for each number
+    <>
+      {/* Main dark overlay - present during counting, gets faded at the end */}
+      {(stage === 'counting' || stage === 'covering' || stage === 'uncovering' || stage === 'fadingOutOverlay') && (
+        <div
+          id="preloader-main-overlay"
+          style={{ opacity: mainOverlayOpacity, transition: `opacity ${FADE_DURATION}ms ease-in-out` }}
+          className="fixed inset-0 z-[9998] flex items-end justify-end p-4 bg-black text-white"
+          aria-hidden={stage === 'hidden'}
+          role="status"
         >
-          {progress}
-        </span>
-      </div>
-      
-      <p className="text-md text-white/80 mb-4">Loading Portfolio...</p>
-      <Loader2 className="h-6 w-6 animate-spin text-white/70" />
-    </div>
+          {stage === 'counting' && (
+            <div className="absolute bottom-4 right-4 p-2 bg-black/50 rounded">
+              <span className="text-5xl font-bold text-white">
+                {progress}
+              </span>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Reveal Pane - this is what animates to cover and then uncover */}
+      {(stage === 'covering' || stage === 'uncovering') && (
+        <div
+          ref={revealPaneRef}
+          id="reveal-pane"
+          onAnimationEnd={handleRevealPaneAnimationEnd}
+          className={cn(
+            "fixed inset-x-0 bg-black z-[9999]", // Higher z-index than main overlay
+            {
+              'animate-cover-screen bottom-0': stage === 'covering',
+              'animate-uncover-screen top-0 h-full': stage === 'uncovering', // Start full height, anchored top
+            }
+          )}
+        />
+      )}
+    </>
   );
 }
