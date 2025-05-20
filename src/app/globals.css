@@ -48,16 +48,16 @@ body {
   }
 
   .dark {
-    --background: 240 10% 3.9%; /* Dark Gray */
+    --background: 0 0% 0%; /* UPDATED TO BLACK */
     --foreground: 0 0% 98%; /* Almost White */
-    --card: 240 10% 3.9%;
+    --card: 0 0% 0%; /* UPDATED TO BLACK */
     --card-foreground: 0 0% 98%;
-    --popover: 240 10% 3.9%;
+    --popover: 0 0% 0%; /* UPDATED TO BLACK */
     --popover-foreground: 0 0% 98%;
     --primary: 220 75% 65%; /* Brighter Professional Blue for dark mode */
     --primary-hover: 220 75% 70%; /* Slightly Lighter/Brighter Blue for dark mode hover */
     --primary-foreground: 240 5.9% 10%; /* Dark Gray */
-    --secondary: 240 3.7% 15.9%; /* Darker Gray */
+    --secondary: 240 3.7% 15.9%; /* Darker Gray - used for some hover/muted elements */
     --secondary-foreground: 0 0% 98%;
     --muted: 240 3.7% 15.9%;
     --muted-foreground: 240 5% 64.9%; /* Lighter Medium Gray */
@@ -66,8 +66,8 @@ body {
     --accent-foreground: 0 0% 98%;
     --destructive: 0 62.8% 30.6%;
     --destructive-foreground: 0 0% 98%;
-    --border: 240 3.7% 15.9%;
-    --input: 240 3.7% 15.9%;
+    --border: 240 3.7% 15.9%; /* This will be the border color on black backgrounds */
+    --input: 240 3.7% 15.9%; /* Input fields will be dark gray on black background */
     --ring: 220 75% 65%; /* Brighter Professional Blue for focus rings */
     --chart-1: 220 70% 50%;
     --chart-2: 160 60% 45%;
@@ -76,7 +76,7 @@ body {
     --chart-5: 340 75% 55%;
 
     /* Dark Theme Sidebar Variables */
-    --sidebar-background: 0 0% 0%; /* Solid Black */
+    --sidebar-background: 0 0% 0%; /* Solid Black - Stays Black */
     --sidebar-foreground: 0 0% 95.9%; /* Light gray text, almost white */
     --sidebar-primary: 220 75% 65%; /* Brighter Professional Blue for active item background */
     --sidebar-primary-foreground: 240 5.9% 10%; /* Dark gray text on active item */
@@ -144,27 +144,6 @@ body {
 .animate-zoomInOutNumber {
   animation: zoomInOutNumber ease-in-out forwards; /* Duration set by inline style */
 }
-
-/* Animations for block reveal effect - REMOVED as per user request */
-/*
-@keyframes coverScreenFromBottom {
-  from { height: 0%; bottom: 0; top: auto; }
-  to { height: 100%; bottom: 0; top: auto; }
-}
-
-@keyframes uncoverScreenToTop {
-  from { height: 100%; top: 0; bottom: auto; }
-  to { height: 0%; top: 0; bottom: auto; }
-}
-
-.animate-cover-screen {
-  animation: coverScreenFromBottom ease-in-out forwards;
-}
-
-.animate-uncover-screen {
-  animation: uncoverScreenToTop ease-in-out forwards;
-}
-*/
 
 /* Scrollbar hiding utilities */
 @layer utilities {
