@@ -1,3 +1,7 @@
+
+"use client"; // Needs to be a client component for useEffect
+
+import React, { useEffect } from 'react'; // Import useEffect
 import NextImage from 'next/image';
 import Link from 'next/link';
 import { ExternalLink, Github, Rocket, Wrench, FlaskConical, CheckCircle2, Archive, ClipboardList, type LucideIcon } from 'lucide-react';
@@ -7,7 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import type { Project, ProjectStatus } from '@/types/supabase'; 
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-
+import { supabase } from '@/lib/supabaseClient'; // Import Supabase client
 
 interface ProjectCardProps {
   project: Project;
@@ -26,6 +30,24 @@ const statusConfig: Record<ProjectStatus, { icon: LucideIcon; label: string; bad
 export default function ProjectCard({ project }: ProjectCardProps) {
   const currentStatusConfig = project.status ? statusConfig[project.status] : statusConfig['Concept']; 
   const isActionable = project.status === 'Deployed' || project.status === 'Completed';
+
+  // Log a project view when the card mounts
+  useEffect(() => {
+    const logView = async () => {
+      if (project && project.id) {
+        const { error } = await supabase
+          .from('project_views')
+          .insert({ project_id: project.id });
+        if (error) {
+          console.warn(`[ProjectCard] Failed to log view for project ${project.id}:`, error.message);
+        } else {
+          // console.log(`[ProjectCard] View logged for project ${project.id}`);
+        }
+      }
+    };
+    logView();
+  }, [project]); // Dependency array includes project to re-log if project prop changes (though unlikely for this use case)
+
 
   let liveDemoButton = null;
   if (project.liveDemoUrl) {
@@ -122,9 +144,9 @@ export default function ProjectCard({ project }: ProjectCardProps) {
           src={project.imageUrl || `https://placehold.co/600x400.png`}
           alt={project.title || 'Project image'}
           layout="fill"
-          objectFit="cover"
-          className="transition-transform duration-300 group-hover:scale-105" // Removed dark mode inversion
+          className="object-cover transition-transform duration-300 group-hover:scale-105" 
           data-ai-hint={project.title || 'project abstract'}
+          sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
         />
       </div>
       <CardHeader>
@@ -172,3 +194,5 @@ export default function ProjectCard({ project }: ProjectCardProps) {
     </Card>
   );
 }
+
+    

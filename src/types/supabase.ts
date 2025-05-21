@@ -14,12 +14,13 @@ export type Json =
 export interface StoredHeroSocialLink {
   label: string;
   url: string;
-  icon_image_url: string | null; // Changed from icon_name
+  icon_image_url: string | null;
 }
 
 // Interface for Hero social links when managed in client-side state (includes temporary id)
 export interface HeroSocialLinkItem extends StoredHeroSocialLink {
   id: string; // Client-side temporary ID for list management
+  iconImageUrl?: string | null; // Compatibility if needed
 }
 
 export interface AdminProfile {
@@ -38,7 +39,7 @@ export interface SiteSettings {
 export interface AdminActivityLog {
   id: string;
   timestamp: string;
-  user_identifier: string;
+  user_identifier: string | null;
   action_type: string;
   description: string;
   details: Json | null;
@@ -46,10 +47,17 @@ export interface AdminActivityLog {
 }
 
 export interface LegalDocument {
-  id: string; // 'terms-and-conditions' or 'privacy-policy'
+  id: string;
   title: string;
   content: string | null;
   updated_at: string;
+}
+
+export interface ProjectView {
+    id: string;
+    project_id: string | null;
+    viewed_at: string;
+    viewer_identifier: string | null;
 }
 
 
@@ -60,25 +68,21 @@ export interface Database {
         Row: AdminProfile
         Insert: Omit<AdminProfile, 'updated_at'> & { updated_at?: string; }
         Update: Partial<AdminProfile>
-        Relationships: [];
       }
       site_settings: {
         Row: SiteSettings
         Insert: Omit<SiteSettings, 'updated_at'> & { updated_at?: string; }
         Update: Partial<SiteSettings>
-        Relationships: [];
       }
       admin_activity_log: {
         Row: AdminActivityLog
         Insert: Omit<AdminActivityLog, 'id' | 'timestamp' | 'is_read'> & { id?: string; timestamp?: string; is_read?: boolean; }
         Update: Partial<AdminActivityLog>
-        Relationships: [];
       }
       legal_documents: {
         Row: LegalDocument
         Insert: Omit<LegalDocument, 'updated_at'> & { updated_at?: string; }
         Update: Partial<LegalDocument>
-        Relationships: [];
       }
       projects: {
         Row: {
@@ -86,7 +90,6 @@ export interface Database {
           title: string
           description: string | null
           image_url: string | null
-          // image_hint was removed
           live_demo_url: string | null
           repo_url: string | null
           tags: string[] | null
@@ -118,13 +121,22 @@ export interface Database {
           progress?: number | null
           created_at?: string
         }
-        Relationships: []
+      }
+      project_views: { // New table for project views
+        Row: ProjectView
+        Insert: {
+          id?: string;
+          project_id?: string | null;
+          viewed_at?: string;
+          viewer_identifier?: string | null;
+        }
+        Update: Partial<ProjectView>
       }
       skill_categories: {
         Row: {
           id: string
           name: string
-          icon_image_url: string | null // For uploaded image URL
+          icon_image_url: string | null
           sort_order: number | null
           created_at: string
         }
@@ -142,13 +154,12 @@ export interface Database {
           sort_order?: number | null
           created_at?: string
         }
-        Relationships: []
       }
       skills: {
         Row: {
           id: string
           name: string
-          icon_image_url: string | null // For uploaded image URL
+          icon_image_url: string | null
           description: string | null
           category_id: string | null
           created_at: string;
@@ -169,14 +180,6 @@ export interface Database {
           category_id?: string | null
           created_at?: string;
         }
-        Relationships: [
-          {
-            foreignKeyName: "skills_category_id_fkey"
-            columns: ["category_id"]
-            referencedRelation: "skill_categories"
-            referencedColumns: ["id"]
-          }
-        ]
       }
       certifications: {
         Row: {
@@ -206,7 +209,6 @@ export interface Database {
           verify_url?: string | null
           created_at?: string
         }
-        Relationships: []
       }
       timeline_events: {
         Row: {
@@ -214,7 +216,7 @@ export interface Database {
           date: string
           title: string
           description: string
-          icon_image_url: string | null // Changed from icon_name
+          icon_image_url: string | null
           type: string
           sort_order: number | null
           created_at: string
@@ -239,7 +241,6 @@ export interface Database {
           sort_order?: number | null
           created_at?: string
         }
-        Relationships: []
       }
       about_content: {
         Row: {
@@ -281,7 +282,6 @@ export interface Database {
           image_tagline?: string | null
           updated_at?: string
         }
-        Relationships: []
       }
       resume_meta: {
         Row: {
@@ -302,7 +302,6 @@ export interface Database {
           resume_pdf_url?: string | null;
           updated_at?: string;
         }
-        Relationships: [];
       }
       resume_experience: {
         Row: {
@@ -335,7 +334,6 @@ export interface Database {
           sort_order?: number | null
           created_at?: string
         }
-        Relationships: []
       }
       resume_education: {
         Row: {
@@ -368,7 +366,6 @@ export interface Database {
           sort_order?: number | null
           created_at?: string
         }
-        Relationships: []
       }
       resume_key_skill_categories: {
         Row: {
@@ -392,7 +389,6 @@ export interface Database {
           sort_order?: number | null
           created_at?: string
         }
-        Relationships: []
       }
       resume_key_skills: {
         Row: {
@@ -410,14 +406,6 @@ export interface Database {
           skill_name?: string
           category_id?: string | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "resume_key_skills_category_id_fkey"
-            columns: ["category_id"]
-            referencedRelation: "resume_key_skill_categories"
-            referencedColumns: ["id"]
-          }
-        ]
       }
       resume_languages: {
         Row: {
@@ -444,130 +432,26 @@ export interface Database {
           sort_order?: number | null
           created_at?: string
         }
-        Relationships: []
       }
       hero_content: {
-        Row: {
-          id: string;
-          main_name: string | null;
-          subtitles: string[] | null;
-          social_media_links: StoredHeroSocialLink[] | null;
-          updated_at: string;
-        }
-        Insert: {
-          id: string;
-          main_name?: string | null;
-          subtitles?: string[] | null;
-          social_media_links?: StoredHeroSocialLink[] | null;
-          updated_at?: string;
-        }
-        Update: {
-          id?: string;
-          main_name?: string | null;
-          subtitles?: string[] | null;
-          social_media_links?: StoredHeroSocialLink[] | null;
-          updated_at?: string;
-        }
-        Relationships: [];
+        Row: HeroContent;
+        Insert: Omit<HeroContent, 'updated_at'> & { updated_at?: string; };
+        Update: Partial<HeroContent>;
       }
       contact_page_details: {
-        Row: {
-          id: string;
-          address: string | null;
-          phone: string | null;
-          phone_href: string | null;
-          email: string | null;
-          email_href: string | null;
-          updated_at: string;
-        }
-        Insert: {
-          id: string;
-          address?: string | null;
-          phone?: string | null;
-          phone_href?: string | null;
-          email?: string | null;
-          email_href?: string | null;
-          updated_at?: string;
-        }
-        Update: {
-          id?: string;
-          address?: string | null;
-          phone?: string | null;
-          phone_href?: string | null;
-          email?: string | null;
-          email_href?: string | null;
-          updated_at?: string;
-        }
-        Relationships: [];
+        Row: ContactPageDetail;
+        Insert: Omit<ContactPageDetail, 'updated_at'> & { updated_at?: string; };
+        Update: Partial<ContactPageDetail>;
       }
       social_links: {
-        Row: {
-          id: string;
-          label: string;
-          icon_image_url: string | null; // Changed from icon_name
-          url: string;
-          display_text: string | null;
-          sort_order: number | null;
-          created_at: string;
-        }
-        Insert: {
-          id?: string;
-          label: string;
-          icon_image_url?: string | null;
-          url: string;
-          display_text?: string | null;
-          sort_order?: number | null;
-          created_at?: string;
-        }
-        Update: {
-          id?: string;
-          label?: string;
-          icon_image_url?: string | null;
-          url?: string;
-          display_text?: string | null;
-          sort_order?: number | null;
-          created_at?: string;
-        }
-        Relationships: [];
+        Row: SocialLink;
+        Insert: Omit<SocialLink, 'id' | 'created_at'> & { id?: string; created_at?: string; };
+        Update: Partial<Omit<SocialLink, 'id' | 'created_at'>>;
       }
       contact_submissions: {
-        Row: {
-          id: string;
-          name: string;
-          email: string;
-          subject: string | null;
-          message: string;
-          phone_number: string | null;
-          status: SubmissionStatus | null;
-          is_starred: boolean | null;
-          submitted_at: string;
-          notes: string | null;
-        }
-        Insert: {
-          id?: string;
-          name: string;
-          email: string;
-          subject?: string | null;
-          message: string;
-          phone_number?: string | null;
-          status?: SubmissionStatus | null;
-          is_starred?: boolean | null;
-          submitted_at?: string;
-          notes?: string | null;
-        }
-        Update: {
-          id?: string;
-          name?: string;
-          email?: string;
-          subject?: string | null;
-          message?: string;
-          phone_number?: string | null;
-          status?: SubmissionStatus | null;
-          is_starred?: boolean | null;
-          submitted_at?: string;
-          notes?: string | null;
-        }
-        Relationships: [];
+        Row: ContactSubmission;
+        Insert: Omit<ContactSubmission, 'id' | 'submitted_at' | 'status' | 'is_starred'> & { id?: string; submitted_at?: string; status?: SubmissionStatus | null; is_starred?: boolean | null; };
+        Update: Partial<Omit<ContactSubmission, 'id'| 'submitted_at'>>;
       }
     } // End Tables
     Views: {
@@ -591,13 +475,16 @@ export interface Project {
   id: string;
   title: string;
   description: string | null;
-  imageUrl: string | null;
+  imageUrl: string | null; // This is the client-side expected prop name
   liveDemoUrl?: string | null;
   repoUrl?: string | null;
   tags: string[] | null;
   status: ProjectStatus | null;
   progress?: number | null;
   created_at: string;
+  image_url?: string | null; // From Supabase (snake_case)
+  live_demo_url?: string | null; // From Supabase
+  repo_url?: string | null;    // From Supabase
 }
 
 export interface Skill {
@@ -605,17 +492,22 @@ export interface Skill {
   name: string;
   iconImageUrl: string | null; // Changed from iconName
   description: string | null;
-  categoryId?: string | null;
-  created_at: string;
+  categoryId?: string | null; // For client-side use, if skill is fetched with category
+  created_at?: string; // Keep if it's in your actual DB table, otherwise remove
+  // Supabase specific fields (if different from client-side)
+  icon_image_url?: string | null;
+  category_id?: string | null;
 }
 
 export interface SkillCategory {
   id: string;
   name: string;
-  iconImageUrl?: string | null; // For uploaded image URL
+  iconImageUrl?: string | null; // Changed from icon_name
   skills?: Skill[];
   sort_order?: number | null;
   created_at?: string;
+  // Supabase specific fields (if different from client-side)
+  icon_image_url?: string | null; // From Supabase
 }
 
 export type TimelineEventType = 'work' | 'education' | 'certification' | 'milestone';
@@ -629,6 +521,8 @@ export interface TimelineEvent {
   type: TimelineEventType;
   sort_order?: number | null;
   created_at?: string;
+  // Supabase specific
+  icon_image_url?: string | null;
 }
 
 export interface Certification {
@@ -636,13 +530,16 @@ export interface Certification {
   title: string;
   issuer: string;
   date: string;
-  imageUrl: string | null;
-  verifyUrl?: string | null;
+  imageUrl: string | null; // Client-side
+  verifyUrl?: string | null; // Client-side
   created_at: string;
+  // Supabase specific
+  image_url?: string | null;
+  verify_url?: string | null;
 }
 
 export interface AboutContent {
-  id: string;
+  id: string; // Fixed ID
   headline_main: string | null;
   headline_code_keyword: string | null;
   headline_connector: string | null;
@@ -650,13 +547,15 @@ export interface AboutContent {
   paragraph1: string | null;
   paragraph2: string | null;
   paragraph3: string | null;
-  imageUrl: string | null;
+  imageUrl: string | null; // Client-side
   image_tagline: string | null;
   updated_at?: string;
+  // Supabase specific
+  image_url?: string | null;
 }
 
 export interface ResumeMeta {
-  id: string;
+  id: string; // Fixed ID
   description: string | null;
   resume_pdf_url: string | null;
   updated_at: string;
@@ -668,7 +567,7 @@ export interface ResumeExperience {
   company_name: string;
   date_range: string | null;
   description_points: string[] | null;
-  icon_image_url: string | null;
+  icon_image_url: string | null; // URL to an image
   sort_order?: number | null;
   created_at: string;
 }
@@ -679,7 +578,7 @@ export interface ResumeEducation {
   institution_name: string;
   date_range: string | null;
   description: string | null;
-  icon_image_url: string | null;
+  icon_image_url: string | null; // URL to an image
   sort_order?: number | null;
   created_at: string;
 }
@@ -688,13 +587,13 @@ export interface ResumeKeySkill {
   id: string;
   skill_name: string;
   category_id?: string | null;
-  // created_at intentionally omitted as per schema
+  // No created_at for individual skills in the last provided DB schema
 }
 
 export interface ResumeKeySkillCategory {
   id: string;
   category_name: string;
-  icon_image_url: string | null;
+  icon_image_url: string | null; // URL to an image
   skills?: ResumeKeySkill[];
   sort_order?: number | null;
   created_at: string;
@@ -704,21 +603,21 @@ export interface ResumeLanguage {
   id: string;
   language_name: string;
   proficiency: string | null;
-  icon_image_url: string | null;
+  icon_image_url: string | null; // URL to an image
   sort_order?: number | null;
   created_at: string;
 }
 
 export interface HeroContent {
-  id: string;
+  id: string; // Fixed ID
   main_name: string | null;
   subtitles: string[] | null;
-  social_media_links: StoredHeroSocialLink[] | null;
+  social_media_links: StoredHeroSocialLink[] | null; // Array of objects
   updated_at: string;
 }
 
 export interface ContactPageDetail {
-  id: string;
+  id: string; // Fixed ID
   address: string | null;
   phone: string | null;
   phone_href: string | null;
@@ -727,10 +626,10 @@ export interface ContactPageDetail {
   updated_at: string;
 }
 
-export interface SocialLink {
+export interface SocialLink { // For Contact Page Social Links
   id: string;
   label: string;
-  icon_image_url: string | null; // Changed from icon_name
+  icon_image_url: string | null; // URL to an image
   url: string;
   display_text: string | null;
   sort_order?: number | null;
@@ -746,8 +645,16 @@ export interface ContactSubmission {
   subject: string | null;
   message: string;
   phone_number: string | null;
-  status?: SubmissionStatus | null;
-  is_starred?: boolean | null;
+  status: SubmissionStatus | null;
+  is_starred: boolean | null;
   submitted_at: string;
   notes?: string | null;
 }
+// Define User type based on Supabase Auth User
+export type User = {
+  id: string;
+  email?: string;
+  // Add other user properties if needed from session.user
+};
+
+    
