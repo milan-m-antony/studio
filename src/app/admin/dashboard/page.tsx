@@ -11,7 +11,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Switch } from "@/components/ui/switch";
 import { 
-  ShieldCheck, LogOut, AlertTriangle, LogIn, Home as HomeIcon, Users, Briefcase, 
+  ShieldCheck, LogOut, AlertTriangle, LogIn, Home as HomeIcon, Briefcase, 
   Wrench, MapPin as JourneyIcon, Award, FileText as ResumeIcon, Mail as ContactIcon, 
   Settings as SettingsIcon, LayoutDashboard, Gavel as LegalIcon, Loader2, Save, Trash2, User as UserIcon,
   Image as ImageIcon, Link as LinkIcon, ListChecks, Languages, Building, GraduationCap, Tag as TagIcon, History, Filter, Eye, Send
@@ -19,7 +19,7 @@ import {
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/lib/supabaseClient'; 
-import type { SiteSettings, User as SupabaseUser } from '@/types/supabase';
+import type { SiteSettings, User as SupabaseUserType } from '@/types/supabase';
 import { useToast } from "@/hooks/use-toast";
 import {
   AlertDialog,
@@ -43,6 +43,7 @@ import ResumeManager from '@/components/admin/ResumeManager';
 import ContactManager from '@/components/admin/ContactManager';
 import LegalManager from '@/components/admin/LegalManager';
 import AdminPageLayout, { type AdminNavItem } from '@/components/admin/AdminPageLayout';
+import DashboardOverview from '@/components/admin/DashboardOverview'; // Ensure this is imported
 
 const ADMIN_SITE_SETTINGS_ID = 'global_settings'; 
 
@@ -65,28 +66,15 @@ function getPageTitle(sectionKey: string): string {
   return item ? item.label : "Portfolio Admin";
 }
 
-const DashboardOverview = () => (
-    <Card className="shadow-lg">
-        <CardHeader>
-            <CardTitle>Welcome to your Dashboard</CardTitle>
-            <CardDescription>Select a section from the sidebar to manage your portfolio content.</CardDescription>
-        </CardHeader>
-        <CardContent>
-            <p>This is the main overview page. Use the navigation sidebar to manage different sections of your portfolio content.</p>
-        </CardContent>
-    </Card>
-);
-
-
 export default function AdminDashboardPage() {
   const router = useRouter();
   const { toast } = useToast();
   const [isMounted, setIsMounted] = useState(false);
-  const [currentUser, setCurrentUser] = useState<SupabaseUser | null>(null);
+  const [currentUser, setCurrentUser] = useState<SupabaseUserType | null>(null);
   const [isLoadingAuth, setIsLoadingAuth] = useState(true); 
 
   const [emailInput, setEmailInput] = useState(''); 
-  const [password, setPassword] = useState('');
+  const [passwordInput, setPasswordInput] = useState(''); // Renamed for clarity
   const [error, setError] = useState('');
   const [activeSection, setActiveSection] = useState('dashboard');
 
@@ -113,7 +101,6 @@ export default function AdminDashboardPage() {
       setCurrentUser(user);
       
       if (user) {
-        // Dispatch custom event for header update
         window.dispatchEvent(new CustomEvent('authChange', { detail: { isAdminAuthenticated: true, username: user.email } }));
       } else {
         window.dispatchEvent(new CustomEvent('authChange', { detail: { isAdminAuthenticated: false, username: null } }));
@@ -123,10 +110,10 @@ export default function AdminDashboardPage() {
 
       if (event === 'SIGNED_OUT') {
         setEmailInput(''); 
-        setPassword('');   
+        setPasswordInput('');   
         setError('');      
         setActiveSection('dashboard'); 
-        router.replace('/admin/dashboard'); 
+        // No need to router.replace here, the component will re-render the login form
       } else if (event === 'SIGNED_IN' && session?.user) {
          if (activeSection === 'settings') { 
              fetchSiteSettings();
@@ -158,8 +145,11 @@ export default function AdminDashboardPage() {
     return () => {
       console.log("[AdminDashboardPage] Unmounting, unsubscribing auth listener.");
       subscription?.unsubscribe();
+      if (deleteCountdownIntervalRef.current) {
+        clearInterval(deleteCountdownIntervalRef.current);
+      }
     };
-  }, [activeSection, router]);
+  }, [activeSection, router]); // router is used in handleFinalDeleteAllData
 
 
   const fetchSiteSettings = async () => {
@@ -180,6 +170,8 @@ export default function AdminDashboardPage() {
       setMaintenanceMessageInput(data.maintenance_message || '');
     } else {
       console.log("[AdminDashboardPage] No site settings found, using defaults.");
+      // Optionally insert default settings if none exist
+      // await supabase.from('site_settings').insert({ id: ADMIN_SITE_SETTINGS_ID, is_maintenance_mode_enabled: false, maintenance_message: 'Default maintenance message.' });
     }
     setIsLoadingSettings(false);
   };
@@ -251,7 +243,7 @@ export default function AdminDashboardPage() {
     setIsLoadingAuth(true);
     
     const trimmedEmail = emailInput.trim();
-    const trimmedPassword = password.trim();
+    const trimmedPassword = passwordInput.trim();
 
     console.log("[AdminDashboardPage] Attempting Supabase login for email:", trimmedEmail);
     
@@ -268,7 +260,7 @@ export default function AdminDashboardPage() {
       toast({ title: "Login Failed", description: signInError.message || "Invalid login credentials.", variant: "destructive" });
     } else if (data.user) {
       console.log("[AdminDashboardPage] Supabase Login successful for user:", data.user.email);
-      // setCurrentUser and dispatchEvent will be handled by onAuthStateChange listener
+      // setCurrentUser and dispatchEvent are handled by onAuthStateChange listener
       toast({ title: "Login Successful", description: "Welcome to the admin dashboard." });
       try {
         await supabase.from('admin_activity_log').insert({ 
@@ -309,7 +301,7 @@ export default function AdminDashboardPage() {
         } catch (logError) {
           console.error("Error logging admin logout:", logError);
         }
-        // onAuthStateChange will set currentUser to null and trigger UI update/redirect
+        // onAuthStateChange will set currentUser to null and trigger UI update
     }
   };
 
@@ -328,6 +320,7 @@ export default function AdminDashboardPage() {
       return;
     }
     
+    // Re-authenticate with Supabase to verify password before dangerous action
     const { error: reauthError } = await supabase.auth.signInWithPassword({
         email: currentUser.email,
         password: adminPasswordConfirm,
@@ -384,7 +377,6 @@ export default function AdminDashboardPage() {
       
       if (functionData && functionData.error) {
          console.error("[AdminDashboardPage] Error returned from Edge Function logic:", JSON.stringify(functionData.error, null, 2));
-         // Try to parse if functionData.error is a stringified JSON
          let parsedFuncError = functionData.error;
          if (typeof functionData.error === 'string') {
             try {
@@ -411,15 +403,6 @@ export default function AdminDashboardPage() {
       setShowDeleteAllDataConfirmModal(false);
     }
   };
-
-  useEffect(() => {
-    return () => {
-      if (deleteCountdownIntervalRef.current) {
-        clearInterval(deleteCountdownIntervalRef.current);
-      }
-    };
-  }, []);
-
 
   if (!isMounted || isLoadingAuth) {
     return (
@@ -449,7 +432,7 @@ export default function AdminDashboardPage() {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="password">Password</Label>
-                <Input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" required />
+                <Input id="password" type="password" value={passwordInput} onChange={(e) => setPasswordInput(e.target.value)} placeholder="••••••••" required />
               </div>
               {error && <Alert variant="destructive"><AlertTriangle className="h-4 w-4" /><AlertTitle>Login Failed</AlertTitle><AlertDescription>{error}</AlertDescription></Alert>}
               <Button type="submit" className="w-full text-lg py-3" disabled={isLoadingAuth}><LogIn className="mr-2 h-5 w-5" /> {isLoadingAuth ? 'Logging in...' : 'Log In'}</Button>
@@ -557,7 +540,7 @@ export default function AdminDashboardPage() {
                 <CardContent>
                     <div className="space-y-4">
                         <div>
-                            <h4 className="font-semibold text-lg text-destructive">Delete All Portfolio Data</h4>
+                            <h4 className="font-semibold text-lg text-destructive">Delete All Portfolio Data & Files</h4>
                             <p className="text-sm text-destructive/80 mb-3">
                                 This will attempt to delete all content from your portfolio database tables (projects, skills, about, resume, etc.) AND associated files from Supabase Storage (images, PDFs). 
                                 This does **not** delete your admin profile or core site settings. This action is irreversible.
@@ -647,6 +630,3 @@ export default function AdminDashboardPage() {
     </AdminPageLayout>
   );
 }
-    
-
-    
