@@ -31,7 +31,7 @@ interface MostInteractedSkillData {
 }
 
 interface DeviceTypeData {
-    name: VisitorLog['device_type'] | 'Other' | 'Unknown'; // Ensure 'Other' and 'Unknown' are part of the type
+    name: VisitorLog['device_type'] | 'Other' | 'Unknown';
     visitors: number;
     color: string;
     icon: React.ElementType;
@@ -45,11 +45,11 @@ const StatCard = ({ title, value, icon: Icon, description, isLoading, valueClass
     </CardHeader>
     <CardContent>
       {isLoading ? (
-        <div className="h-8 w-2/3 bg-muted animate-pulse rounded-md my-1"></div>
-      ) : value !== undefined && value !== null && value !== "N/A" ? (
+        <div className="text-2xl font-bold">...</div>
+      ) : (value !== undefined && value !== null && value !== "N/A" && value !== "Error") ? (
         <div className={`text-2xl font-bold ${valueClassName || ''}`}>{value}</div>
       ) : (
-        <div className="text-2xl font-bold text-muted-foreground/50">{value === "N/A" ? "N/A" : "0"}</div>
+        <div className="text-2xl font-bold text-muted-foreground/70">{value === "Error" ? "Error" : (value === "N/A" ? "N/A" : "0")}</div>
       )}
       <p className="text-xs text-muted-foreground mt-1">{description}</p>
     </CardContent>
@@ -83,6 +83,12 @@ export default function DashboardOverview() {
   const [deviceTypeData, setDeviceTypeData] = useState<DeviceTypeData[]>([]);
   const [isLoadingDeviceTypeData, setIsLoadingDeviceTypeData] = useState(true);
 
+  const [databaseSize, setDatabaseSize] = useState<string | null>(null);
+  const [isLoadingDbSize, setIsLoadingDbSize] = useState(true);
+  const [bucketStorageUsed, setBucketStorageUsed] = useState<string | null>(null);
+  const [isLoadingBucketStorage, setIsLoadingBucketStorage] = useState(true);
+
+
   const fetchDashboardData = useCallback(async (isManualRefresh = false) => {
     if (isManualRefresh && isRefreshing) return; 
     if (isManualRefresh) setIsRefreshing(true);
@@ -96,32 +102,27 @@ export default function DashboardOverview() {
     setIsLoadingResumeDownloads(true);
     setIsLoadingRecentSubmissions(true);
     setIsLoadingDeviceTypeData(true);
+    setIsLoadingDbSize(true);
+    setIsLoadingBucketStorage(true);
 
     try {
-      // Fetch Site Settings (including tracking toggle)
+      // Site Settings (Tracking Toggle)
       const { data: settingsData, error: settingsError } = await supabase
         .from('site_settings')
         .select('is_analytics_tracking_enabled')
         .eq('id', ADMIN_SITE_SETTINGS_ID)
         .maybeSingle();
-      if (settingsError) {
-        console.error("[DashboardOverview] Error fetching site settings:", JSON.stringify(settingsError, null, 2));
-      } else if (settingsData) {
-        setIsAnalyticsTrackingEnabled(settingsData.is_analytics_tracking_enabled);
-      }
+      if (settingsError) console.error("[DashboardOverview] Error fetching site settings:", JSON.stringify(settingsError, null, 2));
+      else if (settingsData) setIsAnalyticsTrackingEnabled(settingsData.is_analytics_tracking_enabled ?? true);
       setIsLoadingAppSettings(false);
 
-      // Fetch Total Project Views
+      // Total Project Views
       const { count: viewsCount, error: viewsError } = await supabase.from('project_views').select('*', { count: 'exact', head: true });
-      if (viewsError) {
-        console.error("[DashboardOverview] Error fetching total project views:", JSON.stringify(viewsError, null, 2));
-        setTotalProjectViews(0);
-      } else {
-        setTotalProjectViews(viewsCount ?? 0);
-      }
+      if (viewsError) { console.error("[DashboardOverview] Error fetching total project views:", JSON.stringify(viewsError, null, 2)); setTotalProjectViews(0); }
+      else setTotalProjectViews(viewsCount ?? 0);
       setIsLoadingTotalProjectViews(false);
 
-      // Fetch Most Viewed Project
+      // Most Viewed Project
       const { data: allProjectViews, error: allProjectViewsError } = await supabase.from('project_views').select('project_id');
       if (allProjectViewsError) {
         console.error("[DashboardOverview] Error fetching project views for aggregation:", JSON.stringify(allProjectViewsError, null, 2));
@@ -129,115 +130,96 @@ export default function DashboardOverview() {
       } else if (allProjectViews && allProjectViews.length > 0) {
         const viewCounts: Record<string, number> = {};
         allProjectViews.forEach(view => { if (view.project_id) viewCounts[view.project_id] = (viewCounts[view.project_id] || 0) + 1; });
-        
-        let maxViews = 0; 
-        let mostViewedId: string | null = null;
-        for (const projectId in viewCounts) { 
-          if (viewCounts[projectId] > maxViews) { 
-            maxViews = viewCounts[projectId]; 
-            mostViewedId = projectId; 
-          }
-        }
-        
+        let maxViews = 0; let mostViewedId: string | null = null;
+        for (const projectId in viewCounts) { if (viewCounts[projectId] > maxViews) { maxViews = viewCounts[projectId]; mostViewedId = projectId; }}
         if (mostViewedId) {
           const { data: projectData, error: projectError } = await supabase.from('projects').select('title').eq('id', mostViewedId).maybeSingle();
           setMostViewedProjectData({ title: projectError ? 'DB Error' : (projectData?.title || 'Unknown Project'), views: maxViews });
-        } else { 
-          setMostViewedProjectData({ title: 'N/A (No Views)', views: 0 }); 
-        }
-      } else { 
-        setMostViewedProjectData({ title: 'N/A (No Views)', views: 0 }); 
-      }
+        } else { setMostViewedProjectData({ title: 'N/A (No Views)', views: 0 }); }
+      } else { setMostViewedProjectData({ title: 'N/A (No Views)', views: 0 }); }
       setIsLoadingMostViewedProject(false);
       
-      // Fetch Most Interacted Skill
-      const { data: allInteractions, error: allInteractionsError } = await supabase
-        .from('skill_interactions')
-        .select('skill_id');
-
+      // Most Interacted Skill
+      const { data: allInteractions, error: allInteractionsError } = await supabase.from('skill_interactions').select('skill_id');
       if (allInteractionsError) {
-          console.error("[DashboardOverview] Error fetching skill interactions for aggregation:", JSON.stringify(allInteractionsError, null, 2));
-          let specificMessage = "Could not fetch skill interactions data from the database.";
-          if (allInteractionsError.message?.includes("relation") && allInteractionsError.message.includes("does not exist")) {
-              specificMessage = "The 'skill_interactions' table does not exist. Please ensure it's created as per the SQL schema.";
-          } else if (allInteractionsError.code === '42P01') { 
-              specificMessage = "Database error: The 'skill_interactions' table seems to be missing.";
-          }
-          setMostInteractedSkillData({ name: 'Error', interactions: 0 });
-          // toast({ title: "Data Fetch Error", description: specificMessage, variant: "destructive", duration: 7000 }); // Optional: user-facing toast
+        console.error("[DashboardOverview] Error fetching skill interactions:", JSON.stringify(allInteractionsError, null, 2));
+        let specificMessage = `Could not fetch skill interactions: ${allInteractionsError.message}.`;
+        if (allInteractionsError.message?.includes("relation") && allInteractionsError.message.includes("does not exist")) {
+            specificMessage = "The 'skill_interactions' table does not exist. Please ensure it's created as per the SQL schema.";
+        } else if ((allInteractionsError as any).code === '42P01' || allInteractionsError.message?.includes('42P01') ) { 
+            specificMessage = "Database error: The 'skill_interactions' table seems to be missing. Please create it.";
+        }
+        setMostInteractedSkillData({ name: 'Error', interactions: 0 });
       } else if (allInteractions && allInteractions.length > 0) {
-          const interactionCounts: Record<string, number> = {};
-          allInteractions.forEach(interaction => { if(interaction.skill_id) interactionCounts[interaction.skill_id] = (interactionCounts[interaction.skill_id] || 0) + 1; });
-          
-          let maxInteractions = 0; 
-          let mostInteractedSkillId: string | null = null;
-          for (const skillId in interactionCounts) { 
-            if (interactionCounts[skillId] > maxInteractions) { 
-              maxInteractions = interactionCounts[skillId]; 
-              mostInteractedSkillId = skillId; 
-            }
-          }
-          if (mostInteractedSkillId) {
-            const { data: skillData, error: skillError } = await supabase.from('skills').select('name').eq('id', mostInteractedSkillId).maybeSingle();
-            setMostInteractedSkillData({ name: skillError ? 'DB Error' : (skillData?.name || 'Unknown Skill'), interactions: maxInteractions });
-          } else { 
-            setMostInteractedSkillData({ name: 'N/A (No Interactions Yet)', interactions: 0 }); 
-          }
-      } else { 
-        setMostInteractedSkillData({ name: 'N/A (No Interactions Yet)', interactions: 0 }); 
-      }
+        const interactionCounts: Record<string, number> = {};
+        allInteractions.forEach(interaction => { if(interaction.skill_id) interactionCounts[interaction.skill_id] = (interactionCounts[interaction.skill_id] || 0) + 1; });
+        let maxInteractions = 0; let mostInteractedSkillId: string | null = null;
+        for (const skillId in interactionCounts) { if (interactionCounts[skillId] > maxInteractions) { maxInteractions = interactionCounts[skillId]; mostInteractedSkillId = skillId; }}
+        if (mostInteractedSkillId) {
+          const { data: skillData, error: skillError } = await supabase.from('skills').select('name').eq('id', mostInteractedSkillId).maybeSingle();
+          setMostInteractedSkillData({ name: skillError ? 'DB Error' : (skillData?.name || 'Unknown Skill'), interactions: maxInteractions });
+        } else { setMostInteractedSkillData({ name: 'N/A', interactions: 0 }); }
+      } else { setMostInteractedSkillData({ name: 'N/A', interactions: 0 }); }
       setIsLoadingMostInteractedSkill(false);
 
-      // Fetch Total Resume Downloads
+      // Total Resume Downloads
       const { count: resumeDownloadsCount, error: resumeError } = await supabase.from('resume_downloads').select('*', { count: 'exact', head: true });
-      if (resumeError) {
-        console.error("[DashboardOverview] Error fetching total resume downloads:", JSON.stringify(resumeError, null, 2));
-        setTotalResumeDownloads(0);
-      } else {
-        setTotalResumeDownloads(resumeDownloadsCount ?? 0);
-      }
+      if (resumeError) { console.error("[DashboardOverview] Error fetching resume downloads:", JSON.stringify(resumeError, null, 2)); setTotalResumeDownloads(0); }
+      else setTotalResumeDownloads(resumeDownloadsCount ?? 0);
       setIsLoadingResumeDownloads(false);
 
-      // Fetch Recent Contact Submissions Count
+      // Recent Contact Submissions
       const sevenDaysAgo = subDays(new Date(), 7).toISOString();
       const { count: submissionsCount, error: submissionsError } = await supabase.from('contact_submissions').select('*', { count: 'exact', head: true }).gte('submitted_at', sevenDaysAgo);
-      if (submissionsError) {
-        console.error("[DashboardOverview] Error fetching recent contact submissions:", JSON.stringify(submissionsError, null, 2));
-        setRecentSubmissionsCount(0);
-      } else {
-        setRecentSubmissionsCount(submissionsCount ?? 0);
-      }
+      if (submissionsError) { console.error("[DashboardOverview] Error fetching recent submissions:", JSON.stringify(submissionsError, null, 2)); setRecentSubmissionsCount(0); }
+      else setRecentSubmissionsCount(submissionsCount ?? 0);
       setIsLoadingRecentSubmissions(false);
 
-      // Fetch Visitor Device Type Counts
+      // Visitor Device Types
       const { data: rawDeviceData, error: deviceCountsError } = await supabase
         .from('visitor_logs')
         .select('device_type');
-
       if (deviceCountsError) {
         console.error("[DashboardOverview] Error fetching device type counts:", JSON.stringify(deviceCountsError, null, 2));
         setDeviceTypeData([]);
       } else if (rawDeviceData) {
         const counts: Record<string, number> = rawDeviceData.reduce((acc, log) => {
-          const device = log.device_type || 'Unknown'; // Handle null/undefined device_type
+          const device = log.device_type || 'Unknown';
           acc[device] = (acc[device] || 0) + 1;
           return acc;
         }, {} as Record<string, number>);
-        
         const formattedDeviceData: DeviceTypeData[] = Object.entries(counts).map(([name, visitors]) => {
-            let iconComponent: React.ElementType = Users; // Default icon
-            let barColor = 'hsl(var(--chart-5))'; // Default color
+            let iconComponent: React.ElementType = Users; let barColor = 'hsl(var(--chart-5))';
             if (name === 'Desktop') { iconComponent = Monitor; barColor = 'hsl(var(--chart-1))'; }
             else if (name === 'Mobile') { iconComponent = Smartphone; barColor = 'hsl(var(--chart-2))'; }
             else if (name === 'Tablet') { iconComponent = Tablet; barColor = 'hsl(var(--chart-4))'; }
             else if (name === 'Unknown') { iconComponent = AlertCircle; barColor = 'hsl(var(--muted))'}
             return { name: name as VisitorLog['device_type'] | 'Other' | 'Unknown', visitors, color: barColor, icon: iconComponent };
-        }).sort((a, b) => b.visitors - a.visitors); // Sort for better chart display
+        }).sort((a, b) => b.visitors - a.visitors);
         setDeviceTypeData(formattedDeviceData);
-      } else {
-        setDeviceTypeData([]);
-      }
+      } else { setDeviceTypeData([]); }
       setIsLoadingDeviceTypeData(false);
+
+      // Supabase Storage & DB Metrics from Edge Function
+      console.log("[DashboardOverview] Invoking 'get-storage-metrics' Edge Function...");
+      const { data: storageMetrics, error: storageMetricsError } = await supabase.functions.invoke('get-storage-metrics');
+      
+      if (storageMetricsError) {
+        console.error("[DashboardOverview] Error invoking 'get-storage-metrics' Edge Function:", JSON.stringify(storageMetricsError, null, 2));
+        toast({ title: "Metrics Error", description: "Could not load Supabase storage/DB size from Edge Function.", variant: "destructive" });
+        setDatabaseSize("Invoke Error");
+        setBucketStorageUsed("Invoke Error");
+      } else if (storageMetrics) {
+        console.log("[DashboardOverview] Received storage metrics from Edge Function:", storageMetrics);
+        setDatabaseSize(storageMetrics.databaseSize || "N/A");
+        setBucketStorageUsed(storageMetrics.bucketStorageUsed || "N/A (See Dashboard)");
+      } else {
+        console.warn("[DashboardOverview] 'get-storage-metrics' Edge Function returned no data or unexpected structure.");
+        setDatabaseSize("N/A - No Data");
+        setBucketStorageUsed("N/A - No Data");
+      }
+      setIsLoadingDbSize(false);
+      setIsLoadingBucketStorage(false);
 
 
       setLastRefreshed(new Date());
@@ -246,6 +228,11 @@ export default function DashboardOverview() {
     } catch (error: any) {
       console.error("[DashboardOverview] General error fetching dashboard data:", error);
       toast({ title: "Error", description: `Could not refresh all dashboard data: ${error.message}`, variant: "destructive"});
+      // Set all loading states to false and error indicators if a general catch occurs
+      setIsLoadingAppSettings(false); setIsLoadingTotalProjectViews(false); setIsLoadingMostViewedProject(false);
+      setIsLoadingMostInteractedSkill(false); setIsLoadingResumeDownloads(false); setIsLoadingRecentSubmissions(false);
+      setIsLoadingDeviceTypeData(false); setIsLoadingDbSize(false); setIsLoadingBucketStorage(false);
+      setDatabaseSize("Fetch Error"); setBucketStorageUsed("Fetch Error");
     } finally {
       if (isManualRefresh) setIsRefreshing(false);
       console.log("[DashboardOverview] Finished fetching all dashboard data.");
@@ -270,7 +257,6 @@ export default function DashboardOverview() {
     if (!user) { 
         toast({ title: "Auth Error", description: "Please log in again to change settings.", variant: "destructive"}); 
         setIsLoadingAppSettings(false); 
-        // Revert switch optimistically if auth fails before Supabase call
         setIsAnalyticsTrackingEnabled(!checked); 
         return; 
     }
@@ -281,7 +267,7 @@ export default function DashboardOverview() {
 
     if (updateError) { 
       toast({ title: "Error", description: `Failed to update tracking setting: ${updateError.message}`, variant: "destructive" }); 
-      setIsAnalyticsTrackingEnabled(!checked); // Revert switch on error
+      setIsAnalyticsTrackingEnabled(!checked); 
     } else { 
       setIsAnalyticsTrackingEnabled(checked); 
       toast({ title: "Success", description: `Analytics tracking ${checked ? 'enabled' : 'disabled'}.` });
@@ -329,7 +315,7 @@ export default function DashboardOverview() {
           <StatCard title="Total Project Views" value={totalProjectViews} icon={Eye} description="Views logged for project cards" isLoading={isLoadingTotalProjectViews} />
           <StatCard 
             title="Most Viewed Project" 
-            value={mostViewedProjectData.title ? `${mostViewedProjectData.title} (${mostViewedProjectData.views} views)` : (mostViewedProjectData.views === 0 ? 'N/A (No Views)' : (isLoadingMostViewedProject ? '...' : 'N/A'))} 
+            value={mostViewedProjectData.title ? `${mostViewedProjectData.title} (${mostViewedProjectData.views} views)` : (mostViewedProjectData.views === 0 ? 'N/A' : (isLoadingMostViewedProject ? '...' : 'N/A'))} 
             icon={TrendingUp} 
             description="Project with highest card views" 
             isLoading={isLoadingMostViewedProject} 
@@ -337,9 +323,9 @@ export default function DashboardOverview() {
           />
           <StatCard 
             title="Most Interacted Skill" 
-            value={mostInteractedSkillData.name ? `${mostInteractedSkillData.name} (${mostInteractedSkillData.interactions} interactions)` : (mostInteractedSkillData.interactions === 0 ? 'N/A (No Interactions Yet)' : (isLoadingMostInteractedSkill ? '...' : 'N/A'))} 
+            value={mostInteractedSkillData.name ? `${mostInteractedSkillData.name} (${mostInteractedSkillData.interactions} interactions)` : (mostInteractedSkillData.interactions === 0 ? 'N/A' : (isLoadingMostInteractedSkill ? '...' : 'N/A'))} 
             icon={Brain} 
-            description="Skill with most card views (requires tracking)" 
+            description="Skill with most card views/interactions" 
             isLoading={isLoadingMostInteractedSkill} 
             valueClassName="truncate text-lg sm:text-xl"
           />
@@ -349,14 +335,14 @@ export default function DashboardOverview() {
       <Card className="shadow-sm">
         <CardHeader><CardTitle className="text-xl flex items-center"><Download className="mr-2 h-6 w-6 text-primary" />Resume & Submissions</CardTitle></CardHeader>
         <CardContent className="grid gap-4 md:grid-cols-2">
-          <StatCard title="Total Resume Downloads" value={totalResumeDownloads} icon={Download} description="Track PDF downloads (requires client-side event logging)" isLoading={isLoadingResumeDownloads}/>
+          <StatCard title="Total Resume Downloads" value={totalResumeDownloads} icon={Download} description="Tracked PDF downloads (requires client-side event logging)" isLoading={isLoadingResumeDownloads}/>
           <StatCard title="Contact Submissions (7 Days)" value={recentSubmissionsCount} icon={Mail} description="New messages from your contact form" isLoading={isLoadingRecentSubmissions}/>
         </CardContent>
       </Card>
       
       <Card className="shadow-sm">
         <CardHeader><CardTitle className="text-xl flex items-center"><Users className="mr-2 h-6 w-6 text-primary" />Visitor Analytics</CardTitle></CardHeader>
-        <CardContent className="grid gap-6 md:grid-cols-1">
+        <CardContent className="grid gap-6 md:grid-cols-1"> 
             <div>
                 <h3 className="text-lg font-semibold mb-3 text-card-foreground/90">Visitors by Device Type</h3>
                 <div className="p-4 border rounded-lg bg-card-foreground/5 dark:bg-card-foreground/10 min-h-[300px]">
@@ -369,9 +355,9 @@ export default function DashboardOverview() {
                             <YAxis dataKey="name" type="category" width={100} stroke="hsl(var(--muted-foreground))" fontSize={12}
                                 tick={({ x, y, payload }) => {
                                     const deviceConfig = deviceTypeData.find(d => d.name === payload.value);
-                                    const DeviceIconComponent = deviceConfig?.icon || Users; // Default to Users icon if not found
+                                    const DeviceIconComponent = deviceConfig?.icon || Users;
                                     return (
-                                        <g transform={`translate(${x - 25},${y})`}> {/* Adjusted x to pull icon further left */}
+                                        <g transform={`translate(${x - 25},${y})`}>
                                             <DeviceIconComponent className="h-4 w-4 inline -translate-y-0.5 mr-1.5 text-muted-foreground" />
                                             <text x={10} y={0} dy={4} textAnchor="start" fill="hsl(var(--muted-foreground))" fontSize={12}>
                                                 {payload.value}
@@ -403,26 +389,26 @@ export default function DashboardOverview() {
       </Card>
 
       <Card className="shadow-sm">
-        <CardHeader><CardTitle className="text-xl flex items-center"><DatabaseIcon className="mr-2 h-6 w-6 text-primary" />Supabase Usage (Placeholders)</CardTitle></CardHeader>
+        <CardHeader><CardTitle className="text-xl flex items-center"><DatabaseIcon className="mr-2 h-6 w-6 text-primary" />Supabase Usage</CardTitle></CardHeader>
         <CardContent className="grid gap-4 md:grid-cols-2">
           <StatCard 
             title="Total Bucket Storage Used" 
-            value="N/A" 
+            value={bucketStorageUsed} 
             icon={HardDrive} 
-            description="See Supabase Dashboard. Client-side fetching not feasible." 
-            isLoading={false} 
+            description="Approximation. Check Supabase Dashboard for exact figures." 
+            isLoading={isLoadingBucketStorage} 
           />
           <StatCard 
             title="Database Size" 
-            value="N/A" 
+            value={databaseSize} 
             icon={DatabaseIcon} 
-            description="See Supabase Dashboard. Client-side fetching not feasible." 
-            isLoading={false} 
+            description="Current size of your PostgreSQL database." 
+            isLoading={isLoadingDbSize} 
           />
         </CardContent>
-        <CardFooter>
+         <CardFooter>
             <CardDescription className="text-xs">
-                Actual storage and database size metrics are best viewed directly in your Supabase project dashboard.
+                Database size is fetched via an Edge Function. Total bucket storage is a placeholder; Supabase Dashboard provides the accurate total.
             </CardDescription>
         </CardFooter>
       </Card>
@@ -430,3 +416,5 @@ export default function DashboardOverview() {
     </div>
   );
 }
+
+    
