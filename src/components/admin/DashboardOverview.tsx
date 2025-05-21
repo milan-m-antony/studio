@@ -31,7 +31,7 @@ interface MostInteractedSkillData {
 }
 
 interface DeviceTypeData {
-    name: VisitorLog['device_type'];
+    name: VisitorLog['device_type'] | 'Other';
     visitors: number;
     color: string;
     icon: React.ElementType;
@@ -110,20 +110,30 @@ export default function DashboardOverview() {
         .select('is_analytics_tracking_enabled')
         .eq('id', ADMIN_SITE_SETTINGS_ID)
         .maybeSingle();
-      if (settingsError) console.error("[DashboardOverview] Error fetching site settings:", settingsError);
-      else if (settingsData) setIsAnalyticsTrackingEnabled(settingsData.is_analytics_tracking_enabled);
+      if (settingsError) {
+        console.error("[DashboardOverview] Error fetching site settings:", JSON.stringify(settingsError, null, 2));
+        toast({ title: "Error", description: `Could not load site settings: ${settingsError.message}`, variant: "destructive" });
+      } else if (settingsData) {
+        setIsAnalyticsTrackingEnabled(settingsData.is_analytics_tracking_enabled);
+      }
       setIsLoadingAppSettings(false);
 
       // Fetch Total Project Views
       const { count: viewsCount, error: viewsError } = await supabase.from('project_views').select('*', { count: 'exact', head: true });
-      if (viewsError) console.error("[DashboardOverview] Error fetching total project views:", JSON.stringify(viewsError, null, 2));
-      setTotalProjectViews(viewsCount ?? 0);
+      if (viewsError) {
+        console.error("[DashboardOverview] Error fetching total project views:", JSON.stringify(viewsError, null, 2));
+        setTotalProjectViews(0); // Default to 0 on error
+      } else {
+        setTotalProjectViews(viewsCount ?? 0);
+      }
       setIsLoadingTotalProjectViews(false);
 
       // Fetch Most Viewed Project
       const { data: allProjectViews, error: allProjectViewsError } = await supabase.from('project_views').select('project_id');
-      if (allProjectViewsError) console.error("Error fetching project views for aggregation:", JSON.stringify(allProjectViewsError, null, 2));
-      else if (allProjectViews && allProjectViews.length > 0) {
+      if (allProjectViewsError) {
+        console.error("[DashboardOverview] Error fetching project views for aggregation:", JSON.stringify(allProjectViewsError, null, 2));
+        setMostViewedProjectData({ title: 'Error fetching', views: 0 });
+      } else if (allProjectViews && allProjectViews.length > 0) {
         const viewCounts: Record<string, number> = {};
         allProjectViews.forEach(view => { if (view.project_id) viewCounts[view.project_id] = (viewCounts[view.project_id] || 0) + 1; });
         let maxViews = 0; let mostViewedId: string | null = null;
@@ -137,8 +147,10 @@ export default function DashboardOverview() {
       
       // Fetch Most Interacted Skill
       const { data: allInteractions, error: allInteractionsError } = await supabase.from('skill_interactions').select('skill_id');
-      if (allInteractionsError) console.error("Error fetching skill interactions for aggregation:", JSON.stringify(allInteractionsError, null, 2));
-      else if (allInteractions && allInteractions.length > 0) {
+      if (allInteractionsError) {
+        console.error("[DashboardOverview] Error fetching skill interactions for aggregation:",  JSON.stringify(allInteractionsError, null, 2));
+        setMostInteractedSkillData({ name: 'Error fetching', interactions: 0 });
+      } else if (allInteractions && allInteractions.length > 0) {
         const interactionCounts: Record<string, number> = {};
         allInteractions.forEach(interaction => { if(interaction.skill_id) interactionCounts[interaction.skill_id] = (interactionCounts[interaction.skill_id] || 0) + 1; });
         let maxInteractions = 0; let mostInteractedSkillId: string | null = null;
@@ -152,35 +164,65 @@ export default function DashboardOverview() {
 
       // Fetch Total Resume Downloads
       const { count: resumeDownloadsCount, error: resumeError } = await supabase.from('resume_downloads').select('*', { count: 'exact', head: true });
-      if (resumeError) console.error("[DashboardOverview] Error fetching total resume downloads:", JSON.stringify(resumeError, null, 2));
-      setTotalResumeDownloads(resumeDownloadsCount ?? 0);
+      if (resumeError) {
+        console.error("[DashboardOverview] Error fetching total resume downloads:", JSON.stringify(resumeError, null, 2));
+        setTotalResumeDownloads(0);
+      } else {
+        setTotalResumeDownloads(resumeDownloadsCount ?? 0);
+      }
       setIsLoadingResumeDownloads(false);
 
       // Fetch Recent Contact Submissions Count
       const sevenDaysAgo = subDays(new Date(), 7).toISOString();
       const { count: submissionsCount, error: submissionsError } = await supabase.from('contact_submissions').select('*', { count: 'exact', head: true }).gte('submitted_at', sevenDaysAgo);
-      if (submissionsError) console.error("[DashboardOverview] Error fetching recent contact submissions:", JSON.stringify(submissionsError, null, 2));
-      setRecentSubmissionsCount(submissionsCount ?? 0);
+      if (submissionsError) {
+        console.error("[DashboardOverview] Error fetching recent contact submissions:", JSON.stringify(submissionsError, null, 2));
+        setRecentSubmissionsCount(0);
+      } else {
+        setRecentSubmissionsCount(submissionsCount ?? 0);
+      }
       setIsLoadingRecentSubmissions(false);
 
       // Fetch Visitor Device Type Counts
-      const { data: deviceCountsData, error: deviceCountsError } = await supabase
+      const { data: allVisits, error: deviceCountsError } = await supabase
         .from('visitor_logs')
-        .select('device_type, count:device_type') // Supabase specific count syntax
-        .group('device_type');
+        .select('device_type');
 
       if (deviceCountsError) {
-        console.error("[DashboardOverview] Error fetching device type counts:", JSON.stringify(deviceCountsError, null, 2));
+        console.error("[DashboardOverview] Error fetching device type data from visitor_logs:", JSON.stringify(deviceCountsError, null, 2));
         setDeviceTypeData([]);
-      } else if (deviceCountsData) {
-        const formattedDeviceData: DeviceTypeData[] = (deviceCountsData as { device_type: VisitorLog['device_type'], count: number }[]).map((item, index) => ({
-          name: item.device_type || 'Unknown',
-          visitors: item.count,
-          // Assign colors and icons based on device type
-          color: item.device_type === 'Desktop' ? 'hsl(var(--chart-1))' : item.device_type === 'Mobile' ? 'hsl(var(--chart-2))' : item.device_type === 'Tablet' ? 'hsl(var(--chart-4))' : 'hsl(var(--chart-5))',
-          icon: item.device_type === 'Desktop' ? Monitor : item.device_type === 'Mobile' ? Smartphone : item.device_type === 'Tablet' ? Tablet : Users,
-        }));
+      } else if (allVisits) {
+        const counts: Record<string, number> = {};
+        allVisits.forEach(visit => {
+          const device = visit.device_type || 'Unknown'; // Handle null/undefined device_type
+          counts[device] = (counts[device] || 0) + 1;
+        });
+        
+        const formattedDeviceData: DeviceTypeData[] = Object.entries(counts).map(([name, visitors]) => {
+            let iconComponent: React.ElementType = Users; // Default icon
+            let barColor = 'hsl(var(--chart-5))'; // Default color for 'Other' or 'Unknown'
+
+            if (name === 'Desktop') {
+                iconComponent = Monitor;
+                barColor = 'hsl(var(--chart-1))';
+            } else if (name === 'Mobile') {
+                iconComponent = Smartphone;
+                barColor = 'hsl(var(--chart-2))';
+            } else if (name === 'Tablet') {
+                iconComponent = Tablet;
+                barColor = 'hsl(var(--chart-4))';
+            }
+            
+            return {
+                name: name as VisitorLog['device_type'] | 'Other',
+                visitors,
+                color: barColor,
+                icon: iconComponent,
+            };
+        });
         setDeviceTypeData(formattedDeviceData);
+      } else {
+        setDeviceTypeData([]);
       }
       setIsLoadingDeviceTypeData(false);
 
@@ -211,12 +253,32 @@ export default function DashboardOverview() {
   const handleToggleAnalyticsTracking = async (checked: boolean) => {
     setIsLoadingAppSettings(true);
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) { toast({ title: "Auth Error", description: "Please log in again.", variant: "destructive"}); setIsLoadingAppSettings(false); return; }
-    const { error: updateError } = await supabase.from('site_settings').update({ is_analytics_tracking_enabled: checked, updated_at: new Date().toISOString() }).eq('id', ADMIN_SITE_SETTINGS_ID);
-    if (updateError) { toast({ title: "Error", description: `Failed to update tracking: ${updateError.message}`, variant: "destructive" }); setIsAnalyticsTrackingEnabled(!checked); 
-    } else { setIsAnalyticsTrackingEnabled(checked); toast({ title: "Success", description: `Analytics tracking ${checked ? 'enabled' : 'disabled'}.` });
-      try { await supabase.from('admin_activity_log').insert({ action_type: checked ? 'ANALYTICS_TRACKING_ENABLED' : 'ANALYTICS_TRACKING_DISABLED', description: `Admin ${checked ? 'enabled' : 'disabled'} site-wide analytics tracking.`, user_identifier: user.id });
-      } catch (logError) { console.error("Error logging analytics tracking toggle:", logError); }
+    if (!user) { 
+        toast({ title: "Auth Error", description: "Please log in again to change settings.", variant: "destructive"}); 
+        setIsLoadingAppSettings(false); 
+        setIsAnalyticsTrackingEnabled(!checked); // Revert optimistic UI
+        return; 
+    }
+    const { error: updateError } = await supabase
+      .from('site_settings')
+      .update({ is_analytics_tracking_enabled: checked, updated_at: new Date().toISOString() })
+      .eq('id', ADMIN_SITE_SETTINGS_ID);
+
+    if (updateError) { 
+      toast({ title: "Error", description: `Failed to update tracking setting: ${updateError.message}`, variant: "destructive" }); 
+      setIsAnalyticsTrackingEnabled(!checked); // Revert UI on error
+    } else { 
+      setIsAnalyticsTrackingEnabled(checked); 
+      toast({ title: "Success", description: `Analytics tracking ${checked ? 'enabled' : 'disabled'}.` });
+      try { 
+        await supabase.from('admin_activity_log').insert({ 
+          action_type: checked ? 'ANALYTICS_TRACKING_ENABLED' : 'ANALYTICS_TRACKING_DISABLED', 
+          description: `Admin ${checked ? 'enabled' : 'disabled'} site-wide analytics tracking.`, 
+          user_identifier: user.id 
+        });
+      } catch (logError) { 
+        console.error("[DashboardOverview] Error logging analytics tracking toggle:", logError); 
+      }
     }
     setIsLoadingAppSettings(false);
   };
@@ -238,7 +300,7 @@ export default function DashboardOverview() {
                     <Label htmlFor="analytics-tracking-switch" className="text-sm font-medium flex items-center whitespace-nowrap">
                       <Settings2 className="mr-2 h-4 w-4" /> Analytics Tracking
                     </Label>
-                    {isLoadingAppSettings ? <Loader2 className="h-4 w-4 animate-spin ml-2" /> : <Switch id="analytics-tracking-switch" checked={isAnalyticsTrackingEnabled} onCheckedChange={handleToggleAnalyticsTracking} aria-label="Toggle analytics tracking" className="ml-2"/> }
+                    {isLoadingAppSettings ? <Loader2 className="h-4 w-4 animate-spin ml-2 text-muted-foreground" /> : <Switch id="analytics-tracking-switch" checked={isAnalyticsTrackingEnabled} onCheckedChange={handleToggleAnalyticsTracking} aria-label="Toggle analytics tracking" className="ml-2"/> }
                 </div>
                 <Button onClick={handleManualRefresh} disabled={isRefreshing} variant="outline" size="sm" className="w-full sm:w-auto"> {isRefreshing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />} Refresh Data </Button>
             </div>
@@ -251,7 +313,7 @@ export default function DashboardOverview() {
         <CardContent className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           <StatCard title="Total Project Views" value={totalProjectViews} icon={Eye} description="Total views across all project cards" isLoading={isLoadingTotalProjectViews} />
           <StatCard title="Most Viewed Project" value={mostViewedProjectData.title ? `${mostViewedProjectData.title} (${mostViewedProjectData.views} views)` : (mostViewedProjectData.views === 0 ? 'N/A (No Views Yet)' : 'N/A')} icon={TrendingUp} description="Project with highest card views" isLoading={isLoadingMostViewedProject} valueClassName="truncate text-lg sm:text-xl" />
-          <StatCard title="Most Interacted Skill" value={mostInteractedSkillData.name ? `${mostInteractedSkillData.name} (${mostInteractedSkillData.interactions} interactions)` : (mostInteractedSkillData.interactions === 0 ? 'N/A (No Interactions Yet)' : 'N/A')} icon={Brain} description="Skill with most card views/interactions" isLoading={isLoadingMostInteractedSkill} valueClassName="truncate text-lg sm:text-xl"/>
+          <StatCard title="Most Interacted Skill" value={mostInteractedSkillData.name ? `${mostInteractedSkillData.name} (${mostInteractedSkillData.interactions} interactions)` : (mostInteractedSkillData.interactions === 0 ? 'N/A (No Interactions Yet)' : 'N/A')} icon={Brain} description="Skill with most card views (requires tracking)" isLoading={isLoadingMostInteractedSkill} valueClassName="truncate text-lg sm:text-xl"/>
         </CardContent>
       </Card>
 
@@ -269,7 +331,7 @@ export default function DashboardOverview() {
             <div>
                 <h3 className="text-lg font-semibold mb-3 text-muted-foreground">Visitors by Device Type</h3>
                 <div className="p-4 border rounded-lg bg-card-foreground/5 dark:bg-card-foreground/10 min-h-[300px]">
-                {isLoadingDeviceTypeData ? <div className="flex justify-center items-center h-full"><Loader2 className="h-8 w-8 animate-spin"/></div> : 
+                {isLoadingDeviceTypeData ? <div className="flex justify-center items-center h-full"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground"/></div> : 
                   deviceTypeData.length > 0 ? (
                     <ResponsiveContainer width="100%" height={300}>
                         <BarChart data={deviceTypeData} layout="vertical" margin={{ top: 5, right: 20, left: 20, bottom: 5 }}>
@@ -277,10 +339,10 @@ export default function DashboardOverview() {
                             <XAxis type="number" stroke="hsl(var(--muted-foreground))" fontSize={12} />
                             <YAxis dataKey="name" type="category" width={80} stroke="hsl(var(--muted-foreground))" fontSize={12}
                                 tick={({ x, y, payload }) => {
-                                    const DeviceIcon = payload.value && deviceTypeData.find(d => d.name === payload.value)?.icon || Users;
+                                    const DeviceIconComponent = payload.value && deviceTypeData.find(d => d.name === payload.value)?.icon || Users;
                                     return (
                                         <g transform={`translate(${x - 25},${y})`}>
-                                            <DeviceIcon className="h-4 w-4 inline -translate-y-0.5 mr-1 text-muted-foreground" />
+                                            <DeviceIconComponent className="h-4 w-4 inline -translate-y-0.5 mr-1 text-muted-foreground" />
                                             <text x={5} y={0} dy={4} textAnchor="start" fill="hsl(var(--muted-foreground))" fontSize={12}>
                                                 {payload.value}
                                             </text>
@@ -288,19 +350,23 @@ export default function DashboardOverview() {
                                     );
                                 }}
                             />
-                            <RechartsTooltip contentStyle={{ backgroundColor: 'hsl(var(--popover))', border: '1px solid hsl(var(--border))', borderRadius: '0.5rem', color: 'hsl(var(--popover-foreground))' }} itemStyle={{ color: 'hsl(var(--popover-foreground))' }} cursor={{ fill: 'hsl(var(--accent)/0.3)' }}/>
+                            <RechartsTooltip 
+                                contentStyle={{ backgroundColor: 'hsl(var(--popover))', border: '1px solid hsl(var(--border))', borderRadius: '0.5rem', color: 'hsl(var(--popover-foreground))' }} 
+                                itemStyle={{ color: 'hsl(var(--popover-foreground))' }} 
+                                cursor={{ fill: 'hsl(var(--accent)/0.3)' }}
+                            />
                             <Bar dataKey="visitors" name="Visitors" radius={[0, 4, 4, 0]} barSize={25}>
                                 {deviceTypeData.map((entry, index) => (<Cell key={`cell-device-${index}`} fill={entry.color} /> ))}
                             </Bar>
                         </BarChart>
                     </ResponsiveContainer>
                   ) : (
-                    <p className="text-center text-muted-foreground py-10">No device data logged yet. Visit your public site from different devices.</p>
+                    <p className="text-center text-muted-foreground py-10">No device data logged yet. Visit your public site from different devices to populate this chart.</p>
                   )
                 }
                 </div>
                 <CardDescription className="text-xs text-muted-foreground mt-2 px-1">
-                  Counts visits based on simple screen width detection on page load.
+                  Counts visits based on simple screen width detection on page load from your public site.
                 </CardDescription>
            </div>
            <div>
@@ -311,7 +377,11 @@ export default function DashboardOverview() {
                         <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border)/0.5)" />
                         <XAxis dataKey="name" stroke="hsl(var(--muted-foreground))" fontSize={12} />
                         <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12}/>
-                        <RechartsTooltip contentStyle={{ backgroundColor: 'hsl(var(--popover))', border: '1px solid hsl(var(--border))', borderRadius: '0.5rem', color: 'hsl(var(--popover-foreground))' }} itemStyle={{ color: 'hsl(var(--popover-foreground))' }} cursor={{ fill: 'hsl(var(--accent)/0.3)' }}/>
+                        <RechartsTooltip 
+                            contentStyle={{ backgroundColor: 'hsl(var(--popover))', border: '1px solid hsl(var(--border))', borderRadius: '0.5rem', color: 'hsl(var(--popover-foreground))' }} 
+                            itemStyle={{ color: 'hsl(var(--popover-foreground))' }} 
+                            cursor={{ fill: 'hsl(var(--accent)/0.3)' }}
+                        />
                         <Bar dataKey="visitors" name="Visitors" radius={[4, 4, 0, 0]} barSize={35}>
                             {placeholderTrafficSourceData.map((entry, index) => (<Cell key={`cell-source-${index}`} fill={entry.color} /> ))}
                         </Bar>
@@ -328,11 +398,13 @@ export default function DashboardOverview() {
       <Card className="shadow-sm border-yellow-500/50 dark:border-yellow-400/40 bg-yellow-50/50 dark:bg-yellow-900/10">
         <CardHeader><CardTitle className="text-lg flex items-center text-yellow-700 dark:text-yellow-500"><AlertCircle className="mr-2 h-5 w-5"/>Implementation Notes</CardTitle></CardHeader>
         <CardContent className="text-sm text-yellow-600 dark:text-yellow-400/80 space-y-2">
-            <p><strong>Analytics Data Collection:</strong> The "Total Project Views", "Most Viewed Project", "Most Interacted Skill", "Total Resume Downloads", and "Visitors by Device Type" metrics require events to be logged from your public-facing site to the respective Supabase tables (`project_views`, `skill_interactions`, `resume_downloads`, `visitor_logs`). Ensure the client-side tracking is active and RLS policies allow inserts from public users.</p>
-            <p><strong>Global Analytics Toggle:</strong> The "Analytics Tracking" switch controls a global setting. Your public site components need to fetch this setting to conditionally log events. This part is not yet implemented in the public-facing components.</p>
-            <p><strong>Visitor Analytics (Sources, Peak Hours, Link Clicks):</strong> These are placeholders. True implementation requires a dedicated analytics service or more complex custom backend tracking.</p>
+            <p><strong>Analytics Data Collection:</strong> "Total Project Views", "Most Viewed Project", "Most Interacted Skill", "Total Resume Downloads", and "Visitors by Device Type" metrics require events to be logged from your public-facing site to the respective Supabase tables (`project_views`, `skill_interactions`, `resume_downloads`, `visitor_logs`). Ensure the client-side tracking (e.g., in `ProjectCard.tsx`, `SkillCard.tsx`, `ResumeSectionClientView.tsx`, and `VisitTracker.tsx`) is active and RLS policies allow inserts from public users.</p>
+            <p><strong>Global Analytics Toggle:</strong> The "Analytics Tracking" switch controls a global setting. Your public site components need to fetch this setting (from `site_settings` table) to conditionally log events. The `VisitTracker.tsx` already does this; other event loggers should be updated similarly.</p>
+            <p><strong>Advanced Visitor Analytics:</strong> Metrics like "Top Traffic Sources", "Peak Visit Hours", and specific "External Link Clicks" are placeholders. True implementation for these typically requires a dedicated analytics service or more complex custom backend tracking and User-Agent parsing.</p>
         </CardContent>
       </Card>
     </div>
   );
 }
+
+    
