@@ -4,7 +4,7 @@
 ## 1. Overview
 
 *   **Purpose:** A dynamic, modern personal portfolio website for Milan, showcasing projects, skills, career journey, and contact information. All content is dynamically managed through a comprehensive admin dashboard.
-*   **Key Technologies:** Next.js (App Router), React, TypeScript, Supabase (PostgreSQL for database, Supabase Storage for file uploads), ShadCN UI components, Tailwind CSS.
+*   **Key Technologies:** Next.js (App Router), React, TypeScript, Supabase (PostgreSQL for database, Supabase Storage for file uploads, Supabase Authentication, Supabase Edge Functions), ShadCN UI components, Tailwind CSS, Nodemailer (within Edge Function for email).
 
 ## 2. Core Public-Facing Features (User View)
 
@@ -19,7 +19,7 @@
     *   Displays an image (uploaded via admin) with an optional tagline (editable).
 *   **Projects Gallery:**
     *   Displays projects in a responsive carousel.
-    *   Each project card shows: title, description, image (uploaded), tags, status (e.g., "Deployed", "In Progress" with progress bar), and links to Live Demo and Source Code (if available). All project details are managed by the admin.
+    *   Each project card shows: title, description, image (uploaded via admin or external URL), tags, status (e.g., "Deployed", "In Progress" with progress bar), and links to Live Demo and Source Code (if available). All project details are managed by the admin.
 *   **Skills Overview:**
     *   Skills are grouped into categories.
     *   Categories can have custom icon image URLs.
@@ -58,8 +58,8 @@
 ## 3. Admin Dashboard Features (`/admin/dashboard`)
 
 *   **Authentication:**
-    *   Login page at `/admin/dashboard` (or redirects from `/admin`).
-    *   Uses static credentials defined in environment variables (`NEXT_PUBLIC_ADMIN_USERNAME`, `NEXT_PUBLIC_ADMIN_PASSWORD`). Client-side authentication.
+    *   Login page at `/admin/dashboard` (redirects from `/admin`).
+    *   Uses **Supabase Authentication** (email/password for the admin user).
 *   **Layout:**
     *   Collapsible sidebar for navigation between content management sections.
     *   Header displaying current section title, theme toggle, admin profile avatar, and activity log trigger.
@@ -97,16 +97,19 @@
     *   **Contact & Submissions Manager:**
         *   **Contact Page Details:** Edit Address, Phone (display & href), Email (display & href).
         *   **Social Links (for contact page):** Add, Edit, Delete links (Label, URL, Icon Image URL, Display Text, Sort Order).
-        *   **Contact Form Submissions:** View list of submissions, filter by status (New, Replied, Archived), mark as starred, change status, view full message in a modal, delete submissions. (Reply via Edge Function partially implemented on client, full setup pending Edge Function deployment).
+        *   **Contact Form Submissions:** View list of submissions, filter by status (New, Replied, Archived), mark as starred, change status, view full message in a modal, delete submissions. **Reply via Supabase Edge Function (e.g., using Gmail SMTP via Nodemailer).**
     *   **Legal Pages Manager:**
         *   Edit content for "Terms & Conditions".
         *   Edit content for "Privacy Policy". (Content stored as text, can be Markdown/HTML).
     *   **Settings Manager:**
         *   Toggle site-wide Maintenance Mode (On/Off).
         *   Edit the custom message displayed during Maintenance Mode.
-*   **Admin Profile:**
-    *   Dropdown menu from avatar.
+        *   **Danger Zone:** "Delete All Portfolio Data" feature with multi-step confirmation (including password re-entry and countdown), invoking a Supabase Edge Function to clear database tables.
+*   **Admin Profile (Dropdown Menu from Avatar):**
     *   Manage (upload, update, delete) admin profile photo (stored in `admin-profile-photos` bucket).
+    *   **Account Settings:**
+        *   Change admin email/username (initiates Supabase Auth email change, possibly via Edge Function for direct update).
+        *   Change admin password (uses Supabase Auth).
     *   Logout button.
 *   **Activity Log:**
     *   Accessible via a Bell icon in the header.
@@ -134,10 +137,10 @@
 *   **`contact_submissions`**: `id`, `name`, `email`, `subject`, `message`, `phone_number`, `status` (TEXT, default 'New'), `is_starred` (BOOLEAN, default false), `submitted_at`, `notes`.
 *   **`site_settings`**: `id` (Fixed TEXT: `'global_settings'`), `is_maintenance_mode_enabled` (BOOLEAN), `maintenance_message` (TEXT), `updated_at`.
 *   **`admin_profile`**: `id` (Fixed UUID: `'00000000-0000-0000-0000-00000000000A'`), `profile_photo_url`, `updated_at`.
-*   **`admin_activity_log`**: `id`, `timestamp`, `user_identifier`, `action_type`, `description`, `details` (JSONB), `is_read` (BOOLEAN).
+*   **`admin_activity_log`**: `id`, `timestamp`, `user_identifier` (stores `auth.uid()`), `action_type`, `description`, `details` (JSONB), `is_read` (BOOLEAN).
 *   **`legal_documents`**: `id` (TEXT, PK - e.g., 'terms-and-conditions'), `title`, `content`, `updated_at`.
 
-*(All tables have appropriate RLS policies: public read for viewable content, and admin (`anon` for dev, `authenticated` for prod ideal) for management).*
+*(All tables have RLS policies: public read for viewable content, and admin (`authenticated` role) for management).*
 
 ## 5. Storage Buckets (Supabase Storage)
 
@@ -147,17 +150,17 @@
 *   `about-images`
 *   `certification-images`
 *   `resume-pdfs`
-*   `resume-experience-icons`
-*   `resume-education-icons`
-*   `resume-language-icons`
+*   `resume-experience-icons` (if using image uploads for these)
+*   `resume-education-icons` (if using image uploads for these)
+*   `resume-language-icons` (if using image uploads for these)
 *   `admin-profile-photos`
 
-*(RLS policies on buckets allow public read and admin (`anon` for dev) uploads/deletes).*
+*(RLS policies on buckets allow public read and authenticated admin uploads/deletes).*
 
 ## 6. Key Client-Side Components (Public-Facing)
 
 *   Section Components: `HeroSection.tsx`, `AboutSectionClientView.tsx`, `ProjectCarousel.tsx`, `SkillsClientView.tsx`, `TimelineItem.tsx`, `CertificationsClientView.tsx`, `ResumeSectionClientView.tsx`, `ContactSectionClientView.tsx`.
-*   UI Components: Extensive use of ShadCN UI components (`Button.tsx`, `Card.tsx`, `Dialog.tsx`, `Sheet.tsx`, `Input.tsx`, `Textarea.tsx`, `Switch.tsx`, `Accordion.tsx`, `Tabs.tsx`, `Badge.tsx`, `Progress.tsx`, `Avatar.tsx`, `DropdownMenu.tsx`, `ScrollArea.tsx`, `Select.tsx`, `Tooltip.tsx`, `AlertDialog.tsx`, `Toast.tsx`, `Toaster.tsx`).
+*   UI Components: Extensive use of ShadCN UI components.
 *   Layout Components: `Header.tsx`, `Footer.tsx`, `Preloader.tsx`.
 *   `ContactForm.tsx`
 
@@ -177,12 +180,16 @@
 
 ## 8. Server-Side Logic
 
-*   **Data Fetching:** Primarily done in Server Components (e.g., `src/app/page.tsx`, and the server-side parts of section components like `ProjectsSection.tsx`, `SkillsSection.tsx`, etc.) using the Supabase client.
+*   **Data Fetching:** Primarily done in Server Components (e.g., `src/app/page.tsx`, `src/app/layout.tsx`, and server-side parts of section components) using the Supabase client.
 *   **Server Actions:**
     *   `src/lib/actions.ts`: Used for the public contact form submission (`submitContactForm`).
-    *   Admin dashboard CRUD operations are handled client-side directly invoking Supabase client methods (insert, update, delete, storage uploads).
+*   **Supabase Edge Functions:**
+    *   `send-contact-reply`: Handles sending email replies for contact submissions.
+    *   `danger-delete-all-data`: Handles deletion of portfolio database content.
+    *   `admin-update-user-email`: Handles admin email/username changes.
 *   **Middleware (`src/middleware.ts`):**
     *   Handles maintenance mode redirection by checking `site_settings` in Supabase.
+*   **Admin Dashboard Data Operations:** Admin CRUD operations are handled client-side within manager components, directly invoking Supabase client methods (insert, update, delete, storage uploads) using the authenticated admin user's session.
 
 ## 9. Styling
 
@@ -193,14 +200,13 @@
 
 *   `NEXT_PUBLIC_SUPABASE_URL`
 *   `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-*   `NEXT_PUBLIC_ADMIN_USERNAME`
-*   `NEXT_PUBLIC_ADMIN_PASSWORD`
+*   *(Supabase Edge Functions will require their own secrets set in the Supabase Dashboard, e.g., `SMTP_USERNAME`, `SMTP_PASSWORD`, `RESEND_API_KEY` if used, etc.)*
 
 ## 11. Potential Future Enhancements
 
-*   Transition admin dashboard from client-side credential check to full Supabase Authentication for better security.
+*   Transition more client-side Supabase calls in admin managers to Next.js Server Actions for a unified data mutation pattern.
 *   Implement server-side pagination and more advanced filtering/searching for admin lists.
-*   Complete the email reply functionality for contact submissions with a fully deployed Supabase Edge Function.
 *   Add a dedicated blog section with admin management.
-*   Integrate analytics (e.g., Google Analytics or Firebase Analytics).
-*   Optimize image loading further and explore advanced Next.js caching strategies (ISR, ISG) if `force-dynamic` becomes a performance bottleneck.
+*   Integrate analytics (e.g., Google Analytics or a self-hosted solution).
+*   More robust error handling and user feedback for Edge Function operations.
+```
