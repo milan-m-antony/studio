@@ -7,7 +7,7 @@ import { Button, buttonVariants } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
-import { PlusCircle, Edit, Trash2, Mail, Link as LinkIcon, Phone, MapPin, Save, MessageSquare, Star, Eye, Filter, Send, Loader2, ImageIcon, ChevronDown, Tag as TagIcon } from 'lucide-react';
+import { PlusCircle, Edit, Trash2, Mail, Link as LinkIcon, Phone, MapPin, Save, MessageSquare, Star, Eye, Filter, Send, Loader2, ImageIcon as DefaultSocialIcon, ChevronDown, Tag as TagIcon } from 'lucide-react';
 import NextImage from 'next/image';
 import { supabase } from '@/lib/supabaseClient';
 import type { ContactPageDetail, SocialLink, ContactSubmission, SubmissionStatus } from '@/types/supabase';
@@ -117,7 +117,7 @@ export default function ContactManager() {
     setIsReplyModalOpen(true);
   };
 
- const handleSendReply = async () => {
+  const handleSendReply = async () => {
     if (!submissionToReplyTo || !submissionToReplyTo.id || !submissionToReplyTo.email || !submissionToReplyTo.name) {
       toast({ title: "Reply Error", description: "Critical submission information is missing. Cannot send reply.", variant: "destructive" });
       console.error("[ContactManager] Critical submission info missing for reply:", submissionToReplyTo);
@@ -146,19 +146,21 @@ export default function ContactManager() {
         console.error("[ContactManager] Error invoking Edge Function (raw):", JSON.stringify(functionError, null, 2));
         let specificMessage = "Failed to send reply. Edge Function call failed.";
         if (typeof functionError === 'object' && functionError !== null) {
-          if ('message' in functionError && typeof (functionError as any).message === 'string' && (functionError as any).message.length > 0) {
-            specificMessage = (functionError as any).message;
-          } else if (functionError.name === 'FunctionsHttpError' && Object.keys(functionError).length > 0 && (functionError as any).context && Object.keys((functionError as any).context).length === 0) {
-            specificMessage = "Edge Function call failed or returned an error. Please check Supabase Edge Function logs for details (e.g., missing secrets, code errors, CORS, or email provider issues).";
-          } else if (functionError.name === 'FunctionsHttpError' || functionError.name === 'FunctionsRelayError' || functionError.name === 'FunctionsFetchError') {
-            specificMessage = "Communication error with the reply service. Please check Supabase Edge Function status and logs, and ensure it's deployed correctly.";
+          const supabaseFuncError = functionError as any; // Type assertion
+          if (supabaseFuncError.message) {
+            specificMessage = supabaseFuncError.message;
+          }
+          if (supabaseFuncError.name === 'FunctionsHttpError' && Object.keys(supabaseFuncError.context || {}).length === 0) {
+             specificMessage = "Edge Function call failed or returned an error. Please check Supabase Edge Function logs for details (e.g., missing secrets, code errors, CORS, or email provider issues).";
+          } else if (supabaseFuncError.name === 'FunctionsHttpError' || supabaseFuncError.name === 'FunctionsRelayError' || supabaseFuncError.name === 'FunctionsFetchError') {
+            specificMessage = "Communication error with the reply service. Check Supabase Edge Function status, logs, and ensure it's deployed correctly.";
           }
         }
         toast({
-          title: "Reply Service Error",
+          title: "Function Invocation Error",
           description: specificMessage,
           variant: "destructive",
-          duration: 12000 // Increased duration for more complex message
+          duration: 10000 
         });
         setIsSendingReply(false);
         return; 
@@ -169,20 +171,21 @@ export default function ContactManager() {
          toast({ title: "Reply Service Error", description: `Edge Function reported: ${typeof functionData.error === 'string' ? functionData.error : JSON.stringify(functionData.error)}. Please check Edge Function logs.`, variant: "destructive", duration: 9000 });
       } else {
         toast({ 
-            title: "Reply Processed", // Changed from "Reply Processed by Server"
-            description: functionData?.message || `Your reply to ${submissionToReplyTo.email} has been processed.`, 
+            title: "Reply Processed", 
+            description: functionData?.message || `Your reply to ${submissionToReplyTo.email} has been processed. Check email provider for delivery status.`, 
             variant: "default",
             duration: 7000 
         });
         setIsReplyModalOpen(false);
         setReplyMessage('');
-        fetchSubmissions();
+        // Update status locally and re-fetch for server confirmation
+        handleUpdateSubmissionStatus(submissionToReplyTo.id, 'Replied'); // Optimistic update + refetch
       }
     } catch (err: any) {
       console.error("[ContactManager] Unexpected error during send reply:", err);
       toast({ 
-          title: "Reply Failed", 
-          description: err.message || "An unexpected error occurred. Please check console and Edge Function logs.", 
+          title: "Reply System Error", 
+          description: err.message || "An unexpected error occurred while attempting to send the reply. Please check console and Edge Function logs.", 
           variant: "destructive", 
           duration: 9000 
       });
@@ -214,7 +217,7 @@ export default function ContactManager() {
       </Card>
 
       <Card className="shadow-lg">
-        <CardHeader><CardTitle className="flex items-center justify-between">Manage Social Links <LinkIcon className="h-6 w-6 text-primary" /></CardTitle><CardDescription>Add, edit, or delete social media links. Provide a direct image URL for icons.</CardDescription></CardHeader>
+        <CardHeader><CardTitle className="flex items-center justify-between">Manage Social Links <LinkIcon className="h-6 w-6 text-primary" /></CardTitle><CardDescription>Add, edit, or delete social media links. Provide an image URL for icons.</CardDescription></CardHeader>
         <CardContent>
           <div className="mb-6 text-right"><Button onClick={() => handleOpenSocialLinkModal()} className="w-full sm:w-auto"><PlusCircle className="mr-2 h-4 w-4" /> Add Social Link</Button></div>
           {isLoadingSocialLinks ? (<p className="text-center text-muted-foreground">Loading social links...</p>) : socialLinks.length === 0 ? (<p className="text-muted-foreground text-center py-4">No social links found.</p>) : (
@@ -226,10 +229,10 @@ export default function ContactManager() {
                         <div className="flex items-center gap-3 flex-grow min-w-0">
                         {link.icon_image_url ? (
                             <div className="relative h-5 w-5 rounded-sm overflow-hidden border bg-muted flex-shrink-0">
-                            <NextImage src={link.icon_image_url} alt={`${link.label} icon`} width={20} height={20} className="object-contain" />
+                              <NextImage src={link.icon_image_url} alt={`${link.label} icon`} width={20} height={20} className="object-contain" />
                             </div>
                         ) : (
-                            <ImageIcon className="h-5 w-5 text-muted-foreground flex-shrink-0" />
+                            <DefaultSocialIcon className="h-5 w-5 text-muted-foreground flex-shrink-0" />
                         )}
                         <div className="flex-grow min-w-0">
                             <h4 className="font-semibold text-sm truncate" title={link.label}>{link.label} <span className="text-xs text-muted-foreground">(Sort: {link.sort_order ?? 0})</span></h4>
@@ -434,3 +437,4 @@ export default function ContactManager() {
     
 
     
+
