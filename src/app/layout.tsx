@@ -9,6 +9,7 @@ import { Geist, Geist_Mono } from 'next/font/google';
 import { supabase } from '@/lib/supabaseClient';
 import type { LegalDocument } from '@/types/supabase';
 import Preloader from '@/components/layout/Preloader';
+import VisitTracker from '@/components/analytics/VisitTracker'; // Import the VisitTracker
 
 const geistSans = Geist({
   variable: '--font-geist-sans',
@@ -21,7 +22,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Milan M Antony | Portfolio",
+  title: "Milan's Portfolio - Creative Developer",
   description: 'Personal portfolio of Milan, a creative developer showcasing projects, skills, and journey.',
 };
 
@@ -61,13 +62,14 @@ async function getLegalDocument(id: string): Promise<LegalDocument | null> {
     return null;
   }
 }
+console.log("[RootLayout] Rendering RootLayout server component.");
 
 export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  console.log("[RootLayout] Rendering RootLayout server component.");
+  console.log("[RootLayout] Executing RootLayout async function.");
   const termsDocPromise = getLegalDocument('terms-and-conditions');
   const privacyDocPromise = getLegalDocument('privacy-policy');
 
@@ -87,7 +89,8 @@ export default async function RootLayout({
       </head>
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
-          <Preloader /> {/* Add Preloader here */}
+          <VisitTracker /> {/* Add VisitTracker here, it's a client component */}
+          <Preloader />
           <div className="flex flex-col min-h-screen">
             <Header />
             <main className="flex-grow">{children}</main>

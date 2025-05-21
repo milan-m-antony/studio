@@ -14,13 +14,13 @@ export type Json =
 export interface StoredHeroSocialLink {
   label: string;
   url: string;
-  icon_image_url: string | null; // Changed from icon_name
+  icon_image_url: string | null;
 }
 
 // Interface for Hero social links when managed in client-side state (includes temporary id)
 export interface HeroSocialLinkItem extends StoredHeroSocialLink {
   id: string; // Client-side temporary ID for list management
-  iconImageUrl?: string | null; // Compatibility if needed, maps to icon_image_url
+  iconImageUrl?: string | null; // Mapped from icon_image_url
 }
 
 export interface AdminProfile {
@@ -33,7 +33,7 @@ export interface SiteSettings {
   id: string; // 'global_settings'
   is_maintenance_mode_enabled: boolean;
   maintenance_message: string | null;
-  is_analytics_tracking_enabled: boolean; // New field
+  is_analytics_tracking_enabled: boolean;
   updated_at: string;
 }
 
@@ -51,7 +51,7 @@ export interface LegalDocument {
   id: string;
   title: string;
   content: string | null;
-  updated_at: string;
+  updated_at: string | null; // Made nullable to handle cases where it might be missing
 }
 
 export interface ProjectView {
@@ -75,6 +75,15 @@ export interface ResumeDownload {
   downloader_identifier: string | null;
 }
 
+export interface VisitorLog {
+  id?: string;
+  visited_at?: string;
+  device_type: 'Mobile' | 'Tablet' | 'Desktop' | 'Unknown';
+  path_visited?: string | null;
+  user_agent_string?: string | null;
+  viewer_identifier?: string | null;
+}
+
 
 export interface Database {
   public: {
@@ -86,8 +95,8 @@ export interface Database {
       }
       site_settings: {
         Row: SiteSettings
-        Insert: Omit<SiteSettings, 'updated_at'> & { updated_at?: string; is_analytics_tracking_enabled?: boolean; }
-        Update: Partial<SiteSettings> & { is_analytics_tracking_enabled?: boolean; }
+        Insert: Omit<SiteSettings, 'updated_at'> & { updated_at?: string; }
+        Update: Partial<SiteSettings>
       }
       admin_activity_log: {
         Row: AdminActivityLog
@@ -112,60 +121,28 @@ export interface Database {
           progress: number | null
           created_at: string
         }
-        Insert: {
-          id?: string
-          title: string
-          description?: string | null
-          image_url?: string | null
-          live_demo_url?: string | null
-          repo_url?: string | null
-          tags?: string[] | null
-          status?: string | null
-          progress?: number | null
-          created_at?: string
-        }
-        Update: {
-          id?: string
-          title?: string
-          description?: string | null
-          image_url?: string | null
-          live_demo_url?: string | null
-          repo_url?: string | null
-          tags?: string[] | null
-          status?: string | null
-          progress?: number | null
-          created_at?: string
-        }
+        Insert: Omit<Database['public']['Tables']['projects']['Row'], 'id' | 'created_at'> & { id?: string, created_at?: string }
+        Update: Partial<Database['public']['Tables']['projects']['Row']>
       }
       project_views: {
         Row: ProjectView
-        Insert: {
-          id?: string;
-          project_id?: string | null;
-          viewed_at?: string;
-          viewer_identifier?: string | null;
-        }
+        Insert: Omit<ProjectView, 'id' | 'viewed_at'> & { id?: string; viewed_at?: string;}
         Update: Partial<ProjectView>
       }
       skill_interactions: { 
         Row: SkillInteraction
-        Insert: {
-          id?: string;
-          skill_id?: string | null;
-          interaction_type?: string | null;
-          interacted_at?: string;
-          viewer_identifier?: string | null;
-        }
+        Insert: Omit<SkillInteraction, 'id' | 'interacted_at'> & { id?: string; interacted_at?: string;}
         Update: Partial<SkillInteraction>
       }
-      resume_downloads: { // New table for resume downloads
+      resume_downloads: {
         Row: ResumeDownload
-        Insert: {
-          id?: string;
-          downloaded_at?: string;
-          downloader_identifier?: string | null;
-        }
+        Insert: Omit<ResumeDownload, 'id' | 'downloaded_at'> & { id?: string; downloaded_at?: string;}
         Update: Partial<ResumeDownload>
+      }
+      visitor_logs: { // New table definition
+        Row: VisitorLog
+        Insert: Omit<VisitorLog, 'id' | 'visited_at'> & { id?: string; visited_at?: string;}
+        Update: Partial<VisitorLog>
       }
       skill_categories: {
         Row: {
@@ -175,20 +152,8 @@ export interface Database {
           sort_order: number | null
           created_at: string
         }
-        Insert: {
-          id?: string
-          name: string
-          icon_image_url?: string | null
-          sort_order?: number | null
-          created_at?: string
-        }
-        Update: {
-          id?: string
-          name?: string
-          icon_image_url?: string | null
-          sort_order?: number | null
-          created_at?: string
-        }
+        Insert: Omit<Database['public']['Tables']['skill_categories']['Row'], 'id' | 'created_at'> & { id?: string, created_at?: string }
+        Update: Partial<Database['public']['Tables']['skill_categories']['Row']>
       }
       skills: {
         Row: {
@@ -199,22 +164,8 @@ export interface Database {
           category_id: string | null
           created_at: string;
         }
-        Insert: {
-          id?: string
-          name: string
-          icon_image_url?: string | null
-          description?: string | null
-          category_id?: string | null
-          created_at?: string;
-        }
-        Update: {
-          id?: string
-          name?: string
-          icon_image_url?: string | null
-          description?: string | null
-          category_id?: string | null
-          created_at?: string;
-        }
+        Insert: Omit<Database['public']['Tables']['skills']['Row'], 'id' | 'created_at'> & { id?: string, created_at?: string }
+        Update: Partial<Database['public']['Tables']['skills']['Row']>
       }
       certifications: {
         Row: {
@@ -226,24 +177,8 @@ export interface Database {
           verify_url: string | null
           created_at: string
         }
-        Insert: {
-          id?: string
-          title: string
-          issuer: string
-          date: string
-          image_url?: string | null
-          verify_url?: string | null
-          created_at?: string
-        }
-        Update: {
-          id?: string
-          title?: string
-          issuer?: string
-          date?: string
-          image_url?: string | null
-          verify_url?: string | null
-          created_at?: string
-        }
+        Insert: Omit<Database['public']['Tables']['certifications']['Row'], 'id' | 'created_at'> & { id?: string, created_at?: string }
+        Update: Partial<Database['public']['Tables']['certifications']['Row']>
       }
       timeline_events: {
         Row: {
@@ -256,30 +191,12 @@ export interface Database {
           sort_order: number | null
           created_at: string
         }
-        Insert: {
-          id?: string
-          date: string
-          title: string
-          description: string
-          icon_image_url?: string | null
-          type: string
-          sort_order?: number | null
-          created_at?: string
-        }
-        Update: {
-          id?: string
-          date?: string
-          title?: string
-          description?: string
-          icon_image_url?: string | null
-          type?: string
-          sort_order?: number | null
-          created_at?: string
-        }
+        Insert: Omit<Database['public']['Tables']['timeline_events']['Row'], 'id' | 'created_at'> & { id?: string, created_at?: string }
+        Update: Partial<Database['public']['Tables']['timeline_events']['Row']>
       }
-      about_content: { // Single row table
+      about_content: {
         Row: {
-          id: string // Fixed ID e.g., '00000000-0000-0000-0000-000000000001'
+          id: string
           headline_main: string | null
           headline_code_keyword: string | null
           headline_connector: string | null
@@ -294,7 +211,7 @@ export interface Database {
         Insert: Omit<AboutContent, 'id' | 'updated_at'> & { id: string; updated_at?: string; }
         Update: Partial<Omit<AboutContent, 'id' | 'updated_at'>> & { updated_at?: string; }
       }
-      resume_meta: { // Single row table
+      resume_meta: {
         Row: ResumeMeta
         Insert: Omit<ResumeMeta, 'id' | 'updated_at'> & { id: string; updated_at?: string; }
         Update: Partial<Omit<ResumeMeta, 'id' | 'updated_at'>> & { updated_at?: string; }
@@ -316,7 +233,7 @@ export interface Database {
       }
       resume_key_skills: {
         Row: ResumeKeySkill
-        Insert: Omit<ResumeKeySkill, 'id'> & { id?: string; } // No created_at
+        Insert: Omit<ResumeKeySkill, 'id'> & { id?: string; }
         Update: Partial<Omit<ResumeKeySkill, 'id'>>
       }
       resume_languages: {
@@ -324,12 +241,12 @@ export interface Database {
         Insert: Omit<ResumeLanguage, 'id' | 'created_at'> & { id?: string; created_at?: string; }
         Update: Partial<Omit<ResumeLanguage, 'id' | 'created_at'>>
       }
-      hero_content: { // Single row table
+      hero_content: {
         Row: HeroContent;
         Insert: Omit<HeroContent, 'id' | 'updated_at'> & { id: string; updated_at?: string; };
         Update: Partial<Omit<HeroContent, 'id' | 'updated_at'>> & { updated_at?: string; };
       }
-      contact_page_details: { // Single row table
+      contact_page_details: {
         Row: ContactPageDetail;
         Insert: Omit<ContactPageDetail, 'id' | 'updated_at'> & { id: string; updated_at?: string; };
         Update: Partial<Omit<ContactPageDetail, 'id' | 'updated_at'>> & { updated_at?: string; };
@@ -343,6 +260,11 @@ export interface Database {
         Row: ContactSubmission;
         Insert: Omit<ContactSubmission, 'id' | 'submitted_at' | 'status' | 'is_starred'> & { id?: string; submitted_at?: string; status?: SubmissionStatus | null; is_starred?: boolean | null; };
         Update: Partial<Omit<ContactSubmission, 'id'| 'submitted_at'>>;
+      }
+      site_settings: {
+        Row: SiteSettings
+        Insert: Omit<SiteSettings, 'updated_at'> & { updated_at?: string; is_analytics_tracking_enabled?: boolean; }
+        Update: Partial<SiteSettings> & { is_analytics_tracking_enabled?: boolean; }
       }
     } // End Tables
     Views: {
@@ -366,14 +288,13 @@ export interface Project {
   id: string;
   title: string;
   description: string | null;
-  imageUrl: string | null; // Mapped from image_url
-  liveDemoUrl?: string | null; // Mapped
-  repoUrl?: string | null; // Mapped
+  imageUrl: string | null;
+  liveDemoUrl?: string | null;
+  repoUrl?: string | null;
   tags: string[] | null;
   status: ProjectStatus | null;
   progress?: number | null;
   created_at: string;
-  // Raw DB fields (optional if you always map)
   image_url?: string | null;
   live_demo_url?: string | null;
   repo_url?: string | null;
@@ -382,11 +303,10 @@ export interface Project {
 export interface Skill {
   id: string;
   name: string;
-  iconImageUrl: string | null; // Mapped from icon_image_url
+  iconImageUrl: string | null;
   description: string | null;
-  categoryId?: string | null; // Mapped
+  categoryId?: string | null;
   created_at?: string;
-  // Raw DB fields
   icon_image_url?: string | null;
   category_id?: string | null;
 }
@@ -394,12 +314,12 @@ export interface Skill {
 export interface SkillCategory {
   id: string;
   name: string;
-  iconImageUrl?: string | null; // Mapped from icon_image_url
-  skills?: Skill[]; // Nested skills
+  iconImageUrl?: string | null;
+  skills?: Skill[];
   sort_order?: number | null;
   created_at?: string;
-  // Raw DB fields
-  icon_image_url?: string | null;
+  icon_image_url?: string | null; // Ensure this exists if used by SkillCategory type directly
+  resume_key_skills?: ResumeKeySkill[]; // For resume key skill categories if structure is different
 }
 
 export type TimelineEventType = 'work' | 'education' | 'certification' | 'milestone';
@@ -409,11 +329,10 @@ export interface TimelineEvent {
   date: string;
   title: string;
   description: string;
-  iconImageUrl: string | null; // Mapped from icon_image_url
+  iconImageUrl: string | null;
   type: TimelineEventType;
   sort_order?: number | null;
   created_at?: string;
-  // Raw DB fields
   icon_image_url?: string | null;
 }
 
@@ -422,16 +341,16 @@ export interface Certification {
   title: string;
   issuer: string;
   date: string;
-  imageUrl: string | null; // Mapped
-  verifyUrl?: string | null; // Mapped
+  imageUrl: string | null;
+  imageHint?: string | null; // Was removed from table, ensure type matches usage
+  verifyUrl?: string | null;
   created_at?: string;
-  // Raw DB fields
   image_url?: string | null;
   verify_url?: string | null;
 }
 
-export interface AboutContent { // For the single row in about_content
-  id: string; // Fixed ID e.g., '00000000-0000-0000-0000-000000000001'
+export interface AboutContent {
+  id: string;
   headline_main: string | null;
   headline_code_keyword: string | null;
   headline_connector: string | null;
@@ -439,15 +358,14 @@ export interface AboutContent { // For the single row in about_content
   paragraph1: string | null;
   paragraph2: string | null;
   paragraph3: string | null;
-  imageUrl: string | null; // Mapped from image_url
+  imageUrl: string | null;
   image_tagline: string | null;
   updated_at?: string;
-  // Raw DB fields
   image_url?: string | null;
 }
 
 export interface ResumeMeta {
-  id: string; // Fixed ID e.g., '00000000-0000-0000-0000-000000000003'
+  id: string;
   description: string | null;
   resume_pdf_url: string | null;
   updated_at: string;
@@ -489,6 +407,7 @@ export interface ResumeKeySkillCategory {
   skills?: ResumeKeySkill[];
   sort_order?: number | null;
   created_at: string;
+  resume_key_skills?: ResumeKeySkill[]; // For Supabase relations
 }
 
 export interface ResumeLanguage {
@@ -500,16 +419,16 @@ export interface ResumeLanguage {
   created_at: string;
 }
 
-export interface HeroContent { // For the single row in hero_content
-  id: string; // Fixed ID e.g., '00000000-0000-0000-0000-000000000004'
+export interface HeroContent {
+  id: string;
   main_name: string | null;
   subtitles: string[] | null;
-  social_media_links: StoredHeroSocialLink[] | null; // Stored as JSONB
+  social_media_links: StoredHeroSocialLink[] | null;
   updated_at: string;
 }
 
-export interface ContactPageDetail { // For the single row
-  id: string; // Fixed ID e.g., '00000000-0000-0000-0000-000000000005'
+export interface ContactPageDetail {
+  id: string;
   address: string | null;
   phone: string | null;
   phone_href: string | null;
@@ -518,10 +437,10 @@ export interface ContactPageDetail { // For the single row
   updated_at: string;
 }
 
-export interface SocialLink { // For social_links table (used in Contact Page)
+export interface SocialLink {
   id: string;
   label: string;
-  icon_image_url: string | null; // Mapped from icon_image_url
+  icon_image_url: string | null;
   url: string;
   display_text: string | null;
   sort_order?: number | null;
@@ -543,6 +462,7 @@ export interface ContactSubmission {
   notes?: string | null;
 }
 
+// Supabase Auth User type (simplified)
 export type User = {
   id: string;
   email?: string;
