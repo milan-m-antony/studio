@@ -6,7 +6,7 @@ import NextImage from 'next/image';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { 
   Sheet, SheetContent, SheetHeader, SheetTrigger,
-  SheetTitle as SheetPrimitiveTitle, // Renamed to avoid conflict if DialogTitle also used
+  SheetTitle as SheetPrimitiveTitle,
   SheetDescription, SheetFooter
 } from '@/components/ui/sheet';
 import {
@@ -20,8 +20,8 @@ import {
   AlertDialogContent,
   AlertDialogDescription,
   AlertDialogFooter,
-  AlertDialogHeader as AlertDialogPrimitiveHeader, // Renamed
-  AlertDialogTitle as AlertDialogPrimitiveAlertDialogTitle, // Renamed
+  AlertDialogHeader as AlertDialogPrimitiveHeader, 
+  AlertDialogTitle as AlertDialogPrimitiveAlertDialogTitle, 
 } from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -34,7 +34,7 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
-import { Card, CardContent, CardHeader as CardPrimitiveHeader, CardTitle as CardPrimitiveCardTitle } from '@/components/ui/card'; // Aliased CardHeader and CardTitle
+import { Card, CardContent, CardHeader as CardPrimitiveHeader, CardTitle as CardPrimitiveCardTitle } from '@/components/ui/card';
 import {
   Menu, X, Sun, Moon,
   LogOut as LogoutIcon, Bell as BellIcon, UserCircle, Settings as SettingsIcon,
@@ -97,7 +97,7 @@ const SidebarContent = ({
             isCollapsed && !isMobile ? "h-8 w-8" : "h-10 w-10"
           )}>
             <NextImage
-              src="/logo.png" // Assuming logo.png is in public folder
+              src="/logo.png" 
               alt="Portfolio Logo"
               fill
               className="object-contain"
@@ -199,6 +199,7 @@ const SidebarContent = ({
   );
 };
 
+
 interface AdminPageLayoutProps {
   navItems: AdminNavItem[];
   activeSection: string;
@@ -231,20 +232,20 @@ export default function AdminPageLayout({
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const { toast } = useToast();
 
+  // State for Profile Photo Modal
   const [profilePhotoUrl, setProfilePhotoUrl] = useState<string | null>(null);
   const [currentDbProfilePhotoUrl, setCurrentDbProfilePhotoUrl] = useState<string | null>(null);
-  
   const [isPhotoModalOpen, setIsPhotoModalOpen] = useState(false);
-  const [isAccountSettingsModalOpen, setIsAccountSettingsModalOpen] = useState(false);
-
   const [profilePhotoFile, setProfilePhotoFile] = useState<File | null>(null);
   const [profilePhotoPreview, setProfilePhotoPreview] = useState<string | null>(null);
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
   
+  // State for Account Settings Modal (Email & Password)
+  const [isAccountSettingsModalOpen, setIsAccountSettingsModalOpen] = useState(false);
   const [newEmailInput, setNewEmailInput] = useState('');
+  const [confirmNewEmailInput, setConfirmNewEmailInput] = useState(''); // New state for confirm email
   const [emailChangeError, setEmailChangeError] = useState('');
   const [isChangingEmail, setIsChangingEmail] = useState(false);
-
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [passwordChangeError, setPasswordChangeError] = useState('');
@@ -573,10 +574,16 @@ export default function AdminPageLayout({
 
   const handleChangeEmail = async () => {
     setEmailChangeError('');
-    if (!newEmailInput.trim() || !/\S+@\S+\.\S+/.test(newEmailInput.trim())) {
+    const trimmedNewEmail = newEmailInput.trim();
+    const trimmedConfirmEmail = confirmNewEmailInput.trim(); // Trim confirm email
+
+    if (!trimmedNewEmail || !/\S+@\S+\.\S+/.test(trimmedNewEmail)) {
       setEmailChangeError("Please enter a valid new email address.");
-      setIsChangingEmail(false); // Ensure loading state is reset
       return;
+    }
+    if (trimmedNewEmail !== trimmedConfirmEmail) { // Compare trimmed values
+        setEmailChangeError("New email and confirmation email do not match.");
+        return;
     }
     setIsChangingEmail(true);
     const { data: { user: currentUserForEmailChange } } = await supabase.auth.getUser();
@@ -586,15 +593,15 @@ export default function AdminPageLayout({
         setIsChangingEmail(false); return;
     }
     
-    console.log(`[AdminPageLayout] Invoking 'admin-update-user-email' Edge Function with newEmail: ${newEmailInput.trim()} for user ID: ${currentUserForEmailChange.id}`);
+    console.log(`[AdminPageLayout] Invoking 'admin-update-user-email' Edge Function with newEmail: ${trimmedNewEmail} for user ID: ${currentUserForEmailChange.id}`);
 
     try {
       const { data: functionData, error: functionError } = await supabase.functions.invoke('admin-update-user-email', {
-        body: { newEmail: newEmailInput.trim() }, // userId will be derived from JWT in Edge Function
+        body: { newEmail: trimmedNewEmail },
       });
 
       if (functionError) {
-        console.error("[AdminPageLayout] Error invoking 'admin-update-user-email' Edge Function:", functionError);
+        console.error("[AdminPageLayout] Error invoking 'admin-update-user-email' Edge Function:", JSON.stringify(functionError, null, 2));
         const message = functionError.message || (typeof functionError === 'object' && (functionError as any).details) || "Failed to invoke email update service. Check Edge Function logs.";
         throw new Error(message);
       }
@@ -605,22 +612,21 @@ export default function AdminPageLayout({
       }
 
       toast({
-        title: "Email Changed Successfully",
-        description: functionData?.message || "Your email/username has been updated. You may need to log out and log back in with the new email for all changes to take effect.",
+        title: "Email Change Initiated",
+        description: functionData?.message || "Email/username change processed successfully. You may need to log out and log back in with the new email.",
         duration: 10000,
       });
 
       await supabase.from('admin_activity_log').insert({
         action_type: 'ADMIN_EMAIL_CHANGED_VIA_FUNCTION',
-        description: `Admin email/username changed from ${username || 'unknown'} to ${newEmailInput.trim()} via Edge Function.`,
+        description: `Admin email/username changed from ${username || 'unknown'} to ${trimmedNewEmail} via Edge Function.`,
         user_identifier: currentUserForEmailChange.id,
-        details: { old_email: username, new_email: newEmailInput.trim() }
+        details: { old_email: username, new_email: trimmedNewEmail }
       });
       
       setNewEmailInput('');
-      // It's best to prompt the user to log out and log back in.
-      // The 'authChange' event might not correctly update the displayed username in the header
-      // until a full session refresh with the new email.
+      setConfirmNewEmailInput('');
+      // Prompt user to log out and log back in if necessary, or rely on onAuthStateChange to handle session.
     } catch (error: any) {
       const message = error.message || "An unexpected error occurred while changing email.";
       setEmailChangeError(message);
@@ -675,6 +681,7 @@ export default function AdminPageLayout({
 
   const handleOpenAccountSettingsModal = () => {
     setNewEmailInput('');
+    setConfirmNewEmailInput('');
     setEmailChangeError('');
     setNewPassword('');
     setConfirmPassword('');
@@ -720,7 +727,7 @@ export default function AdminPageLayout({
 
       <div className={cn(
         "flex flex-col flex-1 overflow-hidden transition-all duration-300 ease-in-out min-w-0",
-        "bg-background text-foreground" // Changed from bg-sidebar
+        "bg-background text-foreground" 
       )}>
         <header className="sticky top-0 z-40 flex h-16 items-center justify-between border-b border-border bg-card px-4 md:px-6 shrink-0">
           <div className="md:hidden"></div> 
@@ -807,12 +814,13 @@ export default function AdminPageLayout({
           </div>
         </header>
 
-        <main className={cn("flex-1 overflow-y-auto p-4 md:p-6 lg:p-8 min-w-0", "bg-background text-foreground")}> {/* Ensure main content uses page background */}
+        <main className={cn("flex-1 overflow-y-auto p-4 md:p-6 lg:p-8 min-w-0", "bg-background text-foreground")}>
           {children}
         </main>
       </div>
     </div>
 
+    {/* Modal for Changing Profile Picture */}
     <Dialog open={isPhotoModalOpen} onOpenChange={setIsPhotoModalOpen}>
         <DialogContent className="sm:max-w-md">
             <DialogPrimitiveHeader>
@@ -851,15 +859,16 @@ export default function AdminPageLayout({
                   </div>
               </div>
             </ScrollArea>
-            <DialogPrimitiveFooter className="pt-4 border-t"> <DialogClose asChild><Button type="button" variant="outline">Close</Button></DialogClose> </DialogPrimitiveFooter>
+            <DialogPrimitiveFooter className="pt-4 border-t"><DialogClose asChild><Button type="button" variant="outline">Close</Button></DialogClose></DialogPrimitiveFooter>
         </DialogContent>
     </Dialog>
 
+    {/* Modal for Account Settings (Email & Password) */}
     <Dialog open={isAccountSettingsModalOpen} onOpenChange={setIsAccountSettingsModalOpen}>
       <DialogContent className="sm:max-w-md">
         <DialogPrimitiveHeader>
           <DialogPrimitiveDialogTitle>Account Settings</DialogPrimitiveDialogTitle>
-          <DialogDescription>Manage your admin account email and password.</DialogDescription>
+          <DialogDescription>Manage your admin account email/username and password.</DialogDescription>
         </DialogPrimitiveHeader>
         <ScrollArea className="max-h-[70vh] p-1 pr-2">
           <div className="grid gap-6 py-4 px-2">
@@ -872,14 +881,18 @@ export default function AdminPageLayout({
                   <p className="text-sm text-muted-foreground mb-1">Current Email: <span className="font-medium text-foreground">{username}</span></p>
                   <Label htmlFor="newEmail">New Email Address</Label>
                   <Input id="newEmail" type="email" value={newEmailInput} onChange={(e) => setNewEmailInput(e.target.value)} placeholder="Enter new email" className={emailChangeError ? "border-destructive" : ""} />
+                </div>
+                <div>
+                  <Label htmlFor="confirmNewEmail">Confirm New Email Address</Label>
+                  <Input id="confirmNewEmail" type="email" value={confirmNewEmailInput} onChange={(e) => setConfirmNewEmailInput(e.target.value)} placeholder="Confirm new email" className={emailChangeError ? "border-destructive" : ""} />
                   {emailChangeError && <p className="text-sm text-destructive mt-1">{emailChangeError}</p>}
                 </div>
                 <Button type="button" onClick={handleChangeEmail} disabled={isChangingEmail || !newEmailInput.trim()} className="w-full sm:w-auto">
                   {isChangingEmail ? <MailIcon className="mr-2 h-4 w-4 animate-spin"/> : <MailIcon className="mr-2 h-4 w-4"/>}
-                  Change Email
+                  Request Email Change
                 </Button>
                  <p className="text-xs text-muted-foreground">
-                  Your email will be updated directly. You may need to log out and log back in with the new email.
+                    Your email/username will be updated directly by an admin function. You may need to log out and log back in.
                 </p>
               </CardContent>
             </Card>
@@ -912,14 +925,15 @@ export default function AdminPageLayout({
       </DialogContent>
     </Dialog>
 
+    {/* AlertDialog for Clear Log Confirmation */}
     <AlertDialog open={showClearLogConfirm} onOpenChange={setShowClearLogConfirm}>
       <AlertDialogContent className="bg-destructive border-destructive text-destructive-foreground">
-        <AlertDialogPrimitiveHeader>
+        <AlertDialogHeader>
           <AlertDialogPrimitiveAlertDialogTitle className="text-destructive-foreground">Clear Entire Activity Log?</AlertDialogPrimitiveAlertDialogTitle>
           <AlertDialogDescription className="text-destructive-foreground/90">
             This action cannot be undone. All activity log entries will be permanently deleted.
           </AlertDialogDescription>
-        </AlertDialogPrimitiveHeader>
+        </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel 
             onClick={() => setShowClearLogConfirm(false)} 
