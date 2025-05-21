@@ -44,7 +44,7 @@ type ContactPageDetailsFormData = z.infer<typeof contactPageDetailsSchema>;
 const socialLinkSchema = z.object({
   id: z.string().uuid().optional(),
   label: z.string().min(1, "Label is required"),
-  icon_image_url: z.string().url("Must be a valid URL if an image URL is provided.").optional().or(z.literal("")).nullable(),
+  icon_image_url: z.string().url("Must be a valid URL if provided.").optional().or(z.literal("")).nullable(),
   url: z.string().url("Must be a valid URL"),
   display_text: z.string().optional().nullable(),
   sort_order: z.coerce.number().optional().default(0),
@@ -100,6 +100,7 @@ export default function ContactManager() {
   const handleDeleteSocialLink = async () => { if (!socialLinkToDelete) return; const { error } = await supabase.from('social_links').delete().eq('id', socialLinkToDelete.id); if (error) {toast({ title: "Error", description: `Failed to delete social link: ${error.message}`, variant: "destructive" }); console.error("Error deleting social link:", error); } else { toast({ title: "Success", description: "Social link deleted." }); fetchSocialLinks(); router.refresh(); } setShowSocialLinkDeleteConfirm(false); setSocialLinkToDelete(null); };
   const handleOpenSocialLinkModal = (link?: SocialLink) => { setCurrentSocialLink(link || null); socialLinkForm.reset(link ? { ...link, icon_image_url: link.icon_image_url || '', sort_order: link.sort_order ?? 0 } : { label: '', icon_image_url: '', url: '', display_text: '', sort_order: 0 }); setIsSocialLinkModalOpen(true); };
   const triggerSocialLinkDeleteConfirmation = (link: SocialLink) => { setSocialLinkToDelete(link); setShowSocialLinkDeleteConfirm(true); };
+  
   const handleViewMessage = (submission: ContactSubmission) => { setSelectedSubmission(submission); setIsViewMessageModalOpen(true); };
   const handleUpdateSubmissionStatus = async (submissionId: string, newStatus: SubmissionStatus) => { const { error } = await supabase.from('contact_submissions').update({ status: newStatus }).eq('id', submissionId); if (error) {toast({ title: "Error", description: `Failed to update status: ${error.message}`, variant: "destructive" }); console.error("Error updating submission status:", error); } else { toast({ title: "Success", description: "Submission status updated." }); fetchSubmissions(); }};
   const handleToggleStar = async (submission: ContactSubmission) => { const { error } = await supabase.from('contact_submissions').update({ is_starred: !submission.is_starred }).eq('id', submission.id); if (error) {toast({ title: "Error", description: `Failed to update star: ${error.message}`, variant: "destructive" }); console.error("Error toggling star:", error); } else { toast({ title: "Success", description: "Star status updated." }); fetchSubmissions(); }};
@@ -107,13 +108,16 @@ export default function ContactManager() {
   const triggerSubmissionDeleteConfirmation = (submission: ContactSubmission) => { setSubmissionToDeleteForDialog(submission); setShowSubmissionDeleteConfirmDialog(true); };
 
   const handleOpenReplyModal = (submission: ContactSubmission) => {
+    if (!submission.id || !submission.email || !submission.name) {
+      toast({ title: "Error", description: "Cannot reply: submission data is incomplete (missing ID, email, or name).", variant: "destructive" });
+      return;
+    }
     setSubmissionToReplyTo(submission);
     setReplyMessage(''); 
     setIsReplyModalOpen(true);
   };
 
   const handleSendReply = async () => {
-    console.log("[ContactManager] handleSendReply called");
     if (!submissionToReplyTo) {
       toast({ title: "Error", description: "No submission selected to reply to.", variant: "destructive" });
       return;
@@ -122,9 +126,9 @@ export default function ContactManager() {
       toast({ title: "Missing Information", description: "Please enter a reply message.", variant: "destructive" });
       return;
     }
-    if (!submissionToReplyTo.id || !submissionToReplyTo.email || !submissionToReplyTo.name) {
-      console.error("[ContactManager] Submission data incomplete for reply:", submissionToReplyTo);
-      toast({ title: "Error", description: "Submission data is incomplete for sending a reply. Please ensure it has ID, email, and name.", variant: "destructive" });
+     if (!submissionToReplyTo.id || !submissionToReplyTo.email || !submissionToReplyTo.name) {
+      console.error("[ContactManager] Submission data incomplete for reply (should have been caught by handleOpenReplyModal):", submissionToReplyTo);
+      toast({ title: "Error", description: "Submission data is incomplete. Cannot send reply.", variant: "destructive" });
       return;
     }
 
@@ -146,35 +150,40 @@ export default function ContactManager() {
         console.error("[ContactManager] Error invoking Edge Function (raw):", JSON.stringify(functionError, null, 2));
         let specificMessage = "Failed to send reply. Edge Function call failed.";
         if (typeof functionError === 'object' && functionError !== null) {
-          if ((functionError as any).message) {
-            specificMessage = (functionError as any).message;
-          } else if ((functionError as any).name === 'FunctionsHttpError' || (functionError as any).name === 'FunctionsRelayError' || (functionError as any).name === 'FunctionsFetchError') {
-             specificMessage = "Failed to connect to the Edge Function. Please check its deployment status, CORS settings, and logs in your Supabase dashboard.";
+          if ('message' in functionError && typeof functionError.message === 'string') {
+            try {
+              const parsedMessage = JSON.parse(functionError.message);
+              if (parsedMessage && typeof parsedMessage.error === 'string') {
+                specificMessage = parsedMessage.error;
+              } else if (typeof parsedMessage.message === 'string') {
+                specificMessage = parsedMessage.message;
+              } else {
+                specificMessage = functionError.message;
+              }
+            } catch (e) {
+              specificMessage = functionError.message; 
+            }
           }
         }
-        throw new Error(specificMessage);
+        throw new Error(specificMessage); 
       }
       
       if (functionData && functionData.error) { 
          console.error("[ContactManager] Error from Edge Function logic:", JSON.stringify(functionData.error, null, 2));
          toast({ title: "Reply Service Error", description: (typeof functionData.error === 'string' ? functionData.error : JSON.stringify(functionData.error)) + " Check Edge Function logs.", variant: "destructive", duration: 9000 });
       } else {
-        toast({ title: "Reply Sent", description: functionData?.message || "Your reply has been processed." });
+        toast({ title: "Reply Sent", description: functionData?.message || "Your reply has been processed (using Gmail SMTP configured in Edge Function)." });
         setIsReplyModalOpen(false);
         setReplyMessage('');
         fetchSubmissions(); 
       }
     } catch (err: any) {
       console.error("[ContactManager] Caught error after trying to invoke Edge Function:", err);
-      let detailedErrorMessage = "An unknown error occurred. Please check the console and Edge Function logs in your Supabase dashboard.";
-      if (err && err.message) {
-        detailedErrorMessage = err.message;
+      let errorMessage = "Function Invocation Error";
+      if (err && err.message) { 
+        errorMessage = err.message;
       }
-      // Check if the error is a FunctionsHttpError and the context is empty, indicating a more generic failure
-      if (err.name === 'FunctionsHttpError' && err.context && Object.keys(err.context).length === 0) {
-        detailedErrorMessage = "Failed to communicate with the Edge Function. It might be unavailable, not deployed correctly, or there could be CORS issues. Please check the function's status and logs in your Supabase dashboard.";
-      }
-      toast({ title: "Reply Failed", description: detailedErrorMessage, variant: "destructive" });
+      toast({ title: "Reply Failed", description: `${errorMessage} Please check the Edge Function logs in Supabase for details.`, variant: "destructive" });
     } finally {
       setIsSendingReply(false);
     }
@@ -255,7 +264,8 @@ export default function ContactManager() {
               </SelectContent>
             </Select>
             <Button variant="outline" onClick={fetchSubmissions} disabled={isLoadingSubmissions} className="w-full sm:w-auto">
-              <Filter className="mr-2 h-4 w-4"/> Apply Filter
+              {isLoadingSubmissions ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Filter className="mr-2 h-4 w-4"/>} 
+              {isLoadingSubmissions ? 'Loading...' : 'Apply Filter'}
             </Button>
           </div>
 
@@ -304,6 +314,7 @@ export default function ContactManager() {
         </CardContent>
       </Card>
 
+      {/* Social Link Modal */}
       <Dialog open={isSocialLinkModalOpen} onOpenChange={(isOpen) => { setIsSocialLinkModalOpen(isOpen); if (!isOpen) setCurrentSocialLink(null); }}>
         <DialogContent className="sm:max-w-[525px]"><DialogHeader><DialogTitle>{currentSocialLink ? 'Edit Social Link' : 'Add New Social Link'}</DialogTitle></DialogHeader>
           <form onSubmit={socialLinkForm.handleSubmit(onSocialLinkSubmit)} className="grid gap-4 py-4">
@@ -343,6 +354,7 @@ export default function ContactManager() {
         </AlertDialogContent>
       </AlertDialog>
 
+      {/* View Submission Modal */}
       {selectedSubmission && (
         <Dialog open={isViewMessageModalOpen} onOpenChange={setIsViewMessageModalOpen}>
           <DialogContent className="sm:max-w-2xl">
@@ -366,6 +378,7 @@ export default function ContactManager() {
         </Dialog>
       )}
 
+      {/* Reply to Submission Modal */}
       {submissionToReplyTo && (
         <Dialog open={isReplyModalOpen} onOpenChange={(isOpen) => { if(!isOpen) setSubmissionToReplyTo(null); setIsReplyModalOpen(isOpen); }}>
           <DialogContent className="sm:max-w-lg">
@@ -396,6 +409,7 @@ export default function ContactManager() {
         </Dialog>
       )}
 
+      {/* Delete Submission Confirmation Dialog */}
       <AlertDialog open={showSubmissionDeleteConfirmDialog} onOpenChange={setShowSubmissionDeleteConfirmDialog}>
         <AlertDialogContent className="bg-destructive border-destructive text-destructive-foreground">
             <AlertDialogPrimitiveHeader>
@@ -412,4 +426,3 @@ export default function ContactManager() {
   );
 }
     
-
