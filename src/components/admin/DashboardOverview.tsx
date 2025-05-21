@@ -1,8 +1,9 @@
+
 // src/components/admin/DashboardOverview.tsx
 "use client";
 
 import React, { useEffect, useState, useCallback, useRef } from 'react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
@@ -26,7 +27,6 @@ interface MostInteractedSkillData {
   interactions: number | null;
 }
 
-// Placeholder data for the device type chart
 const placeholderDeviceData = [
   { name: 'Desktop', visitors: 450, color: 'hsl(var(--chart-1))', icon: Monitor },
   { name: 'Mobile', visitors: 750, color: 'hsl(var(--chart-2))', icon: Smartphone },
@@ -114,8 +114,12 @@ export default function DashboardOverview() {
       const { count: viewsCount, error: viewsError } = await supabase
         .from('project_views')
         .select('*', { count: 'exact', head: true });
-      if (viewsError) console.error("[DashboardOverview] Error fetching total project views:", JSON.stringify(viewsError, null, 2));
-      setTotalProjectViews(viewsCount ?? 0);
+      if (viewsError) {
+        console.error("[DashboardOverview] Error fetching total project views:", JSON.stringify(viewsError, null, 2));
+        setTotalProjectViews(0); 
+      } else {
+        setTotalProjectViews(viewsCount ?? 0);
+      }
       setIsLoadingTotalProjectViews(false);
 
       // Fetch Most Viewed Project
@@ -125,7 +129,7 @@ export default function DashboardOverview() {
 
       if (allProjectViewsError) {
         console.error("Error fetching project views for aggregation:", JSON.stringify(allProjectViewsError, null, 2));
-        setMostViewedProjectData({ title: 'Error loading data', views: 0 });
+        setMostViewedProjectData({ title: 'Error', views: 0 });
       } else if (allProjectViews && allProjectViews.length > 0) {
         const viewCounts: Record<string, number> = {};
         allProjectViews.forEach(view => { if (view.project_id) viewCounts[view.project_id] = (viewCounts[view.project_id] || 0) + 1; });
@@ -137,12 +141,12 @@ export default function DashboardOverview() {
           const { data: projectData, error: projectError } = await supabase.from('projects').select('title').eq('id', mostViewedId).maybeSingle();
           if (projectError) {
             console.error("Error fetching project title for most viewed:", JSON.stringify(projectError, null, 2));
-            setMostViewedProjectData({ title: 'Project Title Error', views: maxViews });
+            setMostViewedProjectData({ title: 'Project Title N/A', views: maxViews });
           } else {
             setMostViewedProjectData({ title: projectData?.title || 'Unknown Project', views: maxViews });
           }
-        } else { setMostViewedProjectData({ title: 'N/A (No Views)', views: 0 }); }
-      } else { setMostViewedProjectData({ title: 'N/A (No Views)', views: 0 }); }
+        } else { setMostViewedProjectData({ title: 'N/A', views: 0 }); }
+      } else { setMostViewedProjectData({ title: 'N/A (No Views Yet)', views: 0 }); }
       setIsLoadingMostViewedProject(false);
       
       // Fetch Most Interacted Skill
@@ -152,7 +156,7 @@ export default function DashboardOverview() {
 
       if (allInteractionsError) {
         console.error("Error fetching skill interactions for aggregation:", JSON.stringify(allInteractionsError, null, 2));
-        setMostInteractedSkillData({ name: 'Error loading data', interactions: 0 });
+        setMostInteractedSkillData({ name: 'Error', interactions: 0 });
       } else if (allInteractions && allInteractions.length > 0) {
         const interactionCounts: Record<string, number> = {};
         allInteractions.forEach(interaction => { if(interaction.skill_id) interactionCounts[interaction.skill_id] = (interactionCounts[interaction.skill_id] || 0) + 1; });
@@ -164,20 +168,24 @@ export default function DashboardOverview() {
           const { data: skillData, error: skillError } = await supabase.from('skills').select('name').eq('id', mostInteractedSkillId).maybeSingle();
           if (skillError) {
             console.error("Error fetching skill name for most interacted:", JSON.stringify(skillError, null, 2));
-            setMostInteractedSkillData({ name: 'Skill Name Error', interactions: maxInteractions });
+            setMostInteractedSkillData({ name: 'Skill Name N/A', interactions: maxInteractions });
           } else {
              setMostInteractedSkillData({ name: skillData?.name || 'Unknown Skill', interactions: maxInteractions });
           }
-        } else { setMostInteractedSkillData({ name: 'N/A (No Interactions)', interactions: 0 }); }
-      } else { setMostInteractedSkillData({ name: 'N/A (No Interactions)', interactions: 0 }); }
+        } else { setMostInteractedSkillData({ name: 'N/A', interactions: 0 }); }
+      } else { setMostInteractedSkillData({ name: 'N/A (No Interactions Yet)', interactions: 0 }); }
       setIsLoadingMostInteractedSkill(false);
 
       // Fetch Total Resume Downloads
       const { count: resumeDownloadsCount, error: resumeError } = await supabase
         .from('resume_downloads')
         .select('*', { count: 'exact', head: true });
-      if (resumeError) console.error("[DashboardOverview] Error fetching total resume downloads:", JSON.stringify(resumeError, null, 2));
-      setTotalResumeDownloads(resumeDownloadsCount ?? 0);
+      if (resumeError) {
+        console.error("[DashboardOverview] Error fetching total resume downloads:", JSON.stringify(resumeError, null, 2));
+        setTotalResumeDownloads(0);
+      } else {
+        setTotalResumeDownloads(resumeDownloadsCount ?? 0);
+      }
       setIsLoadingResumeDownloads(false);
 
       // Fetch Recent Contact Submissions Count
@@ -186,8 +194,12 @@ export default function DashboardOverview() {
         .from('contact_submissions')
         .select('*', { count: 'exact', head: true })
         .gte('submitted_at', sevenDaysAgo);
-      if (submissionsError) console.error("[DashboardOverview] Error fetching recent contact submissions:", JSON.stringify(submissionsError, null, 2));
-      setRecentSubmissionsCount(submissionsCount ?? 0);
+      if (submissionsError) {
+        console.error("[DashboardOverview] Error fetching recent contact submissions:", JSON.stringify(submissionsError, null, 2));
+        setRecentSubmissionsCount(0);
+      } else {
+        setRecentSubmissionsCount(submissionsCount ?? 0);
+      }
       setIsLoadingRecentSubmissions(false);
 
       setLastRefreshed(new Date());
@@ -249,7 +261,7 @@ export default function DashboardOverview() {
         await supabase.from('admin_activity_log').insert({
             action_type: checked ? 'ANALYTICS_TRACKING_ENABLED' : 'ANALYTICS_TRACKING_DISABLED',
             description: `Admin ${checked ? 'enabled' : 'disabled'} site-wide analytics tracking.`,
-            user_identifier: user.id
+            user_identifier: user.id // Using authenticated user ID
         });
       } catch (logError) {
           console.error("Error logging analytics tracking toggle:", logError);
@@ -312,7 +324,7 @@ export default function DashboardOverview() {
           />
           <StatCard 
             title="Most Viewed Project" 
-            value={mostViewedProjectData.title ? `${mostViewedProjectData.title} (${mostViewedProjectData.views} views)` : (mostViewedProjectData.views === 0 ? 'N/A (No Views)' : 'N/A')}
+            value={mostViewedProjectData.title ? `${mostViewedProjectData.title} (${mostViewedProjectData.views} views)` : (mostViewedProjectData.views === 0 ? 'N/A (No Views Yet)' : 'N/A')}
             icon={TrendingUp} 
             description="Project with highest card views" 
             isLoading={isLoadingMostViewedProject}
@@ -320,9 +332,9 @@ export default function DashboardOverview() {
           />
           <StatCard 
             title="Most Interacted Skill" 
-            value={mostInteractedSkillData.name ? `${mostInteractedSkillData.name} (${mostInteractedSkillData.interactions} views)` : (mostInteractedSkillData.interactions === 0 ? 'N/A (No Interactions)' : 'N/A')}
+            value={mostInteractedSkillData.name ? `${mostInteractedSkillData.name} (${mostInteractedSkillData.interactions} interactions)` : (mostInteractedSkillData.interactions === 0 ? 'N/A (No Interactions Yet)' : 'N/A')}
             icon={Brain} 
-            description="Skill with most card views" 
+            description="Skill with most card views (requires tracking)" 
             isLoading={isLoadingMostInteractedSkill}
             valueClassName="truncate text-lg sm:text-xl"
           />
@@ -338,7 +350,7 @@ export default function DashboardOverview() {
             title="Total Resume Downloads" 
             value={totalResumeDownloads} 
             icon={Download} 
-            description="Total PDF downloads (requires client-side event logging)" 
+            description="Track PDF downloads (requires client-side event logging)" 
             isLoading={isLoadingResumeDownloads}
           />
           <StatCard 
@@ -356,7 +368,7 @@ export default function DashboardOverview() {
           <CardTitle className="text-xl flex items-center"><Users className="mr-2 h-6 w-6 text-primary" />Visitor Analytics (Placeholders)</CardTitle>
           <CardDescription>For comprehensive insights, integrate a dedicated analytics service.</CardDescription>
         </CardHeader>
-        <CardContent className="grid gap-6 md:grid-cols-1 lg:grid-cols-2"> {/* Changed to lg:grid-cols-2 */}
+        <CardContent className="grid gap-6 md:grid-cols-1 lg:grid-cols-2">
             <div>
                 <h3 className="text-lg font-semibold mb-3 text-muted-foreground">Visitors by Device Type</h3>
                 <div className="p-4 border rounded-lg bg-card-foreground/5 dark:bg-card-foreground/10 min-h-[300px]">
@@ -392,6 +404,9 @@ export default function DashboardOverview() {
                     </ResponsiveContainer>
                 )}
                 </div>
+                <CardDescription className="text-xs text-muted-foreground mt-2 px-1">
+                  Note: This chart uses sample data. Real device tracking requires integrating an analytics service (e.g., Google Analytics, Vercel Analytics) or custom User-Agent parsing and logging to a database.
+                </CardDescription>
            </div>
            <div>
                 <h3 className="text-lg font-semibold mb-3 text-muted-foreground">Top Traffic Sources</h3>
@@ -416,6 +431,9 @@ export default function DashboardOverview() {
                     </ResponsiveContainer>
                 )}
                 </div>
+                <CardDescription className="text-xs text-muted-foreground mt-2 px-1">
+                  Note: This chart uses sample data. Real traffic source tracking requires integrating an analytics service.
+                </CardDescription>
            </div>
         </CardContent>
       </Card>
@@ -425,12 +443,11 @@ export default function DashboardOverview() {
             <CardTitle className="text-lg flex items-center text-yellow-700 dark:text-yellow-500"><AlertCircle className="mr-2 h-5 w-5"/>Implementation Notes</CardTitle>
         </CardHeader>
         <CardContent className="text-sm text-yellow-600 dark:text-yellow-400/80 space-y-2">
-            <p><strong>Analytics Tracking Toggle:</strong> This switch controls whether NEW view/interaction/download events are logged. Update your public components (`ProjectCard`, `SkillCard`, `ResumeSectionClientView`) to check this setting before logging if you implement that feature.</p>
-            <p><strong>Visitor Analytics & Charts:</strong> These sections currently use placeholder data. For real data, integrate a service like Vercel Analytics, Google Analytics, or implement custom event logging and backend aggregation.</p>
-             <p><strong>Data Aggregation:</strong> For "Most Viewed/Interacted" metrics, data is currently fetched and aggregated client-side. For larger datasets, consider server-side aggregation or database views/functions for better performance.</p>
+            <p><strong>Analytics Tracking Toggle:</strong> This switch controls whether NEW view/interaction/download events are logged to your Supabase tables. Your public components (`ProjectCard`, `SkillCard`, `ResumeSectionClientView`) need to be updated to check this global setting before sending logging data to Supabase.</p>
+            <p><strong>Visitor Analytics & Charts:</strong> The "Visitors by Device Type" and "Top Traffic Sources" charts currently use placeholder data. For real data, integrate a dedicated analytics service or implement custom event logging with User-Agent parsing on your backend.</p>
+             <p><strong>Data Aggregation for Views/Interactions:</strong> For "Most Viewed Project" and "Most Interacted Skill," data is fetched and aggregated client-side in the dashboard. For larger datasets, consider server-side aggregation (e.g., Supabase database views or functions) for better performance.</p>
         </CardContent>
       </Card>
     </div>
   );
 }
-
