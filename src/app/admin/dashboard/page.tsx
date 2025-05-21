@@ -17,7 +17,6 @@ import {
   ImageIcon, Link as LinkIcon, ListChecks, Languages, Building, GraduationCap, Tag as TagIcon, History, Filter, Eye, Send, KeyRound, UserCog
 } from 'lucide-react';
 import Link from 'next/link';
-import { cn } from '@/lib/utils';
 import { supabase } from '@/lib/supabaseClient'; 
 import type { SiteSettings, User as SupabaseUserType, AdminActivityLog } from '@/types/supabase';
 import { useToast } from "@/hooks/use-toast";
@@ -31,6 +30,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle as AlertDialogPrimitiveTitle,
 } from "@/components/ui/alert-dialog";
+import { cn } from '@/lib/utils';
 
 // Import Admin Managers
 import HeroManager from '@/components/admin/HeroManager';
@@ -63,18 +63,23 @@ const adminNavItems: AdminNavItem[] = [
 ];
 
 // Define deletable sections for the Danger Zone
+// Ensure 'tables' and 'buckets' arrays match your database schema and storage setup.
 const deletableSectionsConfig = [
     { key: 'hero', label: 'Hero Section Content', tables: ['hero_content'], buckets: [] },
     { key: 'about', label: 'About Section Content', tables: ['about_content'], buckets: ['about-images'] },
-    { key: 'projects', label: 'All Projects Data', tables: ['projects', 'project_views'], buckets: ['project-images'] },
-    { key: 'skills', label: 'All Skills & Categories', tables: ['skills', 'skill_categories', 'skill_interactions'], buckets: ['category-icons', 'skill-icons'] },
+    { key: 'projects', label: 'All Projects & Project Views', tables: ['projects', 'project_views'], buckets: ['project-images'] },
+    { key: 'skills', label: 'All Skills, Categories & Interactions', tables: ['skills', 'skill_categories', 'skill_interactions'], buckets: ['category-icons', 'skill-icons'] },
     { key: 'journey', label: 'Journey/Timeline Events', tables: ['timeline_events'], buckets: [] }, // Add bucket if timeline items have unique uploaded images
     { key: 'certifications', label: 'All Certifications Data', tables: ['certifications'], buckets: ['certification-images'] },
-    { key: 'resume', label: 'All Resume Data', tables: ['resume_meta', 'resume_experience', 'resume_education', 'resume_key_skills', 'resume_key_skill_categories', 'resume_languages'], buckets: ['resume-pdfs', 'resume-experience-icons', 'resume-education-icons', 'resume-language-icons'] }, // Add specific icon buckets if used
-    { key: 'contact_info', label: 'Contact Page Details & Links', tables: ['contact_page_details', 'social_links'], buckets: [] }, // Assume social link icons are URLs, not uploaded for now
+    { key: 'resume', label: 'All Resume Data (Meta, Experience, Edu, Skills, Lang)', tables: ['resume_meta', 'resume_experience', 'resume_education', 'resume_key_skills', 'resume_key_skill_categories', 'resume_languages'], buckets: ['resume-pdfs', 'resume-experience-icons', 'resume-education-icons', 'resume-language-icons'] },
+    { key: 'contact_page_content', label: 'Contact Page Details & Social Links', tables: ['contact_page_details', 'social_links'], buckets: [] },
     { key: 'contact_submissions', label: 'All Contact Form Submissions', tables: ['contact_submissions'], buckets: [] },
     { key: 'legal_docs', label: 'Legal Documents Content', tables: ['legal_documents'], buckets: [] },
     { key: 'activity_log', label: 'Admin Activity Log', tables: ['admin_activity_log'], buckets: [] },
+    // New entries for specific analytics data feeding the dashboard overview
+    { key: 'project_views_analytics', label: 'Project Views Data (Analytics)', tables: ['project_views'], buckets: [] },
+    { key: 'skill_interactions_analytics', label: 'Skill Interactions Data (Analytics)', tables: ['skill_interactions'], buckets: [] },
+    { key: 'resume_downloads_analytics', label: 'Resume Downloads Data (Analytics)', tables: ['resume_downloads'], buckets: [] },
   ] as const; 
   
 type DeletableSectionKey = typeof deletableSectionsConfig[number]['key'];
@@ -101,7 +106,6 @@ export default function AdminDashboardPage() {
   const [isLoadingSettings, setIsLoadingSettings] = useState(false);
   const [maintenanceMessageInput, setMaintenanceMessageInput] = useState('');
 
-  // State for "Delete Selected Sections" feature
   const [selectedSectionsForDeletion, setSelectedSectionsForDeletion] = useState<Record<DeletableSectionKey, boolean>>(
     deletableSectionsConfig.reduce((acc, section) => ({ ...acc, [section.key]: false }), {} as Record<DeletableSectionKey, boolean>)
   );
@@ -111,6 +115,7 @@ export default function AdminDashboardPage() {
   const [deleteCountdown, setDeleteCountdown] = useState(5);
   const [isDeletingData, setIsDeletingData] = useState(false);
   const deleteCountdownIntervalRef = React.useRef<NodeJS.Timeout | null>(null);
+  const [authListener, setAuthListener] = useState<any>(null); // To store the auth subscription
 
 
   useEffect(() => {
@@ -135,15 +140,16 @@ export default function AdminDashboardPage() {
         setPasswordInput('');   
         setError('');      
         setActiveSection('dashboard'); 
+        router.replace('/admin/dashboard'); // Ensure redirect to login view on sign out
       } else if (event === 'SIGNED_IN' && session?.user) {
          if (activeSection === 'settings') { 
              fetchSiteSettings();
          }
       } else if (event === 'USER_UPDATED' && session?.user) {
-        // Update current user if email changes while logged in (though usually requires re-login)
         setCurrentUser(session.user);
       }
     });
+    setAuthListener(subscription); // Store the subscription
     
     const getInitialSession = async () => {
         console.log("[AdminDashboardPage] Checking initial session on mount.");
@@ -168,16 +174,16 @@ export default function AdminDashboardPage() {
 
     return () => {
       console.log("[AdminDashboardPage] Unmounting, unsubscribing auth listener.");
-      subscription?.unsubscribe();
+      authListener?.unsubscribe(); // Correctly unsubscribe
       if (deleteCountdownIntervalRef.current) {
         clearInterval(deleteCountdownIntervalRef.current);
       }
     };
-  }, [activeSection]); 
+  }, [activeSection, router, authListener]); // Added authListener and router to dependency array
 
 
   const fetchSiteSettings = async () => {
-    if (!currentUser) return; // Ensure user is authenticated before fetching settings
+    if (!currentUser) return; 
     console.log("[AdminDashboardPage] Fetching site settings...");
     setIsLoadingSettings(true);
     const { data, error: fetchError } = await supabase
@@ -269,7 +275,7 @@ export default function AdminDashboardPage() {
     setIsLoadingAuth(true);
     
     const trimmedEmail = emailInput.trim();
-    const trimmedPassword = passwordInput.trim(); // No longer trim password, send as is
+    const trimmedPassword = passwordInput; // Password should not be trimmed before sending to Supabase Auth
 
     console.log("[AdminDashboardPage] Attempting Supabase login for email:", trimmedEmail);
     
@@ -286,18 +292,17 @@ export default function AdminDashboardPage() {
       toast({ title: "Login Failed", description: signInError.message || "Invalid login credentials.", variant: "destructive" });
     } else if (data.user) {
       console.log("[AdminDashboardPage] Supabase Login successful for user:", data.user.email);
-      // setCurrentUser and dispatchEvent are handled by onAuthStateChange listener
       toast({ title: "Login Successful", description: "Welcome to the admin dashboard." });
       try {
         await supabase.from('admin_activity_log').insert({ 
             action_type: 'ADMIN_LOGIN_SUCCESS', 
             description: `Admin "${data.user.email}" logged in successfully.`,
-            user_identifier: data.user.id // Use the actual user ID
+            user_identifier: data.user.id 
           });
       } catch (logError) {
         console.error("Error logging admin login:", logError);
       }
-      // router.replace('/admin/dashboard'); // Not needed, onAuthStateChange handles re-render
+      router.replace('/admin/dashboard'); // Re-evaluate route now that user is set
     } else {
         setError("An unexpected error occurred during login. No user data returned.");
         toast({ title: "Login Error", description: "An unexpected error occurred. Please try again.", variant: "destructive" });
@@ -306,7 +311,7 @@ export default function AdminDashboardPage() {
 
   const handleLogout = async () => {
     if (!currentUser) return;
-    const userIdForLog = currentUser.id; // Capture before currentUser becomes null
+    const userIdForLog = currentUser.id; 
     const userEmailForLog = currentUser.email || "Admin"; 
     console.log(`[AdminDashboardPage] Attempting Supabase logout for user: ${userEmailForLog}`);
     
@@ -327,7 +332,6 @@ export default function AdminDashboardPage() {
         } catch (logError) {
           console.error("Error logging admin logout:", logError);
         }
-        // onAuthStateChange will set currentUser to null and trigger UI update to login form
     }
   };
 
@@ -346,7 +350,7 @@ export default function AdminDashboardPage() {
     }
     const selected = getSelectedSectionsForDeletion();
     if (selected.length === 0) {
-        toast({ title: "No Sections Selected", description: "Please select at least one section to delete.", variant: "default"});
+        toast({ title: "No Sections Selected", description: "Please select at least one data group to delete.", variant: "default"});
         return;
     }
     setAdminPasswordConfirm('');
@@ -386,7 +390,7 @@ export default function AdminDashboardPage() {
     }, 1000);
   };
 
-  const handleFinalDeleteData = async () => {
+  const handleFinalDeleteAllData = async () => {
     if (!currentUser) {
         toast({ title: "Authentication Error", description: "Action aborted. User not authenticated.", variant: "destructive"});
         return;
@@ -400,18 +404,18 @@ export default function AdminDashboardPage() {
                                    .map(([key]) => key as DeletableSectionKey);
 
     if (selectedSectionKeys.length === 0) {
-        toast({ title: "No Sections Selected", description: "Deletion aborted. No sections were selected.", variant: "default" });
+        toast({ title: "No Sections Selected", description: "Deletion aborted. No data groups were selected.", variant: "default" });
         setShowDeleteDataConfirmModal(false);
         return;
     }
 
     setIsDeletingData(true);
-    toast({ title: "Processing Deletion", description: `Attempting to delete selected sections and associated files...`});
+    toast({ title: "Processing Deletion", description: `Attempting to delete selected data groups and associated files...`});
 
     try {
       console.log('[AdminDashboardPage] Invoking danger-delete-all-data Edge Function with sections:', selectedSectionKeys);
       const { error: functionError, data: functionData } = await supabase.functions.invoke('danger-delete-all-data', {
-        body: { sections_to_delete: selectedSectionKeys }
+        body: { sections_to_delete: selectedSectionKeys } // Send the keys of selected sections
       });
 
       if (functionError) {
@@ -419,23 +423,29 @@ export default function AdminDashboardPage() {
         let detailedMessage = functionError.message || "Function invocation failed.";
         if (functionError.message?.includes("Function not found")) {
             detailedMessage = "The 'danger-delete-all-data' Edge Function could not be found. Ensure it's deployed.";
+        } else if (functionError.name === 'FunctionsHttpError' || functionError.name === 'FunctionsRelayError' || functionError.name === 'FunctionsFetchError') {
+             const context = (functionError as any).context;
+             if (!context || Object.keys(context).length === 0 || (context.message && context.message.includes("Failed to fetch"))) {
+                 detailedMessage = "Edge Function call failed or returned an error. Check Supabase Edge Function logs for details (e.g., missing secrets, code errors, CORS, or network issues).";
+             } else if (context.message) {
+                 detailedMessage = `Edge Function Error: ${context.message}`;
+             }
         }
         throw new Error(detailedMessage);
       }
       
       if (functionData && functionData.error) {
          console.error("[AdminDashboardPage] Error returned from Edge Function logic:", JSON.stringify(functionData.error, null, 2));
-         throw new Error(typeof functionData.error === 'string' ? functionData.error : "An error occurred in the Edge Function.");
+         throw new Error(typeof functionData.error === 'string' ? functionData.error : "An error occurred in the Edge Function's data deletion logic.");
       }
 
-      toast({ title: "Success", description: functionData?.message || "Selected sections deletion process initiated successfully.", duration: 7000 });
+      toast({ title: "Success", description: functionData?.message || "Selected data groups deletion process initiated successfully.", duration: 7000 });
       await supabase.from('admin_activity_log').insert({
         action_type: 'DATA_DELETION_INITIATED_SELECTIVE',
-        description: `Admin initiated deletion for sections: ${selectedSectionKeys.join(', ')}.`,
+        description: `Admin initiated deletion for data groups: ${selectedSectionKeys.join(', ')}.`,
         user_identifier: currentUser.id,
         details: { deleted_sections: selectedSectionKeys }
       });
-      // Reset toggles
       setSelectedSectionsForDeletion(deletableSectionsConfig.reduce((acc, section) => ({ ...acc, [section.key]: false }), {} as Record<DeletableSectionKey, boolean>));
       router.refresh(); 
     } catch (err: any) {
@@ -492,7 +502,6 @@ export default function AdminDashboardPage() {
   }
 
   const selectedSectionLabels = getSelectedSectionsForDeletion().map(s => s.label).join(', ');
-
 
   return (
     <AdminPageLayout
@@ -582,10 +591,10 @@ export default function AdminDashboardPage() {
                 </CardHeader>
                 <CardContent>
                     <div className="space-y-4">
-                        <h4 className="font-semibold text-lg text-destructive">Select Sections for Deletion</h4>
+                        <h4 className="font-semibold text-lg text-destructive">Select Data Groups for Deletion</h4>
                         <p className="text-sm text-destructive/80 mb-3">
-                            Toggle the switches for each section you wish to permanently delete data from. This includes database records AND associated files in Supabase Storage (e.g., project images, uploaded icons). 
-                            This action does **not** delete your admin profile or core site settings (like maintenance mode status).
+                            Toggle switches for data groups you wish to permanently delete. This includes database records AND associated files in Supabase Storage. 
+                            This action does **not** delete your admin profile or core site settings (like maintenance mode status itself).
                         </p>
                         <ScrollArea className="h-[300px] w-full p-4 border rounded-md bg-destructive/5">
                             <div className="space-y-3">
@@ -612,7 +621,7 @@ export default function AdminDashboardPage() {
                             className="w-full sm:w-auto"
                         >
                             {isDeletingData ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
-                            Delete Selected Sections & Files
+                            Delete Selected Data Groups & Files
                         </Button>
                          {getSelectedSectionsForDeletion().length > 0 && (
                             <p className="text-xs text-destructive/70 mt-1">
@@ -662,7 +671,7 @@ export default function AdminDashboardPage() {
           <AlertDialogHeader>
             <AlertDialogPrimitiveTitle className="text-destructive-foreground">FINAL CONFIRMATION: DELETE SELECTED DATA & FILES?</AlertDialogPrimitiveTitle>
             <AlertDialogDescription className="text-destructive-foreground/90">
-              You are about to permanently delete all data for the following sections: <strong className="text-destructive-foreground">{selectedSectionLabels || 'None Selected (Error - should not happen)'}</strong>. 
+              You are about to permanently delete all data for the following groups: <strong className="text-destructive-foreground">{selectedSectionLabels || 'None Selected (Error - should not happen)'}</strong>. 
               This includes database records AND associated files from Supabase Storage. This action is **IRREVERSIBLE**.
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -680,7 +689,7 @@ export default function AdminDashboardPage() {
               className={cn(buttonVariants({ variant: "outline" }), "border-destructive-foreground/40 text-destructive-foreground", "hover:bg-destructive-foreground/10 hover:text-destructive-foreground hover:border-destructive-foreground/60")}
             >Cancel</AlertDialogCancel>
             <AlertDialogAction 
-              onClick={handleFinalDeleteData} 
+              onClick={handleFinalDeleteAllData} 
               disabled={deleteCountdown > 0 || isDeletingData}
               className={cn(
                 buttonVariants({ variant: "default" }), 
@@ -690,14 +699,11 @@ export default function AdminDashboardPage() {
               )}
             >
               {isDeletingData ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-              Confirm Deletion of Selected Sections
+              Confirm Deletion of Selected Data Groups
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-
     </AdminPageLayout>
   );
 }
-
-    
