@@ -89,7 +89,7 @@ export default function ContactManager() {
   const [isSendingReply, setIsSendingReply] = useState(false);
 
   const fetchContactDetails = async () => { setIsLoadingContactDetails(true); const { data, error } = await supabase.from('contact_page_details').select('*').eq('id', PRIMARY_CONTACT_DETAILS_ID).maybeSingle(); if (error) {toast({ title: "Error", description: `Could not fetch contact details: ${error.message}`, variant: "destructive" }); console.error("Error fetching contact details:", error);} else if (data) contactDetailsForm.reset(data as ContactPageDetailsFormData); setIsLoadingContactDetails(false); };
-  const fetchSocialLinks = async () => { setIsLoadingSocialLinks(true); const { data, error } = await supabase.from('social_links').select('id, label, icon_image_url, url, display_text, sort_order').order('sort_order', { ascending: true }); if (error) { toast({ title: "Error", description: `Could not fetch social links: ${error.message}`, variant: "destructive" }); console.error("Error fetching social links:", error); } else setSocialLinks((data || []).map(link => ({ ...link, icon_image_url: link.icon_image_url || null }))); setIsLoadingSocialLinks(false);};
+  const fetchSocialLinks = async () => { setIsLoadingSocialLinks(true); const { data, error } = await supabase.from('social_links').select('*').order('sort_order', { ascending: true }); if (error) { toast({ title: "Error", description: `Could not fetch social links: ${error.message}`, variant: "destructive" }); console.error("Error fetching social links:", error); } else setSocialLinks((data || []).map(link => ({ ...link, icon_image_url: link.icon_image_url || null }))); setIsLoadingSocialLinks(false);};
   const fetchSubmissions = async () => { setIsLoadingSubmissions(true); let query = supabase.from('contact_submissions').select('*').order('submitted_at', { ascending: false }); if (statusFilter !== 'All') { query = query.eq('status', statusFilter); } const { data, error } = await query; if (error) {toast({ title: "Error", description: `Could not fetch submissions: ${error.message}`, variant: "destructive" }); console.error("Error fetching submissions:", error); } else setSubmissions(data || []); setIsLoadingSubmissions(false); };
 
   useEffect(() => { fetchContactDetails(); fetchSocialLinks(); }, []);
@@ -117,11 +117,10 @@ export default function ContactManager() {
     setIsReplyModalOpen(true);
   };
 
-  const handleSendReply = async () => {
-    if (!submissionToReplyTo?.id || !submissionToReplyTo?.email || !submissionToReplyTo?.name) {
-      toast({ title: "Reply Error", description: "Cannot send reply: critical submission information is missing.", variant: "destructive" });
-      console.error("Critical submission info missing for reply:", submissionToReplyTo);
-      setIsSendingReply(false);
+ const handleSendReply = async () => {
+    if (!submissionToReplyTo || !submissionToReplyTo.id || !submissionToReplyTo.email || !submissionToReplyTo.name) {
+      toast({ title: "Reply Error", description: "Critical submission information is missing. Cannot send reply.", variant: "destructive" });
+      console.error("[ContactManager] Critical submission info missing for reply:", submissionToReplyTo);
       return;
     }
     if (!replyMessage.trim()) {
@@ -146,23 +145,22 @@ export default function ContactManager() {
       if (functionError) {
         console.error("[ContactManager] Error invoking Edge Function (raw):", JSON.stringify(functionError, null, 2));
         let specificMessage = "Failed to send reply. Edge Function call failed.";
-        // Attempt to get more specific error message if available from Supabase's FunctionError structure
         if (typeof functionError === 'object' && functionError !== null) {
-          if ('message' in functionError && typeof (functionError as any).message === 'string') {
+          if ('message' in functionError && typeof (functionError as any).message === 'string' && (functionError as any).message.length > 0) {
             specificMessage = (functionError as any).message;
-          } else if ('details' in functionError && typeof (functionError as any).details === 'string') {
-            specificMessage = (functionError as any).details;
+          } else if (functionError.name === 'FunctionsHttpError' && Object.keys(functionError).length > 0 && (functionError as any).context && Object.keys((functionError as any).context).length === 0) {
+            specificMessage = "Edge Function call failed or returned an error. Please check Supabase Edge Function logs for details (e.g., missing secrets, code errors, CORS, or email provider issues).";
           } else if (functionError.name === 'FunctionsHttpError' || functionError.name === 'FunctionsRelayError' || functionError.name === 'FunctionsFetchError') {
-            specificMessage = "Failed to communicate with the reply service. Please check Edge Function status and logs in Supabase.";
+            specificMessage = "Communication error with the reply service. Please check Supabase Edge Function status and logs, and ensure it's deployed correctly.";
           }
         }
         toast({
           title: "Reply Service Error",
           description: specificMessage,
           variant: "destructive",
-          duration: 9000
+          duration: 12000 // Increased duration for more complex message
         });
-        setIsSendingReply(false); // Ensure loading state is reset on functionError
+        setIsSendingReply(false);
         return; 
       }
       
@@ -171,14 +169,14 @@ export default function ContactManager() {
          toast({ title: "Reply Service Error", description: `Edge Function reported: ${typeof functionData.error === 'string' ? functionData.error : JSON.stringify(functionData.error)}. Please check Edge Function logs.`, variant: "destructive", duration: 9000 });
       } else {
         toast({ 
-            title: "Reply Processed by Server", 
-            description: functionData?.message || `Your reply to ${submissionToReplyTo.email} has been processed. Submission status will update.`, 
+            title: "Reply Processed", // Changed from "Reply Processed by Server"
+            description: functionData?.message || `Your reply to ${submissionToReplyTo.email} has been processed.`, 
             variant: "default",
             duration: 7000 
         });
         setIsReplyModalOpen(false);
         setReplyMessage('');
-        fetchSubmissions(); // Re-fetch submissions to update status and notes
+        fetchSubmissions();
       }
     } catch (err: any) {
       console.error("[ContactManager] Unexpected error during send reply:", err);
@@ -335,7 +333,7 @@ export default function ContactManager() {
                         <img src={watchedSocialLinkIconUrlInModal} alt="Icon Preview" className="h-6 w-6 object-contain border rounded-sm bg-muted" />
                     </div>
                 ) : (
-                    <div className="mt-2 text-xs text-muted-foreground">No preview available or invalid URL.</div>
+                    <div className="mt-2 text-xs text-muted-foreground">No preview for Icon Image URL.</div>
                 )}
               </div>
               <div><Label htmlFor="social_url">URL <span className="text-destructive">*</span></Label><Input id="social_url" type="url" {...socialLinkForm.register("url")} placeholder="https://www.example.com" />{socialLinkForm.formState.errors.url && <p className="text-destructive text-sm mt-1">{socialLinkForm.formState.errors.url.message}</p>}</div>
