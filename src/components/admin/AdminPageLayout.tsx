@@ -5,7 +5,7 @@ import Link from 'next/link';
 import NextImage from 'next/image';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { 
-  Sheet, SheetContent, SheetHeader, SheetTrigger,
+  Sheet, SheetContent, SheetHeader as SheetPrimitiveHeader, SheetTrigger,
   SheetTitle as SheetPrimitiveTitle,
   SheetDescription, SheetFooter
 } from '@/components/ui/sheet';
@@ -20,7 +20,7 @@ import {
   AlertDialogContent,
   AlertDialogDescription,
   AlertDialogFooter,
-  AlertDialogHeader as AlertDialogPrimitiveHeader, 
+  AlertDialogHeader, // Added AlertDialogHeader here
   AlertDialogTitle as AlertDialogPrimitiveAlertDialogTitle, 
 } from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
@@ -45,6 +45,8 @@ import { useTheme } from '@/contexts/ThemeProvider';
 import { cn } from '@/lib/utils';
 import React, { useState, useEffect, type ChangeEvent, type ReactNode, useCallback } from 'react';
 import { format, parseISO, isValid as isValidDate } from 'date-fns';
+import * as AccordionPrimitive from "@radix-ui/react-accordion";
+
 
 const ADMIN_PROFILE_ID = '00000000-0000-0000-0000-00000000000A'; 
 
@@ -92,7 +94,7 @@ const SidebarContent = ({
           }}
           aria-label="Go to admin dashboard"
         >
-          <div className={cn(
+           <div className={cn(
             "relative rounded-full overflow-hidden border border-sidebar-accent flex-shrink-0",
             isCollapsed && !isMobile ? "h-8 w-8" : "h-10 w-10"
           )}>
@@ -130,7 +132,7 @@ const SidebarContent = ({
                     ? "bg-sidebar-primary text-sidebar-primary-foreground font-semibold"
                     : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
                   isCollapsed && !isMobile
-                    ? "justify-center py-2.5 px-0"
+                    ? "justify-center py-2.5 px-0" 
                     : "justify-start py-2.5 px-3"
                 )}
                 onClick={() => {
@@ -172,7 +174,7 @@ const SidebarContent = ({
                   ? "bg-sidebar-primary text-sidebar-primary-foreground font-semibold"
                   : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
                 isCollapsed && !isMobile
-                  ? "justify-center py-2.5 px-0"
+                  ? "justify-center py-2.5 px-0" 
                   : "justify-start py-2.5 px-3"
               )}
               onClick={() => {
@@ -243,7 +245,7 @@ export default function AdminPageLayout({
   // State for Account Settings Modal (Email & Password)
   const [isAccountSettingsModalOpen, setIsAccountSettingsModalOpen] = useState(false);
   const [newEmailInput, setNewEmailInput] = useState('');
-  const [confirmNewEmailInput, setConfirmNewEmailInput] = useState(''); // New state for confirm email
+  const [confirmNewEmailInput, setConfirmNewEmailInput] = useState('');
   const [emailChangeError, setEmailChangeError] = useState('');
   const [isChangingEmail, setIsChangingEmail] = useState(false);
   const [newPassword, setNewPassword] = useState('');
@@ -368,6 +370,7 @@ export default function AdminPageLayout({
         toast({ title: "Authentication Error", description: "You must be logged in to clear logs.", variant: "destructive" });
         setIsLoadingActivities(false); return;
     }
+    // Using .neq to delete all rows; adjust if your 'id' can be '000...'
     const { error } = await supabase.from('admin_activity_log').delete().neq('id', '00000000-0000-0000-0000-000000000000'); 
     if (error) {
       console.error("Error clearing activity log:", error);
@@ -499,7 +502,7 @@ export default function AdminPageLayout({
       try {
          await supabase.from('admin_activity_log').insert({ 
             action_type: 'PROFILE_PHOTO_UPDATED', 
-            description: `Admin profile photo updated.`,
+            description: `Admin profile photo updated by ${userForDbUpdate.email}.`,
             user_identifier: userForDbUpdate.id
         });
       } catch(logError) {
@@ -561,7 +564,7 @@ export default function AdminPageLayout({
       try {
         await supabase.from('admin_activity_log').insert({ 
             action_type: 'PROFILE_PHOTO_REMOVED', 
-            description: `Admin profile photo removed.`,
+            description: `Admin profile photo removed by ${userForDelete.email}.`,
             user_identifier: userForDelete.id
         });
       } catch(logError) {
@@ -575,13 +578,13 @@ export default function AdminPageLayout({
   const handleChangeEmail = async () => {
     setEmailChangeError('');
     const trimmedNewEmail = newEmailInput.trim();
-    const trimmedConfirmEmail = confirmNewEmailInput.trim(); // Trim confirm email
+    const trimmedConfirmEmail = confirmNewEmailInput.trim();
 
     if (!trimmedNewEmail || !/\S+@\S+\.\S+/.test(trimmedNewEmail)) {
       setEmailChangeError("Please enter a valid new email address.");
       return;
     }
-    if (trimmedNewEmail !== trimmedConfirmEmail) { // Compare trimmed values
+    if (trimmedNewEmail !== trimmedConfirmEmail) {
         setEmailChangeError("New email and confirmation email do not match.");
         return;
     }
@@ -597,7 +600,7 @@ export default function AdminPageLayout({
 
     try {
       const { data: functionData, error: functionError } = await supabase.functions.invoke('admin-update-user-email', {
-        body: { newEmail: trimmedNewEmail },
+        body: { newEmail: trimmedNewEmail }, // userId is implicitly taken from the invoking user's JWT
       });
 
       if (functionError) {
@@ -612,21 +615,21 @@ export default function AdminPageLayout({
       }
 
       toast({
-        title: "Email Change Initiated",
+        title: "Email Change Processed",
         description: functionData?.message || "Email/username change processed successfully. You may need to log out and log back in with the new email.",
         duration: 10000,
       });
 
       await supabase.from('admin_activity_log').insert({
         action_type: 'ADMIN_EMAIL_CHANGED_VIA_FUNCTION',
-        description: `Admin email/username changed from ${username || 'unknown'} to ${trimmedNewEmail} via Edge Function.`,
+        description: `Admin email/username changed from ${username || 'unknown'} to ${trimmedNewEmail} via Edge Function for user ${currentUserForEmailChange.id}.`,
         user_identifier: currentUserForEmailChange.id,
         details: { old_email: username, new_email: trimmedNewEmail }
       });
       
       setNewEmailInput('');
       setConfirmNewEmailInput('');
-      // Prompt user to log out and log back in if necessary, or rely on onAuthStateChange to handle session.
+      // setIsAccountSettingsModalOpen(false); // Consider if modal should close or user explicitly does
     } catch (error: any) {
       const message = error.message || "An unexpected error occurred while changing email.";
       setEmailChangeError(message);
@@ -662,7 +665,7 @@ export default function AdminPageLayout({
       try {
         await supabase.from('admin_activity_log').insert({ 
             action_type: 'ADMIN_PASSWORD_CHANGED', 
-            description: `Admin password changed.`, 
+            description: `Admin password changed by ${currentUserForPasswordChange.email}.`, 
             user_identifier: currentUserForPasswordChange.id 
         });
       } catch(logError) {
@@ -740,10 +743,10 @@ export default function AdminPageLayout({
                 </Button>
               </SheetTrigger>
               <SheetContent side="right" className="w-[350px] sm:w-[400px] p-0 flex flex-col">
-                <SheetHeader className="p-4 border-b">
+                <SheetPrimitiveHeader className="p-4 border-b">
                   <SheetPrimitiveTitle className="flex items-center"><History className="mr-2 h-5 w-5"/>Recent Activity</SheetPrimitiveTitle>
                   <SheetDescription>Latest updates and actions in the admin panel.</SheetDescription>
-                </SheetHeader>
+                </SheetPrimitiveHeader>
                 <ScrollArea className="flex-grow p-4">
                   {isLoadingActivities ? (
                     <p className="text-muted-foreground text-center py-4">Loading activities...</p>
@@ -892,7 +895,7 @@ export default function AdminPageLayout({
                   Request Email Change
                 </Button>
                  <p className="text-xs text-muted-foreground">
-                    Your email/username will be updated directly by an admin function. You may need to log out and log back in.
+                    Your email/username will be updated by an admin function. You may need to log out and log back in.
                 </p>
               </CardContent>
             </Card>
@@ -953,3 +956,4 @@ export default function AdminPageLayout({
     </>
   );
 }
+
