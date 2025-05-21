@@ -5,11 +5,13 @@ import Link from 'next/link';
 import NextImage from 'next/image';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { 
-  Sheet, SheetContent, SheetHeader, SheetTitle as SheetPrimitiveTitle, SheetTrigger,
+  Sheet, SheetContent, SheetHeader, SheetTrigger,
+  SheetTitle as SheetPrimitiveTitle, // Renamed to avoid conflict if DialogTitle also used
   SheetDescription, SheetFooter
 } from '@/components/ui/sheet';
 import {
-  Dialog, DialogContent, DialogDescription, DialogFooter as DialogPrimitiveFooter, DialogHeader as DialogPrimitiveHeader, DialogTitle as DialogPrimitiveDialogTitle, DialogClose
+  Dialog, DialogContent, DialogDescription, DialogFooter as DialogPrimitiveFooter, 
+  DialogHeader as DialogPrimitiveHeader, DialogTitle as DialogPrimitiveDialogTitle, DialogClose
 } from "@/components/ui/dialog";
 import {
   AlertDialog,
@@ -18,8 +20,8 @@ import {
   AlertDialogContent,
   AlertDialogDescription,
   AlertDialogFooter,
-  AlertDialogHeader as AlertDialogPrimitiveHeader,
-  AlertDialogTitle as AlertDialogPrimitiveAlertDialogTitle,
+  AlertDialogHeader as AlertDialogPrimitiveHeader, // Renamed
+  AlertDialogTitle as AlertDialogPrimitiveAlertDialogTitle, // Renamed
 } from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -32,7 +34,7 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
-import { Card, CardContent, CardHeader as CardPrimitiveHeader, CardTitle as CardPrimitiveCardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader as CardPrimitiveHeader, CardTitle as CardPrimitiveCardTitle } from '@/components/ui/card'; // Aliased CardHeader and CardTitle
 import {
   Menu, X, Sun, Moon,
   LogOut as LogoutIcon, Bell as BellIcon, UserCircle, Settings as SettingsIcon,
@@ -50,7 +52,7 @@ export interface AdminNavItem {
   key: string;
   label: string;
   icon: LucideIcon;
-  href?: string; // Optional, if direct navigation is needed for some items
+  href?: string; 
 }
 
 interface SidebarContentProps {
@@ -95,7 +97,7 @@ const SidebarContent = ({
             isCollapsed && !isMobile ? "h-8 w-8" : "h-10 w-10"
           )}>
             <NextImage
-              src="/logo.png"
+              src="/logo.png" // Assuming logo.png is in public folder
               alt="Portfolio Logo"
               fill
               className="object-contain"
@@ -113,7 +115,7 @@ const SidebarContent = ({
       <ScrollArea className="flex-grow">
         <nav className={cn(
           "space-y-1",
-          isCollapsed && !isMobile ? "px-4 py-2" : "px-4 py-2" 
+          isCollapsed && !isMobile ? "px-2 py-2" : "px-4 py-2"
         )}>
           {navItems.filter(item => item.key !== 'settings').map((item) => {
             const Icon = item.icon;
@@ -128,8 +130,8 @@ const SidebarContent = ({
                     ? "bg-sidebar-primary text-sidebar-primary-foreground font-semibold"
                     : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
                   isCollapsed && !isMobile
-                    ? "justify-center py-2.5 px-0" 
-                    : "justify-start py-2.5 px-3" 
+                    ? "justify-center py-2.5 px-0"
+                    : "justify-start py-2.5 px-3"
                 )}
                 onClick={() => {
                   onSelectSection(item.key);
@@ -153,7 +155,7 @@ const SidebarContent = ({
 
       <div className={cn(
           "mt-auto border-t border-sidebar-border shrink-0",
-           isCollapsed && !isMobile ? "px-4 py-2" : "px-4 py-2" 
+           isCollapsed && !isMobile ? "px-2 py-2" : "px-4 py-2"
       )}>
         {(() => {
           const settingsItem = navItems.find(item => item.key === 'settings');
@@ -231,19 +233,23 @@ export default function AdminPageLayout({
 
   const [profilePhotoUrl, setProfilePhotoUrl] = useState<string | null>(null);
   const [currentDbProfilePhotoUrl, setCurrentDbProfilePhotoUrl] = useState<string | null>(null);
+  
   const [isPhotoModalOpen, setIsPhotoModalOpen] = useState(false);
+  const [isAccountSettingsModalOpen, setIsAccountSettingsModalOpen] = useState(false);
+
   const [profilePhotoFile, setProfilePhotoFile] = useState<File | null>(null);
   const [profilePhotoPreview, setProfilePhotoPreview] = useState<string | null>(null);
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
   
-  const [isAccountSettingsModalOpen, setIsAccountSettingsModalOpen] = useState(false);
   const [newEmailInput, setNewEmailInput] = useState('');
   const [emailChangeError, setEmailChangeError] = useState('');
   const [isChangingEmail, setIsChangingEmail] = useState(false);
+
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [passwordChangeError, setPasswordChangeError] = useState('');
   const [isChangingPassword, setIsChangingPassword] = useState(false);
+
 
   const fetchAdminProfile = useCallback(async () => {
     const { data: { user: currentUser } } = await supabase.auth.getUser();
@@ -253,7 +259,7 @@ export default function AdminPageLayout({
         setProfilePhotoPreview(null);
         return;
     }
-    console.log("[AdminPageLayout] Fetching admin profile for ID:", ADMIN_PROFILE_ID);
+    console.log("[AdminPageLayout] Fetching admin profile for fixed ID:", ADMIN_PROFILE_ID);
     const { data, error } = await supabase
       .from('admin_profile')
       .select('profile_photo_url')
@@ -263,12 +269,10 @@ export default function AdminPageLayout({
     if (error) {
       console.error("[AdminPageLayout] Error fetching admin profile photo:", JSON.stringify(error, null, 2));
     } else if (data && data.profile_photo_url) {
-      console.log("[AdminPageLayout] Fetched profile photo URL:", data.profile_photo_url);
       setProfilePhotoUrl(data.profile_photo_url);
       setCurrentDbProfilePhotoUrl(data.profile_photo_url);
       setProfilePhotoPreview(data.profile_photo_url); 
     } else {
-      console.log("[AdminPageLayout] No profile photo found in DB or data is null.");
       setProfilePhotoUrl(null);
       setCurrentDbProfilePhotoUrl(null);
       setProfilePhotoPreview(null);
@@ -285,14 +289,11 @@ export default function AdminPageLayout({
     }
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === 'USER_UPDATED') { // Specifically listen for user updates which happen after email change
-        fetchAdminProfile(); // Refetch admin profile
+      if (event === 'USER_UPDATED' || event === 'SIGNED_IN') { 
+        fetchAdminProfile();
         if (session?.user?.email && username !== session.user.email) {
-          // Dispatch event to potentially update username display in AdminDashboardPage
            window.dispatchEvent(new CustomEvent('authChange', { detail: { isAdminAuthenticated: true, username: session.user.email } }));
         }
-      } else if (event === 'SIGNED_IN') {
-        fetchAdminProfile();
       } else if (event === 'SIGNED_OUT') {
         setProfilePhotoUrl(null);
         setCurrentDbProfilePhotoUrl(null);
@@ -449,7 +450,7 @@ export default function AdminPageLayout({
       console.log('[AdminPageLayout] Attempting to upload profile photo:', fileName, 'to bucket: admin-profile-photos');
       const { data: uploadData, error: uploadError } = await supabase.storage
         .from('admin-profile-photos')
-        .upload(fileName, profilePhotoFile, { cacheControl: '3600', upsert: true }); // Using upsert: true can simplify logic for overwriting
+        .upload(fileName, profilePhotoFile, { cacheControl: '3600', upsert: true });
 
       if (uploadError) {
         console.error("[AdminPageLayout] Error uploading profile photo to storage:", JSON.stringify(uploadError, null, 2));
@@ -465,7 +466,6 @@ export default function AdminPageLayout({
       }
       newPhotoUrlToSave = publicUrlData.publicUrl;
       
-      // If a new photo was uploaded and there was an old one DIFFERENT from the new one, delete the old one.
       if (oldImageStoragePathToDelete && oldImageStoragePathToDelete !== fileName && newPhotoUrlToSave !== currentDbProfilePhotoUrl) {
           console.log("[AdminPageLayout] New photo uploaded, attempting to delete old photo:", oldImageStoragePathToDelete);
           const { error: storageDeleteError } = await supabase.storage.from('admin-profile-photos').remove([oldImageStoragePathToDelete]);
@@ -477,7 +477,7 @@ export default function AdminPageLayout({
       }
     }
     
-    console.log('[AdminPageLayout] Updating admin_profile with photo URL:', newPhotoUrlToSave, 'for ID:', ADMIN_PROFILE_ID);
+    console.log('[AdminPageLayout] Attempting to update admin_profile with photo URL:', newPhotoUrlToSave, 'for ID:', ADMIN_PROFILE_ID);
     console.log('[AdminPageLayout] Current user for DB update:', userForDbUpdate?.email, 'User ID:', userForDbUpdate?.id);
 
     const { error: dbError } = await supabase
@@ -568,48 +568,66 @@ export default function AdminPageLayout({
       }
     }
     setIsUploadingPhoto(false);
-    setIsPhotoModalOpen(false); // Close modal after deletion
+    setIsPhotoModalOpen(false); 
   };
 
   const handleChangeEmail = async () => {
     setEmailChangeError('');
     if (!newEmailInput.trim() || !/\S+@\S+\.\S+/.test(newEmailInput.trim())) {
       setEmailChangeError("Please enter a valid new email address.");
+      setIsChangingEmail(false); // Ensure loading state is reset
       return;
     }
     setIsChangingEmail(true);
     const { data: { user: currentUserForEmailChange } } = await supabase.auth.getUser();
+
     if (!currentUserForEmailChange || !currentUserForEmailChange.id) {
-        toast({ title: "Auth Error", description: "Please log in again to change email.", variant: "destructive"});
+        toast({ title: "Auth Error", description: "User session not found. Please log in again.", variant: "destructive"});
         setIsChangingEmail(false); return;
     }
-    const { error } = await supabase.auth.updateUser({ email: newEmailInput.trim() });
+    
+    console.log(`[AdminPageLayout] Invoking 'admin-update-user-email' Edge Function with newEmail: ${newEmailInput.trim()} for user ID: ${currentUserForEmailChange.id}`);
 
-    if (error) {
-      setEmailChangeError(`Failed to initiate email change: ${error.message}`);
-      toast({ title: "Email Change Failed", description: error.message, variant: "destructive" });
-    } else {
-      // If "Secure email change" is disabled in Supabase, the email updates immediately.
-      // If it's enabled, Supabase handles sending confirmation to old/new emails.
-      // The toast message needs to reflect the possibility of immediate change or confirmation step.
-      toast({ 
-          title: "Email Change Processed", 
-          description: "Your request to change email has been processed. If email confirmation is enabled in your project settings, please check both your old and new email addresses for confirmation links. Otherwise, the change is immediate. You may need to log in again.", 
-          duration: 10000 
+    try {
+      const { data: functionData, error: functionError } = await supabase.functions.invoke('admin-update-user-email', {
+        body: { newEmail: newEmailInput.trim() }, // userId will be derived from JWT in Edge Function
       });
-      try {
-        await supabase.from('admin_activity_log').insert({ 
-            action_type: 'ADMIN_EMAIL_CHANGE_REQUESTED', 
-            description: `Admin initiated email change from ${currentUserForEmailChange.email || 'Unknown Email'} to ${newEmailInput.trim()}.`,
-            user_identifier: currentUserForEmailChange.id,
-            details: { old_email: currentUserForEmailChange.email, new_email: newEmailInput.trim() }
-        });
-      } catch(logError) {
-        console.error("Error logging email change request:", logError);
+
+      if (functionError) {
+        console.error("[AdminPageLayout] Error invoking 'admin-update-user-email' Edge Function:", functionError);
+        const message = functionError.message || (typeof functionError === 'object' && (functionError as any).details) || "Failed to invoke email update service. Check Edge Function logs.";
+        throw new Error(message);
       }
+
+      if (functionData?.error) {
+        console.error("[AdminPageLayout] Error response from 'admin-update-user-email' Edge Function:", functionData.error);
+        throw new Error(functionData.error || "An error occurred within the email update service.");
+      }
+
+      toast({
+        title: "Email Changed Successfully",
+        description: functionData?.message || "Your email/username has been updated. You may need to log out and log back in with the new email for all changes to take effect.",
+        duration: 10000,
+      });
+
+      await supabase.from('admin_activity_log').insert({
+        action_type: 'ADMIN_EMAIL_CHANGED_VIA_FUNCTION',
+        description: `Admin email/username changed from ${username || 'unknown'} to ${newEmailInput.trim()} via Edge Function.`,
+        user_identifier: currentUserForEmailChange.id,
+        details: { old_email: username, new_email: newEmailInput.trim() }
+      });
+      
       setNewEmailInput('');
+      // It's best to prompt the user to log out and log back in.
+      // The 'authChange' event might not correctly update the displayed username in the header
+      // until a full session refresh with the new email.
+    } catch (error: any) {
+      const message = error.message || "An unexpected error occurred while changing email.";
+      setEmailChangeError(message);
+      toast({ title: "Email Change Failed", description: message, variant: "destructive" });
+    } finally {
+      setIsChangingEmail(false);
     }
-    setIsChangingEmail(false);
   };
 
   const handleChangePassword = async () => {
@@ -638,7 +656,7 @@ export default function AdminPageLayout({
       try {
         await supabase.from('admin_activity_log').insert({ 
             action_type: 'ADMIN_PASSWORD_CHANGED', 
-            description: `Admin password changed.`, // Description generalized for security
+            description: `Admin password changed.`, 
             user_identifier: currentUserForPasswordChange.id 
         });
       } catch(logError) {
@@ -702,10 +720,10 @@ export default function AdminPageLayout({
 
       <div className={cn(
         "flex flex-col flex-1 overflow-hidden transition-all duration-300 ease-in-out min-w-0",
-        "bg-background text-foreground" 
+        "bg-background text-foreground" // Changed from bg-sidebar
       )}>
         <header className="sticky top-0 z-40 flex h-16 items-center justify-between border-b border-border bg-card px-4 md:px-6 shrink-0">
-          <div className="md:hidden"></div> {/* Placeholder for mobile menu trigger space */}
+          <div className="md:hidden"></div> 
           <h1 className="text-xl font-semibold text-foreground">{pageTitle}</h1>
           <div className="flex items-center gap-3">
             <Sheet open={isActivitySheetOpen} onOpenChange={setIsActivitySheetOpen}>
@@ -789,7 +807,7 @@ export default function AdminPageLayout({
           </div>
         </header>
 
-        <main className={cn("flex-1 overflow-y-auto p-4 md:p-6 lg:p-8 min-w-0", "bg-background text-foreground")}>
+        <main className={cn("flex-1 overflow-y-auto p-4 md:p-6 lg:p-8 min-w-0", "bg-background text-foreground")}> {/* Ensure main content uses page background */}
           {children}
         </main>
       </div>
@@ -847,7 +865,7 @@ export default function AdminPageLayout({
           <div className="grid gap-6 py-4 px-2">
             <Card>
               <CardPrimitiveHeader>
-                <CardPrimitiveCardTitle className="text-lg flex items-center"><MailIcon className="mr-2 h-5 w-5 text-primary"/>Change Email</CardPrimitiveCardTitle>
+                <CardPrimitiveCardTitle className="text-lg flex items-center"><MailIcon className="mr-2 h-5 w-5 text-primary"/>Change Email/Username</CardPrimitiveCardTitle>
               </CardPrimitiveHeader>
               <CardContent className="space-y-4">
                 <div>
@@ -858,11 +876,10 @@ export default function AdminPageLayout({
                 </div>
                 <Button type="button" onClick={handleChangeEmail} disabled={isChangingEmail || !newEmailInput.trim()} className="w-full sm:w-auto">
                   {isChangingEmail ? <MailIcon className="mr-2 h-4 w-4 animate-spin"/> : <MailIcon className="mr-2 h-4 w-4"/>}
-                  Request Email Change
+                  Change Email
                 </Button>
                  <p className="text-xs text-muted-foreground">
-                  If "Secure email change" is disabled in Supabase settings, the email will change immediately.
-                  Otherwise, a confirmation link will be sent to the new email address. You might be logged out after confirming.
+                  Your email will be updated directly. You may need to log out and log back in with the new email.
                 </p>
               </CardContent>
             </Card>
@@ -922,5 +939,3 @@ export default function AdminPageLayout({
     </>
   );
 }
-
-    
