@@ -7,7 +7,7 @@ import { Button, buttonVariants } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
-import { PlusCircle, Edit, Trash2, Mail, Link as LinkIcon, Phone, MapPin, Save, MessageSquare, Star, Eye, Filter, Send, Image as ImageIcon } from 'lucide-react';
+import { PlusCircle, Edit, Trash2, Mail, Link as LinkIcon, Phone, MapPin, Save, MessageSquare, Star, Eye, Filter, Send, Image as ImageIcon, Loader2 } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
 import type { ContactPageDetail, SocialLink, ContactSubmission, SubmissionStatus } from '@/types/supabase';
 import {
@@ -26,7 +26,7 @@ import NextImage from 'next/image';
 import { format, parseISO, isValid } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Textarea } from '@/components/ui/textarea'; // For reply modal
+import { Textarea } from '@/components/ui/textarea';
 
 const PRIMARY_CONTACT_DETAILS_ID = '00000000-0000-0000-0000-000000000005';
 
@@ -44,7 +44,7 @@ type ContactPageDetailsFormData = z.infer<typeof contactPageDetailsSchema>;
 const socialLinkSchema = z.object({
   id: z.string().uuid().optional(),
   label: z.string().min(1, "Label is required"),
-  icon_image_url: z.string().url("Must be a valid URL if an image URL is provided.").optional().or(z.literal("")).nullable(), // Changed from icon_name
+  icon_image_url: z.string().url("Must be a valid URL if an image URL is provided.").optional().or(z.literal("")).nullable(),
   url: z.string().url("Must be a valid URL"),
   display_text: z.string().optional().nullable(),
   sort_order: z.coerce.number().optional().default(0),
@@ -195,6 +195,50 @@ export default function ContactManager() {
     setIsReplyModalOpen(true);
   };
 
+  const handleSendReply = async () => {
+    if (!submissionToReplyTo || !replyMessage.trim()) {
+      toast({ title: "Missing Information", description: "Please enter a reply message.", variant: "destructive" });
+      return;
+    }
+    setIsSendingReply(true);
+    try {
+      console.log(`[ContactManager] Invoking 'send-contact-reply' Edge Function for submission ID: ${submissionToReplyTo.id}`);
+      const { data: functionData, error: functionError } = await supabase.functions.invoke('send-contact-reply', {
+        body: {
+          submissionId: submissionToReplyTo.id,
+          replyText: replyMessage.trim(),
+          recipientEmail: submissionToReplyTo.email,
+          recipientName: submissionToReplyTo.name,
+        },
+      });
+
+      if (functionError) {
+        console.error("[ContactManager] Error invoking Edge Function (raw):", JSON.stringify(functionError, null, 2));
+        throw functionError; // Let the catch block handle it
+      }
+      
+      if (functionData && functionData.error) {
+         console.error("[ContactManager] Error returned from Edge Function logic:", JSON.stringify(functionData.error, null, 2));
+         throw new Error(typeof functionData.error === 'string' ? functionData.error : "An error occurred in the reply Edge Function.");
+      }
+
+      toast({ title: "Reply Sent", description: functionData?.message || "Your reply has been sent successfully." });
+      setIsReplyModalOpen(false);
+      setReplyMessage('');
+      fetchSubmissions(); // Refresh submissions to show updated status
+    } catch (error: any) {
+      console.error("[ContactManager] Failed to send reply:", error);
+      let errorMessage = "Failed to send reply. Please try again.";
+      if (error.message) {
+        errorMessage = error.message;
+      } else if (typeof error === 'object' && error !== null && 'details' in error) {
+        errorMessage = (error as {details: string}).details || errorMessage;
+      }
+      toast({ title: "Error Sending Reply", description: errorMessage, variant: "destructive" });
+    } finally {
+      setIsSendingReply(false);
+    }
+  };
 
   return (
     <>
@@ -397,13 +441,10 @@ export default function ContactManager() {
               </div>
             </div>
             <DialogFooter>
-              <DialogClose asChild><Button type="button" variant="outline">Cancel</Button></DialogClose>
-              {/* The handleSendReply function and the actual Send button were removed in a previous step.
-                  This modal now only allows composing a message but not sending it via the Edge Function.
-                  To re-enable, the handleSendReply function and the "Send Reply" button need to be restored.
-              */}
-               <Button type="button" disabled={true} className="bg-muted hover:bg-muted text-muted-foreground cursor-not-allowed">
-                Send Reply (Disabled)
+              <DialogClose asChild><Button type="button" variant="outline" disabled={isSendingReply}>Cancel</Button></DialogClose>
+              <Button type="button" onClick={handleSendReply} disabled={isSendingReply || !replyMessage.trim()}>
+                {isSendingReply ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}
+                Send Reply
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -415,3 +456,5 @@ export default function ContactManager() {
     </>
   );
 }
+
+    
