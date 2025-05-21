@@ -2,7 +2,7 @@
 "use client";
 
 import { Button } from '@/components/ui/button';
-import { Download, Eye, Briefcase, GraduationCap, ListChecks, Languages as LanguagesIcon, Type as TypeIcon } from 'lucide-react'; // Added TypeIcon
+import { Download, Eye, Briefcase as DefaultExperienceIcon, GraduationCap as DefaultEducationIcon, ListChecks, Languages as DefaultLanguagesIcon, Type as DefaultCategoryIcon, LucideIcon } from 'lucide-react';
 import NextImage from 'next/image';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -12,6 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { format, parseISO, isValid } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
+import { cn } from '@/lib/utils';
 
 import type { 
   ResumeExperience, 
@@ -28,7 +29,7 @@ interface ResumeDetailItemProps {
   date?: string;
   description?: string | string[];
   iconImageUrl?: string | null;
-  DefaultIconComponent?: React.ElementType;
+  DefaultIconComponent?: React.ElementType; // For fallback if iconImageUrl is not provided
 }
 
 const ResumeDetailItem: React.FC<ResumeDetailItemProps> = ({ title, subtitle, date, description, iconImageUrl, DefaultIconComponent }) => {
@@ -36,14 +37,14 @@ const ResumeDetailItem: React.FC<ResumeDetailItemProps> = ({ title, subtitle, da
   
   const iconContent = iconImageUrl ? (
     <div className="relative h-6 w-6 rounded-sm overflow-hidden border bg-muted flex-shrink-0">
-      <NextImage src={iconImageUrl} alt={`${title} icon`} fill className="object-contain dark:filter dark:brightness-0 dark:invert" sizes="24px" />
+      {/* Removed dark:filter dark:brightness-0 dark:invert from className here */}
+      <NextImage src={iconImageUrl} alt={`${title} icon`} fill className="object-contain" sizes="24px" />
     </div>
   ) : ActualIconComponent ? (
     <ActualIconComponent className="h-6 w-6 text-primary flex-shrink-0" />
   ) : (
     <div className="h-6 w-6 text-primary flex-shrink-0"> 
-      {/* Fallback simple circle if no DefaultIconComponent and no image URL */}
-      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle></svg>
+      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"></circle></svg>
     </div>
   );
 
@@ -102,7 +103,7 @@ export default function ResumeSectionClientView({
         if (isValid(date)) {
           setFormattedLastUpdated(format(date, "MMMM d, yyyy 'at' h:mm a"));
         } else {
-          console.warn("ResumeSectionClientView: Received invalid date for updated_at:", resumeMetaData.updated_at);
+          console.warn("ResumeSectionClientView: Received invalid date for resume_meta updated_at:", resumeMetaData.updated_at);
           setFormattedLastUpdated("Date unavailable");
         }
       } catch (error) {
@@ -138,16 +139,16 @@ export default function ResumeSectionClientView({
       const blob = await response.blob();
       const link = document.createElement('a');
       link.href = URL.createObjectURL(blob);
-      link.download = "Milan_Resume.pdf"; 
+      link.download = "Milan_Antony_Resume.pdf"; // You can customize filename
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
       URL.revokeObjectURL(link.href); 
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error during PDF download:", error);
       toast({
         title: "Download Failed",
-        description: "Could not download the PDF. Please try again later or check the URL.",
+        description: error.message || "Could not download the PDF. Please try again later.",
         variant: "destructive",
       });
     }
@@ -214,16 +215,16 @@ export default function ResumeSectionClientView({
 
       <Tabs defaultValue="experience" className="w-full max-w-4xl mx-auto">
         <TabsList className="grid w-full grid-cols-2 md:grid-cols-4 mb-8">
-          <TabsTrigger value="experience"><Briefcase className="mr-2 h-4 w-4 inline-block" />Experience</TabsTrigger>
-          <TabsTrigger value="education"><GraduationCap className="mr-2 h-4 w-4 inline-block" />Education</TabsTrigger>
+          <TabsTrigger value="experience"><DefaultExperienceIcon className="mr-2 h-4 w-4 inline-block" />Experience</TabsTrigger>
+          <TabsTrigger value="education"><DefaultEducationIcon className="mr-2 h-4 w-4 inline-block" />Education</TabsTrigger>
           <TabsTrigger value="skills"><ListChecks className="mr-2 h-4 w-4 inline-block" />Key Skills</TabsTrigger>
-          <TabsTrigger value="languages"><LanguagesIcon className="mr-2 h-4 w-4 inline-block" />Languages</TabsTrigger>
+          <TabsTrigger value="languages"><DefaultLanguagesIcon className="mr-2 h-4 w-4 inline-block" />Languages</TabsTrigger>
         </TabsList>
 
         <TabsContent value="experience">
           <Card>
             <CardHeader>
-              <CardTitle className="text-2xl flex items-center"><Briefcase className="mr-3 h-6 w-6 text-primary" /> Professional Experience</CardTitle>
+              <CardTitle className="text-2xl flex items-center"><DefaultExperienceIcon className="mr-3 h-6 w-6 text-primary" /> Professional Experience</CardTitle>
             </CardHeader>
             <CardContent>
               {experienceData && experienceData.length > 0 ? (
@@ -235,7 +236,7 @@ export default function ResumeSectionClientView({
                     date={exp.date_range}
                     description={exp.description_points || []}
                     iconImageUrl={exp.icon_image_url}
-                    DefaultIconComponent={Briefcase}
+                    DefaultIconComponent={DefaultExperienceIcon}
                   />
                 ))
               ) : (
@@ -248,7 +249,7 @@ export default function ResumeSectionClientView({
         <TabsContent value="education">
           <Card>
             <CardHeader>
-              <CardTitle className="text-2xl flex items-center"><GraduationCap className="mr-3 h-6 w-6 text-primary" /> Education</CardTitle>
+              <CardTitle className="text-2xl flex items-center"><DefaultEducationIcon className="mr-3 h-6 w-6 text-primary" /> Education</CardTitle>
             </CardHeader>
             <CardContent>
               {educationData && educationData.length > 0 ? (
@@ -260,7 +261,7 @@ export default function ResumeSectionClientView({
                     date={edu.date_range}
                     description={edu.description || undefined}
                     iconImageUrl={edu.icon_image_url}
-                    DefaultIconComponent={GraduationCap}
+                    DefaultIconComponent={DefaultEducationIcon}
                   />
                 ))
               ) : (
@@ -282,10 +283,10 @@ export default function ResumeSectionClientView({
                       <div className="flex items-center mb-3">
                         {skillCategory.icon_image_url ? (
                             <div className="relative h-5 w-5 mr-2 rounded-sm overflow-hidden border bg-muted flex-shrink-0">
-                                <NextImage src={skillCategory.icon_image_url} alt={skillCategory.category_name} fill className="object-contain dark:filter dark:brightness-0 dark:invert" sizes="20px" />
+                                <NextImage src={skillCategory.icon_image_url} alt={skillCategory.category_name} fill className="object-contain" sizes="20px" />
                             </div>
                         ) : (
-                            <TypeIcon className="h-5 w-5 mr-2 text-primary flex-shrink-0" /> 
+                            <DefaultCategoryIcon className="h-5 w-5 mr-2 text-primary flex-shrink-0" /> 
                         )}
                         <h4 className="text-lg font-semibold text-foreground">{skillCategory.category_name}</h4>
                       </div>
@@ -311,7 +312,7 @@ export default function ResumeSectionClientView({
         <TabsContent value="languages">
           <Card>
             <CardHeader>
-              <CardTitle className="text-2xl flex items-center"><LanguagesIcon className="mr-3 h-6 w-6 text-primary" /> Languages</CardTitle>
+              <CardTitle className="text-2xl flex items-center"><DefaultLanguagesIcon className="mr-3 h-6 w-6 text-primary" /> Languages</CardTitle>
             </CardHeader>
             <CardContent>
               {languagesData && languagesData.length > 0 ? (
@@ -319,9 +320,9 @@ export default function ResumeSectionClientView({
                   <ResumeDetailItem
                     key={lang.id}
                     title={lang.language_name}
-                    description={lang.proficiency || undefined} // Display proficiency in the description area
+                    description={lang.proficiency || undefined}
                     iconImageUrl={lang.icon_image_url}
-                    DefaultIconComponent={LanguagesIcon} 
+                    DefaultIconComponent={DefaultLanguagesIcon} 
                   />
                 ))
               ) : (
@@ -334,4 +335,3 @@ export default function ResumeSectionClientView({
     </>
   );
 }
-
