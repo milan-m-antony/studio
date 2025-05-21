@@ -31,7 +31,7 @@ interface MostInteractedSkillData {
 }
 
 interface DeviceTypeData {
-    name: VisitorLog['device_type'] | 'Other' | 'Unknown'; // Added Unknown
+    name: VisitorLog['device_type'] | 'Other' | 'Unknown';
     visitors: number;
     color: string;
     icon: React.ElementType;
@@ -84,7 +84,7 @@ export default function DashboardOverview() {
   const [isLoadingDeviceTypeData, setIsLoadingDeviceTypeData] = useState(true);
 
   const fetchDashboardData = useCallback(async (isManualRefresh = false) => {
-    if (isManualRefresh && isRefreshing) return; // Prevent multiple manual refreshes
+    if (isManualRefresh && isRefreshing) return; 
     if (isManualRefresh) setIsRefreshing(true);
     
     console.log("[DashboardOverview] Fetching all dashboard data...");
@@ -125,7 +125,7 @@ export default function DashboardOverview() {
       const { data: allProjectViews, error: allProjectViewsError } = await supabase.from('project_views').select('project_id');
       if (allProjectViewsError) {
         console.error("[DashboardOverview] Error fetching project views for aggregation:", JSON.stringify(allProjectViewsError, null, 2));
-        setMostViewedProjectData({ title: 'Error', views: 0 });
+        setMostViewedProjectData({ title: 'Error loading', views: 0 });
       } else if (allProjectViews && allProjectViews.length > 0) {
         const viewCounts: Record<string, number> = {};
         allProjectViews.forEach(view => { if (view.project_id) viewCounts[view.project_id] = (viewCounts[view.project_id] || 0) + 1; });
@@ -140,26 +140,26 @@ export default function DashboardOverview() {
       
       // Fetch Most Interacted Skill
       const { data: allInteractions, error: allInteractionsError } = await supabase.from('skill_interactions').select('skill_id');
-        if (allInteractionsError) {
-            console.error("[DashboardOverview] Error fetching skill interactions for aggregation:", JSON.stringify(allInteractionsError, null, 2));
-            let specificMessage = "Could not fetch skill interactions.";
-            if (allInteractionsError.message.includes("relation") && allInteractionsError.message.includes("does not exist")) {
-                specificMessage = "Skill interactions table not found. Please ensure 'skill_interactions' table exists in Supabase.";
-            } else if (allInteractionsError.code === '42P01') { // PostgreSQL error code for undefined table
-                specificMessage = "The 'skill_interactions' table does not exist in your database.";
-            }
-            setMostInteractedSkillData({ name: 'Error', interactions: 0 });
-            // toast({ title: "Data Error", description: specificMessage, variant: "destructive" }); // Optionally toast
-        } else if (allInteractions && allInteractions.length > 0) {
-            const interactionCounts: Record<string, number> = {};
-            allInteractions.forEach(interaction => { if(interaction.skill_id) interactionCounts[interaction.skill_id] = (interactionCounts[interaction.skill_id] || 0) + 1; });
-            let maxInteractions = 0; let mostInteractedSkillId: string | null = null;
-            for (const skillId in interactionCounts) { if (interactionCounts[skillId] > maxInteractions) { maxInteractions = interactionCounts[skillId]; mostInteractedSkillId = skillId; }}
-            if (mostInteractedSkillId) {
+      if (allInteractionsError) {
+          console.error("[DashboardOverview] Error fetching skill interactions for aggregation:", JSON.stringify(allInteractionsError, null, 2));
+          let specificMessage = "Could not fetch skill interactions.";
+          if (allInteractionsError.message?.includes("relation") && allInteractionsError.message.includes("does not exist")) {
+              specificMessage = "Skill interactions table not found. Please ensure 'skill_interactions' table exists.";
+          } else if (allInteractionsError.code === '42P01') {
+              specificMessage = "The 'skill_interactions' table does not exist in your database.";
+          }
+          setMostInteractedSkillData({ name: 'Error loading', interactions: 0 });
+          // toast({ title: "Data Error", description: specificMessage, variant: "destructive" }); 
+      } else if (allInteractions && allInteractions.length > 0) {
+          const interactionCounts: Record<string, number> = {};
+          allInteractions.forEach(interaction => { if(interaction.skill_id) interactionCounts[interaction.skill_id] = (interactionCounts[interaction.skill_id] || 0) + 1; });
+          let maxInteractions = 0; let mostInteractedSkillId: string | null = null;
+          for (const skillId in interactionCounts) { if (interactionCounts[skillId] > maxInteractions) { maxInteractions = interactionCounts[skillId]; mostInteractedSkillId = skillId; }}
+          if (mostInteractedSkillId) {
             const { data: skillData, error: skillError } = await supabase.from('skills').select('name').eq('id', mostInteractedSkillId).maybeSingle();
             setMostInteractedSkillData({ name: skillError ? 'Error' : (skillData?.name || 'Unknown Skill'), interactions: maxInteractions });
-            } else { setMostInteractedSkillData({ name: 'N/A (No Interactions)', interactions: 0 }); }
-        } else { setMostInteractedSkillData({ name: 'N/A (No Interactions)', interactions: 0 }); }
+          } else { setMostInteractedSkillData({ name: 'N/A (No Interactions Yet)', interactions: 0 }); }
+      } else { setMostInteractedSkillData({ name: 'N/A (No Interactions Yet)', interactions: 0 }); }
       setIsLoadingMostInteractedSkill(false);
 
       // Fetch Total Resume Downloads
@@ -183,36 +183,38 @@ export default function DashboardOverview() {
       }
       setIsLoadingRecentSubmissions(false);
 
-      // Fetch Visitor Device Type Counts
-      const { data: allVisits, error: deviceCountsError } = await supabase
+      // Fetch Visitor Device Type Counts (Client-side aggregation)
+      const { data: allVisits, error: allVisitsError } = await supabase
         .from('visitor_logs')
         .select('device_type');
 
-      if (deviceCountsError) {
-        console.error("[DashboardOverview] Error fetching device type data:", JSON.stringify(deviceCountsError, null, 2));
+      if (allVisitsError) {
+        console.error("[DashboardOverview] Error fetching visitor logs for device type aggregation:", JSON.stringify(allVisitsError, null, 2));
         setDeviceTypeData([]);
       } else if (allVisits) {
         const counts: Record<string, number> = {};
         allVisits.forEach(visit => {
-          const device = visit.device_type || 'Unknown';
+          const device = visit.device_type || 'Unknown'; // Group null/empty as 'Unknown'
           counts[device] = (counts[device] || 0) + 1;
         });
         
         const formattedDeviceData: DeviceTypeData[] = Object.entries(counts).map(([name, visitors]) => {
-            let iconComponent: React.ElementType = Users;
+            let iconComponent: React.ElementType = Users; // Default icon
             let barColor = 'hsl(var(--chart-5))'; 
 
             if (name === 'Desktop') { iconComponent = Monitor; barColor = 'hsl(var(--chart-1))'; }
             else if (name === 'Mobile') { iconComponent = Smartphone; barColor = 'hsl(var(--chart-2))'; }
             else if (name === 'Tablet') { iconComponent = Tablet; barColor = 'hsl(var(--chart-4))'; }
+            else if (name === 'Unknown') { iconComponent = AlertCircle; barColor = 'hsl(var(--muted))'}
             
             return { name: name as VisitorLog['device_type'] | 'Other' | 'Unknown', visitors, color: barColor, icon: iconComponent };
-        }).sort((a, b) => b.visitors - a.visitors); // Sort by most visitors
+        }).sort((a, b) => b.visitors - a.visitors);
         setDeviceTypeData(formattedDeviceData);
       } else {
         setDeviceTypeData([]);
       }
       setIsLoadingDeviceTypeData(false);
+
 
       setLastRefreshed(new Date());
       if (isManualRefresh) toast({ title: "Success", description: "Dashboard data updated ✅" });
@@ -224,7 +226,7 @@ export default function DashboardOverview() {
       if (isManualRefresh) setIsRefreshing(false);
       console.log("[DashboardOverview] Finished fetching all dashboard data.");
     }
-  }, [toast, isRefreshing]); // Added isRefreshing to dep array
+  }, [toast, isRefreshing]); 
 
   useEffect(() => {
     fetchDashboardData(); 
@@ -234,7 +236,7 @@ export default function DashboardOverview() {
       fetchDashboardData(false);
     }, AUTO_REFRESH_INTERVAL_MS);
     return () => { if (autoRefreshTimerRef.current) clearInterval(autoRefreshTimerRef.current); };
-  }, [fetchDashboardData]); // fetchDashboardData is memoized with useCallback
+  }, [fetchDashboardData]); 
 
   const handleManualRefresh = () => { if (!isRefreshing) fetchDashboardData(true); };
 
@@ -299,9 +301,9 @@ export default function DashboardOverview() {
       <Card className="shadow-sm">
         <CardHeader><CardTitle className="text-xl flex items-center"><ShoppingBag className="mr-2 h-6 w-6 text-primary" />Project & Skill Engagement</CardTitle></CardHeader>
         <CardContent className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          <StatCard title="Total Project Views" value={totalProjectViews} icon={Eye} description="Total views across all projects" isLoading={isLoadingTotalProjectViews} />
-          <StatCard title="Most Viewed Project" value={mostViewedProjectData.title ? `${mostViewedProjectData.title} (${mostViewedProjectData.views} views)` : (mostViewedProjectData.views === 0 ? 'N/A (No Views)' : (isLoadingMostViewedProject ? '...' : 'N/A'))} icon={TrendingUp} description="Project with highest views" isLoading={isLoadingMostViewedProject} valueClassName="truncate text-lg sm:text-xl" />
-          <StatCard title="Most Interacted Skill" value={mostInteractedSkillData.name ? `${mostInteractedSkillData.name} (${mostInteractedSkillData.interactions} interactions)` : (mostInteractedSkillData.interactions === 0 ? 'N/A (No Interactions)' : (isLoadingMostInteractedSkill ? '...' : 'N/A'))} icon={Brain} description="Skill with most card views (requires tracking)" isLoading={isLoadingMostInteractedSkill} valueClassName="truncate text-lg sm:text-xl"/>
+          <StatCard title="Total Project Views" value={totalProjectViews} icon={Eye} description="Views logged when project cards are displayed" isLoading={isLoadingTotalProjectViews} />
+          <StatCard title="Most Viewed Project" value={mostViewedProjectData.title ? `${mostViewedProjectData.title} (${mostViewedProjectData.views} views)` : (mostViewedProjectData.views === 0 ? 'N/A (No Views Yet)' : (isLoadingMostViewedProject ? '...' : 'N/A'))} icon={TrendingUp} description="Project with highest card views" isLoading={isLoadingMostViewedProject} valueClassName="truncate text-lg sm:text-xl" />
+          <StatCard title="Most Interacted Skill" value={mostInteractedSkillData.name ? `${mostInteractedSkillData.name} (${mostInteractedSkillData.interactions} interactions)` : (mostInteractedSkillData.interactions === 0 ? 'N/A (No Interactions Yet)' : (isLoadingMostInteractedSkill ? '...' : 'N/A'))} icon={Brain} description="Skill with most card views (requires tracking)" isLoading={isLoadingMostInteractedSkill} valueClassName="truncate text-lg sm:text-xl"/>
         </CardContent>
       </Card>
 
@@ -315,22 +317,23 @@ export default function DashboardOverview() {
 
       <Card className="shadow-sm">
         <CardHeader><CardTitle className="text-xl flex items-center"><Users className="mr-2 h-6 w-6 text-primary" />Visitor Analytics</CardTitle></CardHeader>
-        <CardContent className="grid gap-6 md:grid-cols-1"> {/* Changed to 1 column for the remaining chart */}
+        <CardContent className="grid gap-6 md:grid-cols-1">
             <div>
-                <h3 className="text-lg font-semibold mb-3 text-muted-foreground">Visitors by Device Type</h3>
+                <h3 className="text-lg font-semibold mb-3 text-card-foreground/90">Visitors by Device Type</h3>
                 <div className="p-4 border rounded-lg bg-card-foreground/5 dark:bg-card-foreground/10 min-h-[300px]">
                 {isLoadingDeviceTypeData ? <div className="flex justify-center items-center h-full"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground"/></div> : 
                   deviceTypeData.length > 0 ? (
                     <ResponsiveContainer width="100%" height={300}>
                         <BarChart data={deviceTypeData} layout="vertical" margin={{ top: 5, right: 30, left: 30, bottom: 5 }}>
                             <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border)/0.5)" />
-                            <XAxis type="number" stroke="hsl(var(--muted-foreground))" fontSize={12} allowDecimals={false} />
+                            <XAxis type="number" stroke="hsl(var(--muted-foreground))" fontSize={12} allowDecimals={false} tick={{ fill: 'hsl(var(--muted-foreground))' }}/>
                             <YAxis dataKey="name" type="category" width={100} stroke="hsl(var(--muted-foreground))" fontSize={12}
                                 tick={({ x, y, payload }) => {
-                                    const DeviceIconComponent = payload.value && deviceTypeData.find(d => d.name === payload.value)?.icon || Users;
+                                    const deviceConfig = deviceTypeData.find(d => d.name === payload.value);
+                                    const DeviceIconComponent = deviceConfig?.icon || Users; // Fallback to Users icon
                                     return (
                                         <g transform={`translate(${x - 25},${y})`}>
-                                            <DeviceIconComponent className="h-4 w-4 inline -translate-y-0.5 mr-1 text-muted-foreground" />
+                                            <DeviceIconComponent className="h-4 w-4 inline -translate-y-0.5 mr-1.5 text-muted-foreground" />
                                             <text x={10} y={0} dy={4} textAnchor="start" fill="hsl(var(--muted-foreground))" fontSize={12}>
                                                 {payload.value}
                                             </text>
@@ -339,7 +342,7 @@ export default function DashboardOverview() {
                                 }}
                             />
                             <RechartsTooltip 
-                                contentStyle={{ backgroundColor: 'hsl(var(--popover))', border: '1px solid hsl(var(--border))', borderRadius: '0.5rem', color: 'hsl(var(--popover-foreground))' }} 
+                                contentStyle={{ backgroundColor: 'hsl(var(--popover))', border: '1px solid hsl(var(--border))', borderRadius: 'var(--radius)', color: 'hsl(var(--popover-foreground))' }} 
                                 itemStyle={{ color: 'hsl(var(--popover-foreground))' }} 
                                 cursor={{ fill: 'hsl(var(--accent)/0.3)' }}
                             />
@@ -354,13 +357,11 @@ export default function DashboardOverview() {
                 }
                 </div>
                 <CardDescription className="text-xs text-muted-foreground mt-2 px-1">
-                  Counts visits based on simple screen width detection on page load from your public site.
+                  Counts visits based on simple screen width detection on page load.
                 </CardDescription>
            </div>
-           {/* Placeholder for other charts if needed in the future, or remove this div if only one chart */}
         </CardContent>
       </Card>
-      
     </div>
   );
 }
