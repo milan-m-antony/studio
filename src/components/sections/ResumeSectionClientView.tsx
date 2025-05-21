@@ -2,7 +2,7 @@
 "use client";
 
 import { Button } from '@/components/ui/button';
-import { Download, Eye, Briefcase as DefaultExperienceIcon, GraduationCap as DefaultEducationIcon, ListChecks, Languages as DefaultLanguagesIcon, Type as DefaultCategoryIcon, LucideIcon } from 'lucide-react';
+import { Download, Eye, Briefcase as DefaultExperienceIcon, GraduationCap as DefaultEducationIcon, ListChecks, Languages as DefaultLanguagesIcon, Type as DefaultCategoryIcon } from 'lucide-react';
 import NextImage from 'next/image';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -13,6 +13,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { format, parseISO, isValid } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
+import { supabase } from '@/lib/supabaseClient'; // Ensure Supabase client is imported
 
 import type { 
   ResumeExperience, 
@@ -29,23 +30,16 @@ interface ResumeDetailItemProps {
   date?: string;
   description?: string | string[];
   iconImageUrl?: string | null;
-  DefaultIconComponent?: React.ElementType; // For fallback if iconImageUrl is not provided
+  DefaultIconComponent?: React.ElementType;
 }
 
-const ResumeDetailItem: React.FC<ResumeDetailItemProps> = ({ title, subtitle, date, description, iconImageUrl, DefaultIconComponent }) => {
-  let ActualIconComponent: React.ElementType | null = DefaultIconComponent || null;
-  
+const ResumeDetailItem: React.FC<ResumeDetailItemProps> = ({ title, subtitle, date, description, iconImageUrl, DefaultIconComponent = DefaultCategoryIcon }) => {
   const iconContent = iconImageUrl ? (
     <div className="relative h-6 w-6 rounded-sm overflow-hidden border bg-muted flex-shrink-0">
-      {/* Removed dark:filter dark:brightness-0 dark:invert from className here */}
       <NextImage src={iconImageUrl} alt={`${title} icon`} fill className="object-contain" sizes="24px" />
     </div>
-  ) : ActualIconComponent ? (
-    <ActualIconComponent className="h-6 w-6 text-primary flex-shrink-0" />
   ) : (
-    <div className="h-6 w-6 text-primary flex-shrink-0"> 
-      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"></circle></svg>
-    </div>
+    <DefaultIconComponent className="h-6 w-6 text-primary flex-shrink-0" />
   );
 
   return (
@@ -100,12 +94,7 @@ export default function ResumeSectionClientView({
     if (resumeMetaData?.updated_at) {
       try {
         const date = parseISO(resumeMetaData.updated_at);
-        if (isValid(date)) {
-          setFormattedLastUpdated(format(date, "MMMM d, yyyy 'at' h:mm a"));
-        } else {
-          console.warn("ResumeSectionClientView: Received invalid date for resume_meta updated_at:", resumeMetaData.updated_at);
-          setFormattedLastUpdated("Date unavailable");
-        }
+        setFormattedLastUpdated(isValid(date) ? format(date, "MMMM d, yyyy 'at' h:mm a") : "Date unavailable");
       } catch (error) {
         console.error("Error formatting resume updated_at date:", error);
         setFormattedLastUpdated("Date unavailable");
@@ -125,6 +114,32 @@ export default function ResumeSectionClientView({
       return;
     }
 
+    console.log("[ResumeSectionClientView] Attempting to log resume download event...");
+    try {
+      const { error: logError } = await supabase
+        .from('resume_downloads')
+        .insert([
+          { /* You could add a downloader_identifier here if you implement session tracking */ }
+        ]);
+      if (logError) {
+        console.error('[ResumeSectionClientView] Failed to log resume download event to Supabase:', JSON.stringify(logError, null, 2));
+        toast({
+          title: "Logging Issue",
+          description: "Could not log download event. Download will still proceed. Error: " + logError.message,
+          variant: "default", // Not destructive, as download will still attempt
+        });
+      } else {
+        console.log('[ResumeSectionClientView] Resume download event logged successfully to Supabase.');
+      }
+    } catch (e: any) {
+      console.error('[ResumeSectionClientView] Exception during resume download event logging:', e);
+      toast({
+        title: "Logging Exception",
+        description: "An exception occurred while logging download event: " + e.message,
+        variant: "default",
+      });
+    }
+
     toast({
       title: "Resume Download",
       description: "Your resume PDF is being prepared for download.",
@@ -139,13 +154,13 @@ export default function ResumeSectionClientView({
       const blob = await response.blob();
       const link = document.createElement('a');
       link.href = URL.createObjectURL(blob);
-      link.download = "Milan_Antony_Resume.pdf"; // You can customize filename
+      link.download = "Milan_Antony_Resume.pdf"; 
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
       URL.revokeObjectURL(link.href); 
     } catch (error: any) {
-      console.error("Error during PDF download:", error);
+      console.error("[ResumeSectionClientView] Error during PDF download:", error);
       toast({
         title: "Download Failed",
         description: error.message || "Could not download the PDF. Please try again later.",
@@ -153,6 +168,7 @@ export default function ResumeSectionClientView({
       });
     }
   };
+
 
   return (
     <>
@@ -207,7 +223,7 @@ export default function ResumeSectionClientView({
               />
             </div>
             <DialogClose asChild>
-                <Button type="button" variant="outline" className="m-4 mt-0 self-end shrink-0">Close Preview</Button>
+                <Button type="button" variant="outline" className="m-4 mt-2 self-end shrink-0">Close Preview</Button>
             </DialogClose>
           </DialogContent>
         </Dialog>
