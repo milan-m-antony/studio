@@ -23,7 +23,7 @@ import { z } from "zod";
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { format, parseISO, isValid } from 'date-fns';
+import { format, parseISO, isValid as isValidDate } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
@@ -89,7 +89,7 @@ export default function ContactManager() {
   const [isSendingReply, setIsSendingReply] = useState(false);
 
   const fetchContactDetails = async () => { setIsLoadingContactDetails(true); const { data, error } = await supabase.from('contact_page_details').select('*').eq('id', PRIMARY_CONTACT_DETAILS_ID).maybeSingle(); if (error) {toast({ title: "Error", description: `Could not fetch contact details: ${error.message}`, variant: "destructive" }); console.error("Error fetching contact details:", error);} else if (data) contactDetailsForm.reset(data as ContactPageDetailsFormData); setIsLoadingContactDetails(false); };
-  const fetchSocialLinks = async () => { setIsLoadingSocialLinks(true); const { data, error } = await supabase.from('social_links').select('*').order('sort_order', { ascending: true }); if (error) { toast({ title: "Error", description: `Could not fetch social links: ${error.message}`, variant: "destructive" }); console.error("Error fetching social links:", error); } else setSocialLinks((data || []).map(link => ({ ...link, icon_image_url: link.icon_image_url || null }))); setIsLoadingSocialLinks(false);};
+  const fetchSocialLinks = async () => { setIsLoadingSocialLinks(true); const { data, error } = await supabase.from('social_links').select('id, label, icon_image_url, url, display_text, sort_order').order('sort_order', { ascending: true }); if (error) { toast({ title: "Error", description: `Could not fetch social links: ${error.message}`, variant: "destructive" }); console.error("Error fetching social links:", error); } else setSocialLinks((data || []).map(link => ({ ...link, icon_image_url: link.icon_image_url || null }))); setIsLoadingSocialLinks(false);};
   const fetchSubmissions = async () => { setIsLoadingSubmissions(true); let query = supabase.from('contact_submissions').select('*').order('submitted_at', { ascending: false }); if (statusFilter !== 'All') { query = query.eq('status', statusFilter); } const { data, error } = await query; if (error) {toast({ title: "Error", description: `Could not fetch submissions: ${error.message}`, variant: "destructive" }); console.error("Error fetching submissions:", error); } else setSubmissions(data || []); setIsLoadingSubmissions(false); };
 
   useEffect(() => { fetchContactDetails(); fetchSocialLinks(); }, []);
@@ -118,13 +118,10 @@ export default function ContactManager() {
   };
 
   const handleSendReply = async () => {
-    if (!submissionToReplyTo) {
-      toast({ title: "Error Replying", description: "No submission selected for reply.", variant: "destructive" });
-      return;
-    }
-    if (!submissionToReplyTo.id || !submissionToReplyTo.email || !submissionToReplyTo.name) {
-      toast({ title: "Error", description: "Submission data is incomplete. Cannot send reply.", variant: "destructive" });
-      console.error("Incomplete submission data for reply:", submissionToReplyTo);
+    if (!submissionToReplyTo?.id || !submissionToReplyTo?.email || !submissionToReplyTo?.name) {
+      toast({ title: "Reply Error", description: "Cannot send reply: critical submission information is missing.", variant: "destructive" });
+      console.error("Critical submission info missing for reply:", submissionToReplyTo);
+      setIsSendingReply(false);
       return;
     }
     if (!replyMessage.trim()) {
@@ -139,7 +136,7 @@ export default function ContactManager() {
       recipientEmail: submissionToReplyTo.email,
       recipientName: submissionToReplyTo.name,
     };
-    console.log("[ContactManager] Payload for Edge Function 'send-contact-reply':", payload);
+    console.log("[ContactManager] Payload for Edge Function:", payload);
 
     try {
       const { data: functionData, error: functionError } = await supabase.functions.invoke('send-contact-reply', {
@@ -149,47 +146,45 @@ export default function ContactManager() {
       if (functionError) {
         console.error("[ContactManager] Error invoking Edge Function (raw):", JSON.stringify(functionError, null, 2));
         let specificMessage = "Failed to send reply. Edge Function call failed.";
+        // Attempt to get more specific error message if available from Supabase's FunctionError structure
         if (typeof functionError === 'object' && functionError !== null) {
           if ('message' in functionError && typeof (functionError as any).message === 'string') {
-            try {
-                const parsedDetails = JSON.parse((functionError as any).message);
-                if (parsedDetails && typeof parsedDetails.error === 'string') specificMessage = parsedDetails.error;
-                else if (parsedDetails && typeof parsedDetails.message === 'string') specificMessage = parsedDetails.message;
-                else specificMessage = (functionError as any).message;
-            } catch (e) { specificMessage = (functionError as any).message; }
+            specificMessage = (functionError as any).message;
           } else if ('details' in functionError && typeof (functionError as any).details === 'string') {
             specificMessage = (functionError as any).details;
-          } else if ('error' in functionError && typeof (functionError as any).error === 'string') {
-            specificMessage = (functionError as any).error;
+          } else if (functionError.name === 'FunctionsHttpError' || functionError.name === 'FunctionsRelayError' || functionError.name === 'FunctionsFetchError') {
+            specificMessage = "Failed to communicate with the reply service. Please check Edge Function status and logs in Supabase.";
           }
         }
-        throw new Error(specificMessage);
+        toast({
+          title: "Reply Service Error",
+          description: specificMessage,
+          variant: "destructive",
+          duration: 9000
+        });
+        setIsSendingReply(false); // Ensure loading state is reset on functionError
+        return; 
       }
       
       if (functionData && functionData.error) { 
          console.error("[ContactManager] Error response from Edge Function logic:", JSON.stringify(functionData.error, null, 2));
-         toast({ title: "Reply Service Error", description: `Edge Function reported: ${typeof functionData.error === 'string' ? functionData.error : JSON.stringify(functionData.error)}`, variant: "destructive", duration: 9000 });
+         toast({ title: "Reply Service Error", description: `Edge Function reported: ${typeof functionData.error === 'string' ? functionData.error : JSON.stringify(functionData.error)}. Please check Edge Function logs.`, variant: "destructive", duration: 9000 });
       } else {
         toast({ 
-            title: "Reply Sent", 
-            description: `Your reply to ${submissionToReplyTo.email} has been processed. Submission status updated.`, 
+            title: "Reply Processed by Server", 
+            description: functionData?.message || `Your reply to ${submissionToReplyTo.email} has been processed. Submission status will update.`, 
             variant: "default",
             duration: 7000 
         });
         setIsReplyModalOpen(false);
         setReplyMessage('');
-        fetchSubmissions(); 
+        fetchSubmissions(); // Re-fetch submissions to update status and notes
       }
     } catch (err: any) {
-      console.error("[ContactManager] Failed to send reply via Edge Function:", err);
-      let errorMessage = "Function Invocation Error";
-      if (err && err.message) errorMessage = err.message;
-      else if (typeof err === 'object' && err !== null && 'details' in err && typeof err.details === 'string') errorMessage = err.details;
-      else if (typeof err === 'object' && err !== null && 'error' in err && typeof err.error === 'string') errorMessage = err.error;
-      
+      console.error("[ContactManager] Unexpected error during send reply:", err);
       toast({ 
           title: "Reply Failed", 
-          description: `${errorMessage}. Please check the Edge Function logs.`, 
+          description: err.message || "An unexpected error occurred. Please check console and Edge Function logs.", 
           variant: "destructive", 
           duration: 9000 
       });
@@ -296,7 +291,7 @@ export default function ContactManager() {
                         <p className="text-sm text-muted-foreground">From: {sub.name} &lt;{sub.email}&gt;</p>
                         {sub.phone_number && <p className="text-sm text-muted-foreground">Phone: {sub.phone_number}</p>}
                         <p className="text-xs text-muted-foreground mt-1">
-                          Received: {sub.submitted_at && isValid(parseISO(sub.submitted_at)) ? format(parseISO(sub.submitted_at), "PPpp") : 'Invalid Date'}
+                          Received: {sub.submitted_at && isValidDate(parseISO(sub.submitted_at)) ? format(parseISO(sub.submitted_at), "PPpp") : 'Invalid Date'}
                         </p>
                       </div>
                       <div className="flex flex-col sm:flex-row sm:items-center gap-2 mt-2 sm:mt-0 self-start sm:self-center shrink-0 w-full sm:w-auto">
@@ -376,7 +371,7 @@ export default function ContactManager() {
               <div className="space-y-4">
                 <div><p className="text-sm font-medium text-muted-foreground">From:</p><p>{selectedSubmission.name} &lt;{selectedSubmission.email}&gt;</p></div>
                 {selectedSubmission.phone_number && <div><p className="text-sm font-medium text-muted-foreground">Phone:</p><p>{selectedSubmission.phone_number}</p></div>}
-                <div><p className="text-sm font-medium text-muted-foreground">Received:</p><p>{selectedSubmission.submitted_at && isValid(parseISO(selectedSubmission.submitted_at)) ? format(parseISO(selectedSubmission.submitted_at), "PPpp") : 'Invalid Date'}</p></div>
+                <div><p className="text-sm font-medium text-muted-foreground">Received:</p><p>{selectedSubmission.submitted_at && isValidDate(parseISO(selectedSubmission.submitted_at)) ? format(parseISO(selectedSubmission.submitted_at), "PPpp") : 'Invalid Date'}</p></div>
                 <div><p className="text-sm font-medium text-muted-foreground">Status:</p><p>{selectedSubmission.status}</p></div>
                 <div><p className="text-sm font-medium text-muted-foreground">Message:</p><p className="whitespace-pre-wrap bg-muted p-3 rounded-md">{selectedSubmission.message}</p></div>
                 {selectedSubmission.notes && (
