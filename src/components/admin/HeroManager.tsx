@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
-import { Home as HeroIcon, PlusCircle, Edit, Trash2, Save, Link as GenericLinkIcon } from 'lucide-react';
+import { Home as HeroIcon, PlusCircle, Edit, Trash2, Save, Link as GenericLinkIcon, Image as ImageIcon } from 'lucide-react';
 import NextImage from 'next/image';
 import { supabase } from '@/lib/supabaseClient';
 import type { HeroContent, StoredHeroSocialLink, HeroSocialLinkItem } from '@/types/supabase';
@@ -22,27 +22,23 @@ import {
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 
-// This ID MUST match the one in your Supabase 'hero_content' table for the single row.
 const PRIMARY_HERO_CONTENT_ID = '00000000-0000-0000-0000-000000000004';
 
-// Schema for individual social links (for the modal form)
 const heroSocialLinkSchema = z.object({
-  id: z.string().uuid().optional(), // Client-side only for useFieldArray
+  id: z.string().uuid().optional(), // Client-side only for useFieldArray key
   label: z.string().min(1, "Label is required"),
   url: z.string().url("Must be a valid URL"),
   icon_image_url: z.string().url("Must be a valid URL if provided.").optional().or(z.literal("")).nullable(),
 });
 type HeroSocialLinkFormData = z.infer<typeof heroSocialLinkSchema>;
 
-// Main schema for hero content
 const heroContentSchema = z.object({
   id: z.string().uuid().default(PRIMARY_HERO_CONTENT_ID),
   main_name: z.string().min(1, "Main name is required.").optional().nullable(),
-  subtitles_string: z.string().optional().nullable(), // For comma-separated input
+  subtitles_string: z.string().optional().nullable(),
   social_media_links: z.array(heroSocialLinkSchema).optional().default([]),
 });
 type HeroContentFormData = z.infer<typeof heroContentSchema>;
-
 
 export default function HeroManager() {
   const router = useRouter();
@@ -76,11 +72,6 @@ export default function HeroManager() {
   
   const watchedSocialLinkIconUrlInModal = socialLinkForm.watch("icon_image_url");
 
-
-  useEffect(() => {
-    fetchHeroContent();
-  }, []);
-
   const fetchHeroContent = async () => {
     setIsLoading(true);
     console.log("[HeroManager] Fetching hero content for ID:", PRIMARY_HERO_CONTENT_ID);
@@ -93,28 +84,22 @@ export default function HeroManager() {
     if (error) {
       console.error("[HeroManager] Error fetching Hero content:", JSON.stringify(error, null, 2));
       toast({ title: "Error", description: `Could not fetch Hero content: ${error.message}`, variant: "destructive" });
-      // Set defaults even on error to prevent form from breaking
-      heroForm.reset({
-        id: PRIMARY_HERO_CONTENT_ID,
-        main_name: 'Error Loading Name',
-        subtitles_string: 'Error loading subtitles',
-        social_media_links: [],
-      });
+      heroForm.reset({ id: PRIMARY_HERO_CONTENT_ID, main_name: 'Error Loading', subtitles_string: '', social_media_links: [] });
     } else if (data) {
       console.log("[HeroManager] Fetched hero data from Supabase:", JSON.stringify(data, null, 2));
+      console.log("[HeroManager] Raw social_media_links from DB:", JSON.stringify(data.social_media_links, null, 2));
       
       let fetchedSocialLinks: HeroSocialLinkItem[] = [];
       if (data.social_media_links && Array.isArray(data.social_media_links)) {
-        // Ensure each item from DB gets a new client-side ID for useFieldArray
         fetchedSocialLinks = (data.social_media_links as StoredHeroSocialLink[]).map(link => ({
-          id: crypto.randomUUID(), // Always generate a new client-side ID
-          label: link.label || '',
-          url: link.url || '',
+          ...link,
+          id: crypto.randomUUID(), // Ensure a NEW client-side ID for useFieldArray
           icon_image_url: link.icon_image_url || null,
         }));
       } else if (data.social_media_links) {
-        console.warn("[HeroManager] social_media_links from DB is not an array:", data.social_media_links);
+        console.warn("[HeroManager] social_media_links from DB is not an array or is null:", data.social_media_links);
       }
+      console.log("[HeroManager] Mapped fetchedSocialLinks for form reset:", JSON.stringify(fetchedSocialLinks, null, 2));
         
       heroForm.reset({
         id: data.id || PRIMARY_HERO_CONTENT_ID,
@@ -122,42 +107,43 @@ export default function HeroManager() {
         subtitles_string: data.subtitles && Array.isArray(data.subtitles) ? data.subtitles.join(', ') : '',
         social_media_links: fetchedSocialLinks,
       });
-      console.log("[HeroManager] Form reset with social_media_links:", JSON.stringify(fetchedSocialLinks, null, 2));
     } else {
-      console.log("[HeroManager] No hero content found for this ID, resetting form to defaults.");
-      heroForm.reset({
-        id: PRIMARY_HERO_CONTENT_ID,
-        main_name: '',
-        subtitles_string: '',
-        social_media_links: [],
-      });
+      console.log("[HeroManager] No hero content found, resetting form to defaults.");
+      heroForm.reset({ id: PRIMARY_HERO_CONTENT_ID, main_name: '', subtitles_string: '', social_media_links: [] });
     }
     setIsLoading(false);
   };
 
+  useEffect(() => {
+    fetchHeroContent();
+  }, []);
+
+
   const onHeroSubmit: SubmitHandler<HeroContentFormData> = async (formData) => {
     setIsLoading(true);
+    console.log("[HeroManager] onHeroSubmit - formData.social_media_links:", JSON.stringify(formData.social_media_links, null, 2));
+
     const subtitlesArray = formData.subtitles_string
       ?.split(',')
       .map(s => s.trim())
       .filter(Boolean);
     
     const storedSocialLinks: StoredHeroSocialLink[] = (formData.social_media_links || []).map(link => {
-      const { id, fieldId, ...rest } = link as any; // Remove client-side specific IDs like 'id' and 'fieldId'
+      const { id, fieldId, ...rest } = link as any; // fieldId is from useFieldArray, id is our client UUID
       return {
-        ...rest, // This should include label, url, icon_image_url
+        ...rest,
         icon_image_url: link.icon_image_url?.trim() === '' ? null : link.icon_image_url,
       };
     });
+    console.log("[HeroManager] onHeroSubmit - prepared storedSocialLinks for Supabase:", JSON.stringify(storedSocialLinks, null, 2));
 
     const dataToUpsert = {
       id: PRIMARY_HERO_CONTENT_ID,
       main_name: formData.main_name || null,
       subtitles: subtitlesArray && subtitlesArray.length > 0 ? subtitlesArray : null,
-      social_media_links: storedSocialLinks.length > 0 ? storedSocialLinks : [], // Send empty JS array
+      social_media_links: storedSocialLinks.length > 0 ? storedSocialLinks : [],
       updated_at: new Date().toISOString(),
     };
-
     console.log("[HeroManager] Data being upserted to Supabase:", JSON.stringify(dataToUpsert, null, 2));
     
     const { error: upsertError, data: upsertedData } = await supabase
@@ -172,7 +158,7 @@ export default function HeroManager() {
     } else {
       toast({ title: "Success", description: "Hero content saved." });
       console.log("[HeroManager] Hero content successfully saved/upserted:", JSON.stringify(upsertedData, null, 2));
-      await fetchHeroContent(); // Re-fetch to ensure form state is in sync with DB
+      await fetchHeroContent(); 
       router.refresh(); 
     }
     setIsLoading(false);
@@ -192,14 +178,16 @@ export default function HeroManager() {
   const onSocialLinkSubmitModal: SubmitHandler<HeroSocialLinkFormData> = (data) => {
     const newLinkData: HeroSocialLinkItem = {
       ...data,
-      id: currentSocialLinkForEdit?.id || crypto.randomUUID(), // Preserve existing client ID or generate new
+      id: currentSocialLinkForEdit?.id || crypto.randomUUID(),
       icon_image_url: data.icon_image_url?.trim() === '' ? null : data.icon_image_url,
     };
 
     if (editingSocialLinkIndex !== null && editingSocialLinkIndex >= 0) {
       updateSocialLink(editingSocialLinkIndex, newLinkData);
+      console.log("[HeroManager] Updated social link in form state at index", editingSocialLinkIndex, heroForm.getValues('social_media_links'));
     } else {
       appendSocialLink(newLinkData);
+      console.log("[HeroManager] Appended social link to form state:", heroForm.getValues('social_media_links'));
     }
     setIsSocialLinkModalOpen(false);
     setCurrentSocialLinkForEdit(null);
@@ -264,15 +252,16 @@ export default function HeroManager() {
                         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
                           <div className="flex items-center gap-2 sm:gap-3 flex-grow min-w-0">
                             {field.icon_image_url && typeof field.icon_image_url === 'string' && field.icon_image_url.trim() !== '' ? (
-                               <div className="relative h-5 w-5 rounded-sm overflow-hidden border bg-muted flex-shrink-0 flex items-center justify-center">
-                                <img 
+                               <div className="relative h-5 w-5 rounded-sm overflow-hidden border bg-muted flex items-center justify-center">
+                                <NextImage 
                                   src={field.icon_image_url} 
                                   alt={`${field.label || 'Icon'} preview`} 
-                                  className="max-h-full max-w-full object-contain" // Use <img> for admin preview
+                                  width={20} height={20} 
+                                  className="object-contain"
                                 />
                               </div>
                             ) : (
-                              <GenericLinkIcon className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                              <ImageIcon className="h-4 w-4 text-muted-foreground flex-shrink-0" />
                             )}
                             <div className="min-w-0 flex-grow">
                               <p className="font-medium text-sm truncate" title={field.label || 'No Label'}>{field.label || '(No Label)'}</p>
@@ -307,24 +296,24 @@ export default function HeroManager() {
         <DialogContent className="sm:max-w-lg"> 
           <DialogHeader>
             <DialogTitle>{currentSocialLinkForEdit ? 'Edit Social Link' : 'Add New Social Link'}</DialogTitle>
-            <DialogDescription>Provide details for the social media link.</DialogDescription>
+            <DialogDescription>Provide details for the social media link. Use a direct image URL for the icon.</DialogDescription>
           </DialogHeader>
           <form onSubmit={socialLinkForm.handleSubmit(onSocialLinkSubmitModal)} className="grid gap-4 py-4">
             <ScrollArea className="max-h-[70vh] p-1">
               <div className="grid gap-4 p-2"> 
                 <div className="space-y-1"> 
-                  <Label htmlFor="social_label" className="text-sm">Label <span className="text-destructive">*</span></Label>
-                  <Input id="social_label" {...socialLinkForm.register("label")} placeholder="e.g., GitHub, LinkedIn" className="w-full"/>
+                  <Label htmlFor="social_label_hero" className="text-sm">Label <span className="text-destructive">*</span></Label>
+                  <Input id="social_label_hero" {...socialLinkForm.register("label")} placeholder="e.g., GitHub, LinkedIn" className="w-full"/>
                   {socialLinkForm.formState.errors.label && <p className="text-destructive text-sm mt-1">{socialLinkForm.formState.errors.label.message}</p>}
                 </div>
                 <div className="space-y-1">
-                  <Label htmlFor="social_url" className="text-sm">URL <span className="text-destructive">*</span></Label>
-                  <Input id="social_url" type="url" {...socialLinkForm.register("url")} placeholder="https://example.com" className="w-full"/>
+                  <Label htmlFor="social_url_hero" className="text-sm">URL <span className="text-destructive">*</span></Label>
+                  <Input id="social_url_hero" type="url" {...socialLinkForm.register("url")} placeholder="https://example.com" className="w-full"/>
                   {socialLinkForm.formState.errors.url && <p className="text-destructive text-sm mt-1">{socialLinkForm.formState.errors.url.message}</p>}
                 </div>
                 <div className="space-y-1">
-                  <Label htmlFor="social_icon_image_url" className="text-sm">Icon Image URL (Optional)</Label>
-                  <Input id="social_icon_image_url" {...socialLinkForm.register("icon_image_url")} placeholder="https://image.url/icon.png or data:image/svg..." className="w-full"/>
+                  <Label htmlFor="social_icon_image_url_hero" className="text-sm">Icon Image URL (Optional)</Label>
+                  <Input id="social_icon_image_url_hero" {...socialLinkForm.register("icon_image_url")} placeholder="https://image.url/icon.png or data:image/svg..." className="w-full"/>
                   {socialLinkForm.formState.errors.icon_image_url && <p className="text-destructive text-sm mt-1">{socialLinkForm.formState.errors.icon_image_url.message}</p>}
                   
                   {watchedSocialLinkIconUrlInModal && typeof watchedSocialLinkIconUrlInModal === 'string' && watchedSocialLinkIconUrlInModal.trim() !== '' ? (
@@ -334,12 +323,12 @@ export default function HeroManager() {
                           <img 
                               src={watchedSocialLinkIconUrlInModal} 
                               alt="Icon Preview" 
-                              className="max-h-full max-w-full object-contain"
+                              className="max-h-full max-w-full object-contain" // Using standard img for robust preview
                           />
                       </div>
                     </div>
                   ) : (
-                    <div className="mt-2 text-xs text-muted-foreground">No preview available or URL invalid.</div>
+                    <div className="mt-2 text-xs text-muted-foreground">No preview available. Enter a valid image URL.</div>
                   )}
                 </div>
               </div>
@@ -354,3 +343,5 @@ export default function HeroManager() {
     </Card>
   );
 }
+
+    
