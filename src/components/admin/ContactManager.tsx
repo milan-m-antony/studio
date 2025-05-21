@@ -1,20 +1,20 @@
 
 "use client";
 
-import React, { useEffect, useState, type ChangeEvent, type FormEventHandler } from 'react';
+import React, { useEffect, useState, type ChangeEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
-import { PlusCircle, Edit, Trash2, Mail, Link as LinkIcon, Phone, MapPin, Save, MessageSquare, Star, Eye, Filter, Send, Image as ImageIcon, Loader2 } from 'lucide-react';
+import { PlusCircle, Edit, Trash2, Mail, Link as LinkIconToUse, Phone, MapPin, Save, MessageSquare, Star, Eye, Filter, Send, Loader2, ImageIcon } from 'lucide-react'; // Renamed Link to LinkIconToUse
 import { supabase } from '@/lib/supabaseClient';
 import type { ContactPageDetail, SocialLink, ContactSubmission, SubmissionStatus } from '@/types/supabase';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose, DialogDescription,
 } from "@/components/ui/dialog";
 import {
-  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription as AlertDialogPrimitiveDescription, AlertDialogFooter as AlertDialogPrimitiveFooter, AlertDialogHeader as AlertDialogPrimitiveHeader, AlertDialogTitle as AlertDialogPrimitiveTitle,
 } from "@/components/ui/alert-dialog";
 import { useForm, type SubmitHandler } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -27,6 +27,7 @@ import { format, parseISO, isValid } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+
 
 const PRIMARY_CONTACT_DETAILS_ID = '00000000-0000-0000-0000-000000000005';
 
@@ -138,7 +139,11 @@ export default function ContactManager() {
     const dataToUpsert = { ...formData, id: PRIMARY_CONTACT_DETAILS_ID, updated_at: new Date().toISOString() };
     const { error } = await supabase.from('contact_page_details').upsert(dataToUpsert, { onConflict: 'id' });
     if (error) toast({ title: "Error", description: `Failed to save contact details: ${error.message}`, variant: "destructive" });
-    else { toast({ title: "Success", description: "Contact details saved." }); fetchContactDetails(); router.refresh(); }
+    else { 
+        toast({ title: "Success", description: "Contact details saved." }); 
+        fetchContactDetails(); 
+        router.refresh(); 
+    }
     setIsLoadingContactDetails(false);
   };
 
@@ -191,30 +196,41 @@ export default function ContactManager() {
 
   const handleOpenReplyModal = (submission: ContactSubmission) => {
     setSubmissionToReplyTo(submission);
-    setReplyMessage(''); // Clear previous reply message
+    setReplyMessage('');
     setIsReplyModalOpen(true);
   };
 
   const handleSendReply = async () => {
-    if (!submissionToReplyTo || !replyMessage.trim()) {
+    if (!submissionToReplyTo) {
+      toast({ title: "Error", description: "No submission selected to reply to.", variant: "destructive" });
+      return;
+    }
+    if (!replyMessage.trim()) {
       toast({ title: "Missing Information", description: "Please enter a reply message.", variant: "destructive" });
       return;
     }
+    if (!submissionToReplyTo.id || !submissionToReplyTo.email || !submissionToReplyTo.name) {
+      toast({ title: "Error", description: "Submission data is incomplete for sending a reply.", variant: "destructive" });
+      return;
+    }
+
     setIsSendingReply(true);
+    const payload = {
+      submissionId: submissionToReplyTo.id,
+      replyText: replyMessage.trim(),
+      recipientEmail: submissionToReplyTo.email,
+      recipientName: submissionToReplyTo.name,
+    };
+    console.log("[ContactManager] Payload for Edge Function (send-contact-reply):", payload);
+
     try {
-      console.log(`[ContactManager] Invoking 'send-contact-reply' Edge Function for submission ID: ${submissionToReplyTo.id}`);
       const { data: functionData, error: functionError } = await supabase.functions.invoke('send-contact-reply', {
-        body: {
-          submissionId: submissionToReplyTo.id,
-          replyText: replyMessage.trim(),
-          recipientEmail: submissionToReplyTo.email,
-          recipientName: submissionToReplyTo.name,
-        },
+        body: payload,
       });
 
       if (functionError) {
         console.error("[ContactManager] Error invoking Edge Function (raw):", JSON.stringify(functionError, null, 2));
-        throw functionError; // Let the catch block handle it
+        throw functionError;
       }
       
       if (functionData && functionData.error) {
@@ -222,23 +238,30 @@ export default function ContactManager() {
          throw new Error(typeof functionData.error === 'string' ? functionData.error : "An error occurred in the reply Edge Function.");
       }
 
-      toast({ title: "Reply Sent", description: functionData?.message || "Your reply has been sent successfully." });
+      toast({ title: "Reply Sent (via Gmail SMTP)", description: functionData?.message || "Your reply has been processed by the server." });
       setIsReplyModalOpen(false);
       setReplyMessage('');
-      fetchSubmissions(); // Refresh submissions to show updated status
+      // Update status locally or re-fetch to see 'Replied' status from Edge function
+      const updatedSubmissions = submissions.map(sub => 
+        sub.id === submissionToReplyTo.id ? { ...sub, status: 'Replied' as SubmissionStatus } : sub
+      );
+      setSubmissions(updatedSubmissions);
+      // Optionally, call fetchSubmissions() after a short delay if Edge Function updates DB
+      // setTimeout(fetchSubmissions, 1000); 
     } catch (error: any) {
       console.error("[ContactManager] Failed to send reply:", error);
-      let errorMessage = "Failed to send reply. Please try again.";
+      let errorMessage = "Failed to send reply. Please ensure the Edge Function is correctly configured for Gmail SMTP.";
       if (error.message) {
         errorMessage = error.message;
-      } else if (typeof error === 'object' && error !== null && 'details' in error) {
-        errorMessage = (error as {details: string}).details || errorMessage;
+      } else if (typeof error === 'object' && error !== null && 'message' in error) {
+        errorMessage = (error as {details?: string, message?: string}).message || errorMessage;
       }
       toast({ title: "Error Sending Reply", description: errorMessage, variant: "destructive" });
     } finally {
       setIsSendingReply(false);
     }
   };
+
 
   return (
     <>
@@ -265,7 +288,7 @@ export default function ContactManager() {
 
       <Card className="mb-8 shadow-lg">
         <CardHeader>
-          <CardTitle className="flex items-center justify-between">Manage Social Links <LinkIcon className="h-6 w-6 text-primary" /></CardTitle>
+          <CardTitle className="flex items-center justify-between">Manage Social Links <LinkIconToUse className="h-6 w-6 text-primary" /></CardTitle>
           <CardDescription>Add, edit, or delete social media links. Provide a direct image URL for icons.</CardDescription>
         </CardHeader>
         <CardContent>
@@ -339,7 +362,7 @@ export default function ContactManager() {
                         <p className="text-sm text-muted-foreground">From: {sub.name} &lt;{sub.email}&gt;</p>
                         {sub.phone_number && <p className="text-sm text-muted-foreground">Phone: {sub.phone_number}</p>}
                         <p className="text-xs text-muted-foreground mt-1">
-                          Received: {isValid(parseISO(sub.submitted_at)) ? format(parseISO(sub.submitted_at), "PPpp") : 'Invalid Date'}
+                          Received: {sub.submitted_at && isValid(parseISO(sub.submitted_at)) ? format(parseISO(sub.submitted_at), "PPpp") : 'Invalid Date'}
                         </p>
                       </div>
                       <div className="flex flex-col sm:flex-row sm:items-center gap-2 mt-2 sm:mt-0 self-start sm:self-center shrink-0 w-full sm:w-auto">
@@ -394,7 +417,18 @@ export default function ContactManager() {
           </form>
         </DialogContent>
       </Dialog>
-      <AlertDialog open={showSocialLinkDeleteConfirm} onOpenChange={setShowSocialLinkDeleteConfirm}><AlertDialogContent className="bg-destructive border-destructive text-destructive-foreground"><AlertDialogHeader><AlertDialogTitle className="text-destructive-foreground">Delete Social Link: {socialLinkToDelete?.label}?</AlertDialogTitle><AlertDialogDescription className="text-destructive-foreground/90">This action cannot be undone.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel onClick={() => { setShowSocialLinkDeleteConfirm(false); setSocialLinkToDelete(null); }} className={cn(buttonVariants({ variant: "outline" }), "border-destructive-foreground/40 text-destructive-foreground hover:bg-destructive-foreground/10 hover:text-destructive-foreground hover:border-destructive-foreground/60")}>Cancel</AlertDialogCancel><AlertDialogAction onClick={handleDeleteSocialLink} className={cn(buttonVariants({ variant: "default" }), "bg-destructive-foreground text-destructive hover:bg-destructive-foreground/90")}>Delete</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
+      <AlertDialog open={showSocialLinkDeleteConfirm} onOpenChange={setShowSocialLinkDeleteConfirm}>
+        <AlertDialogContent className="bg-destructive border-destructive text-destructive-foreground">
+            <AlertDialogPrimitiveHeader>
+                <AlertDialogPrimitiveTitle className="text-destructive-foreground">Delete Social Link: {socialLinkToDelete?.label}?</AlertDialogPrimitiveTitle>
+                <AlertDialogPrimitiveDescription className="text-destructive-foreground/90">This action cannot be undone.</AlertDialogPrimitiveDescription>
+            </AlertDialogPrimitiveHeader>
+            <AlertDialogPrimitiveFooter>
+                <AlertDialogCancel onClick={() => { setShowSocialLinkDeleteConfirm(false); setSocialLinkToDelete(null); }} className={cn(buttonVariants({ variant: "outline" }), "border-destructive-foreground/40 text-destructive-foreground hover:bg-destructive-foreground/10 hover:text-destructive-foreground hover:border-destructive-foreground/60")}>Cancel</AlertDialogCancel>
+                <AlertDialogAction onClick={handleDeleteSocialLink} className={cn(buttonVariants({ variant: "default" }), "bg-destructive-foreground text-destructive hover:bg-destructive-foreground/90")}>Delete</AlertDialogAction>
+            </AlertDialogPrimitiveFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* View Message Modal */}
       {selectedSubmission && (
@@ -408,7 +442,7 @@ export default function ContactManager() {
               <div className="space-y-4">
                 <div><p className="text-sm font-medium text-muted-foreground">From:</p><p>{selectedSubmission.name} &lt;{selectedSubmission.email}&gt;</p></div>
                 {selectedSubmission.phone_number && <div><p className="text-sm font-medium text-muted-foreground">Phone:</p><p>{selectedSubmission.phone_number}</p></div>}
-                <div><p className="text-sm font-medium text-muted-foreground">Received:</p><p>{isValid(parseISO(selectedSubmission.submitted_at)) ? format(parseISO(selectedSubmission.submitted_at), "PPpp") : 'Invalid Date'}</p></div>
+                <div><p className="text-sm font-medium text-muted-foreground">Received:</p><p>{selectedSubmission.submitted_at && isValid(parseISO(selectedSubmission.submitted_at)) ? format(parseISO(selectedSubmission.submitted_at), "PPpp") : 'Invalid Date'}</p></div>
                 <div><p className="text-sm font-medium text-muted-foreground">Status:</p><p>{selectedSubmission.status}</p></div>
                 <div><p className="text-sm font-medium text-muted-foreground">Message:</p><p className="whitespace-pre-wrap bg-muted p-3 rounded-md">{selectedSubmission.message}</p></div>
               </div>
@@ -452,9 +486,21 @@ export default function ContactManager() {
       )}
 
       {/* Delete Submission Confirmation Dialog */}
-      <AlertDialog open={showSubmissionDeleteConfirm} onOpenChange={setShowSubmissionDeleteConfirm}><AlertDialogContent className="bg-destructive border-destructive text-destructive-foreground"><AlertDialogHeader><AlertDialogTitle className="text-destructive-foreground">Delete Submission from: {submissionToDelete?.name}?</AlertDialogTitle><AlertDialogDescription className="text-destructive-foreground/90">This action cannot be undone and will permanently delete this message.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel onClick={() => { setShowSubmissionDeleteConfirm(false); setSubmissionToDelete(null); }} className={cn(buttonVariants({ variant: "outline" }), "border-destructive-foreground/40 text-destructive-foreground hover:bg-destructive-foreground/10 hover:text-destructive-foreground hover:border-destructive-foreground/60")}>Cancel</AlertDialogCancel><AlertDialogAction onClick={handleDeleteSubmission} className={cn(buttonVariants({ variant: "default" }), "bg-destructive-foreground text-destructive hover:bg-destructive-foreground/90")}>Delete Message</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
+      <AlertDialog open={showSubmissionDeleteConfirm} onOpenChange={setShowSubmissionDeleteConfirm}>
+        <AlertDialogContent className="bg-destructive border-destructive text-destructive-foreground">
+            <AlertDialogPrimitiveHeader>
+                <AlertDialogPrimitiveTitle className="text-destructive-foreground">Delete Submission from: {submissionToDelete?.name}?</AlertDialogPrimitiveTitle>
+                <AlertDialogPrimitiveDescription className="text-destructive-foreground/90">This action cannot be undone and will permanently delete this message.</AlertDialogPrimitiveDescription>
+            </AlertDialogPrimitiveHeader>
+            <AlertDialogPrimitiveFooter>
+                <AlertDialogCancel onClick={() => { setShowSubmissionDeleteConfirm(false); setSubmissionToDelete(null); }} className={cn(buttonVariants({ variant: "outline" }), "border-destructive-foreground/40 text-destructive-foreground hover:bg-destructive-foreground/10 hover:text-destructive-foreground hover:border-destructive-foreground/60")}>Cancel</AlertDialogCancel>
+                <AlertDialogAction onClick={handleDeleteSubmission} className={cn(buttonVariants({ variant: "default" }), "bg-destructive-foreground text-destructive hover:bg-destructive-foreground/90")}>Delete Message</AlertDialogAction>
+            </AlertDialogPrimitiveFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }
+    
 
     
