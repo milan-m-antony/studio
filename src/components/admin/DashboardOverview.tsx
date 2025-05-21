@@ -31,7 +31,7 @@ interface MostInteractedSkillData {
 }
 
 interface DeviceTypeData {
-    name: VisitorLog['device_type'] | 'Other' | 'Unknown';
+    name: VisitorLog['device_type'] | 'Other' | 'Unknown'; // Ensure 'Other' and 'Unknown' are part of the type
     visitors: number;
     color: string;
     icon: React.ElementType;
@@ -129,37 +129,63 @@ export default function DashboardOverview() {
       } else if (allProjectViews && allProjectViews.length > 0) {
         const viewCounts: Record<string, number> = {};
         allProjectViews.forEach(view => { if (view.project_id) viewCounts[view.project_id] = (viewCounts[view.project_id] || 0) + 1; });
-        let maxViews = 0; let mostViewedId: string | null = null;
-        for (const projectId in viewCounts) { if (viewCounts[projectId] > maxViews) { maxViews = viewCounts[projectId]; mostViewedId = projectId; }}
+        
+        let maxViews = 0; 
+        let mostViewedId: string | null = null;
+        for (const projectId in viewCounts) { 
+          if (viewCounts[projectId] > maxViews) { 
+            maxViews = viewCounts[projectId]; 
+            mostViewedId = projectId; 
+          }
+        }
+        
         if (mostViewedId) {
           const { data: projectData, error: projectError } = await supabase.from('projects').select('title').eq('id', mostViewedId).maybeSingle();
-          setMostViewedProjectData({ title: projectError ? 'Error' : (projectData?.title || 'Unknown Project'), views: maxViews });
-        } else { setMostViewedProjectData({ title: 'N/A (No Views)', views: 0 }); }
-      } else { setMostViewedProjectData({ title: 'N/A (No Views)', views: 0 }); }
+          setMostViewedProjectData({ title: projectError ? 'DB Error' : (projectData?.title || 'Unknown Project'), views: maxViews });
+        } else { 
+          setMostViewedProjectData({ title: 'N/A (No Views)', views: 0 }); 
+        }
+      } else { 
+        setMostViewedProjectData({ title: 'N/A (No Views)', views: 0 }); 
+      }
       setIsLoadingMostViewedProject(false);
       
       // Fetch Most Interacted Skill
-      const { data: allInteractions, error: allInteractionsError } = await supabase.from('skill_interactions').select('skill_id');
+      const { data: allInteractions, error: allInteractionsError } = await supabase
+        .from('skill_interactions')
+        .select('skill_id');
+
       if (allInteractionsError) {
           console.error("[DashboardOverview] Error fetching skill interactions for aggregation:", JSON.stringify(allInteractionsError, null, 2));
-          let specificMessage = "Could not fetch skill interactions.";
+          let specificMessage = "Could not fetch skill interactions data from the database.";
           if (allInteractionsError.message?.includes("relation") && allInteractionsError.message.includes("does not exist")) {
-              specificMessage = "Skill interactions table not found. Please ensure 'skill_interactions' table exists.";
-          } else if (allInteractionsError.code === '42P01') { // PostgreSQL error code for undefined_table
-              specificMessage = "The 'skill_interactions' table does not exist in your database.";
+              specificMessage = "The 'skill_interactions' table does not exist. Please ensure it's created as per the SQL schema.";
+          } else if (allInteractionsError.code === '42P01') { 
+              specificMessage = "Database error: The 'skill_interactions' table seems to be missing.";
           }
           setMostInteractedSkillData({ name: 'Error', interactions: 0 });
-          toast({ title: "Data Error", description: specificMessage, variant: "destructive", duration: 7000 });
+          // toast({ title: "Data Fetch Error", description: specificMessage, variant: "destructive", duration: 7000 }); // Optional: user-facing toast
       } else if (allInteractions && allInteractions.length > 0) {
           const interactionCounts: Record<string, number> = {};
           allInteractions.forEach(interaction => { if(interaction.skill_id) interactionCounts[interaction.skill_id] = (interactionCounts[interaction.skill_id] || 0) + 1; });
-          let maxInteractions = 0; let mostInteractedSkillId: string | null = null;
-          for (const skillId in interactionCounts) { if (interactionCounts[skillId] > maxInteractions) { maxInteractions = interactionCounts[skillId]; mostInteractedSkillId = skillId; }}
+          
+          let maxInteractions = 0; 
+          let mostInteractedSkillId: string | null = null;
+          for (const skillId in interactionCounts) { 
+            if (interactionCounts[skillId] > maxInteractions) { 
+              maxInteractions = interactionCounts[skillId]; 
+              mostInteractedSkillId = skillId; 
+            }
+          }
           if (mostInteractedSkillId) {
             const { data: skillData, error: skillError } = await supabase.from('skills').select('name').eq('id', mostInteractedSkillId).maybeSingle();
-            setMostInteractedSkillData({ name: skillError ? 'Error' : (skillData?.name || 'Unknown Skill'), interactions: maxInteractions });
-          } else { setMostInteractedSkillData({ name: 'N/A (No Interactions)', interactions: 0 }); }
-      } else { setMostInteractedSkillData({ name: 'N/A (No Interactions)', interactions: 0 }); }
+            setMostInteractedSkillData({ name: skillError ? 'DB Error' : (skillData?.name || 'Unknown Skill'), interactions: maxInteractions });
+          } else { 
+            setMostInteractedSkillData({ name: 'N/A (No Interactions Yet)', interactions: 0 }); 
+          }
+      } else { 
+        setMostInteractedSkillData({ name: 'N/A (No Interactions Yet)', interactions: 0 }); 
+      }
       setIsLoadingMostInteractedSkill(false);
 
       // Fetch Total Resume Downloads
@@ -184,29 +210,29 @@ export default function DashboardOverview() {
       setIsLoadingRecentSubmissions(false);
 
       // Fetch Visitor Device Type Counts
-      const { data: deviceCountsRaw, error: deviceCountsError } = await supabase
+      const { data: rawDeviceData, error: deviceCountsError } = await supabase
         .from('visitor_logs')
         .select('device_type');
 
       if (deviceCountsError) {
         console.error("[DashboardOverview] Error fetching device type counts:", JSON.stringify(deviceCountsError, null, 2));
         setDeviceTypeData([]);
-      } else if (deviceCountsRaw) {
-        const counts: Record<string, number> = deviceCountsRaw.reduce((acc, log) => {
-          const device = log.device_type || 'Unknown';
+      } else if (rawDeviceData) {
+        const counts: Record<string, number> = rawDeviceData.reduce((acc, log) => {
+          const device = log.device_type || 'Unknown'; // Handle null/undefined device_type
           acc[device] = (acc[device] || 0) + 1;
           return acc;
         }, {} as Record<string, number>);
         
         const formattedDeviceData: DeviceTypeData[] = Object.entries(counts).map(([name, visitors]) => {
-            let iconComponent: React.ElementType = Users;
-            let barColor = 'hsl(var(--chart-5))'; 
+            let iconComponent: React.ElementType = Users; // Default icon
+            let barColor = 'hsl(var(--chart-5))'; // Default color
             if (name === 'Desktop') { iconComponent = Monitor; barColor = 'hsl(var(--chart-1))'; }
             else if (name === 'Mobile') { iconComponent = Smartphone; barColor = 'hsl(var(--chart-2))'; }
             else if (name === 'Tablet') { iconComponent = Tablet; barColor = 'hsl(var(--chart-4))'; }
             else if (name === 'Unknown') { iconComponent = AlertCircle; barColor = 'hsl(var(--muted))'}
             return { name: name as VisitorLog['device_type'] | 'Other' | 'Unknown', visitors, color: barColor, icon: iconComponent };
-        }).sort((a, b) => b.visitors - a.visitors);
+        }).sort((a, b) => b.visitors - a.visitors); // Sort for better chart display
         setDeviceTypeData(formattedDeviceData);
       } else {
         setDeviceTypeData([]);
@@ -244,6 +270,7 @@ export default function DashboardOverview() {
     if (!user) { 
         toast({ title: "Auth Error", description: "Please log in again to change settings.", variant: "destructive"}); 
         setIsLoadingAppSettings(false); 
+        // Revert switch optimistically if auth fails before Supabase call
         setIsAnalyticsTrackingEnabled(!checked); 
         return; 
     }
@@ -254,7 +281,7 @@ export default function DashboardOverview() {
 
     if (updateError) { 
       toast({ title: "Error", description: `Failed to update tracking setting: ${updateError.message}`, variant: "destructive" }); 
-      setIsAnalyticsTrackingEnabled(!checked); 
+      setIsAnalyticsTrackingEnabled(!checked); // Revert switch on error
     } else { 
       setIsAnalyticsTrackingEnabled(checked); 
       toast({ title: "Success", description: `Analytics tracking ${checked ? 'enabled' : 'disabled'}.` });
@@ -297,25 +324,39 @@ export default function DashboardOverview() {
       </Card>
 
       <Card className="shadow-sm">
-        <CardHeader><CardTitle className="text-xl flex items-center"><TrendingUp className="mr-2 h-6 w-6 text-primary" />Engagement Metrics</CardTitle></CardHeader>
+        <CardHeader><CardTitle className="text-xl flex items-center"><TrendingUp className="mr-2 h-6 w-6 text-primary" />Project & Skill Engagement</CardTitle></CardHeader>
         <CardContent className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           <StatCard title="Total Project Views" value={totalProjectViews} icon={Eye} description="Views logged for project cards" isLoading={isLoadingTotalProjectViews} />
-          <StatCard title="Most Viewed Project" value={mostViewedProjectData.title ? `${mostViewedProjectData.title} (${mostViewedProjectData.views} views)` : (mostViewedProjectData.views === 0 ? 'N/A' : (isLoadingMostViewedProject ? '...' : 'N/A'))} icon={TrendingUp} description="Project with highest card views" isLoading={isLoadingMostViewedProject} valueClassName="truncate text-lg sm:text-xl" />
-          <StatCard title="Most Interacted Skill" value={mostInteractedSkillData.name ? `${mostInteractedSkillData.name} (${mostInteractedSkillData.interactions} interactions)` : (mostInteractedSkillData.interactions === 0 ? 'N/A' : (isLoadingMostInteractedSkill ? '...' : 'N/A'))} icon={Brain} description="Skill with most card views" isLoading={isLoadingMostInteractedSkill} valueClassName="truncate text-lg sm:text-xl"/>
+          <StatCard 
+            title="Most Viewed Project" 
+            value={mostViewedProjectData.title ? `${mostViewedProjectData.title} (${mostViewedProjectData.views} views)` : (mostViewedProjectData.views === 0 ? 'N/A (No Views)' : (isLoadingMostViewedProject ? '...' : 'N/A'))} 
+            icon={TrendingUp} 
+            description="Project with highest card views" 
+            isLoading={isLoadingMostViewedProject} 
+            valueClassName="truncate text-lg sm:text-xl"
+          />
+          <StatCard 
+            title="Most Interacted Skill" 
+            value={mostInteractedSkillData.name ? `${mostInteractedSkillData.name} (${mostInteractedSkillData.interactions} interactions)` : (mostInteractedSkillData.interactions === 0 ? 'N/A (No Interactions Yet)' : (isLoadingMostInteractedSkill ? '...' : 'N/A'))} 
+            icon={Brain} 
+            description="Skill with most card views (requires tracking)" 
+            isLoading={isLoadingMostInteractedSkill} 
+            valueClassName="truncate text-lg sm:text-xl"
+          />
         </CardContent>
       </Card>
 
       <Card className="shadow-sm">
-        <CardHeader><CardTitle className="text-xl flex items-center"><Download className="mr-2 h-6 w-6 text-primary" />Key Actions & Submissions</CardTitle></CardHeader>
+        <CardHeader><CardTitle className="text-xl flex items-center"><Download className="mr-2 h-6 w-6 text-primary" />Resume & Submissions</CardTitle></CardHeader>
         <CardContent className="grid gap-4 md:grid-cols-2">
-          <StatCard title="Total Resume Downloads" value={totalResumeDownloads} icon={Download} description="Requires client-side event logging" isLoading={isLoadingResumeDownloads}/>
-          <StatCard title="Contact Submissions (7 Days)" value={recentSubmissionsCount} icon={Mail} description="New messages from contact form" isLoading={isLoadingRecentSubmissions}/>
+          <StatCard title="Total Resume Downloads" value={totalResumeDownloads} icon={Download} description="Track PDF downloads (requires client-side event logging)" isLoading={isLoadingResumeDownloads}/>
+          <StatCard title="Contact Submissions (7 Days)" value={recentSubmissionsCount} icon={Mail} description="New messages from your contact form" isLoading={isLoadingRecentSubmissions}/>
         </CardContent>
       </Card>
       
       <Card className="shadow-sm">
         <CardHeader><CardTitle className="text-xl flex items-center"><Users className="mr-2 h-6 w-6 text-primary" />Visitor Analytics</CardTitle></CardHeader>
-        <CardContent className="grid gap-6 md:grid-cols-1"> {/* Changed to md:grid-cols-1 for single chart */}
+        <CardContent className="grid gap-6 md:grid-cols-1">
             <div>
                 <h3 className="text-lg font-semibold mb-3 text-card-foreground/90">Visitors by Device Type</h3>
                 <div className="p-4 border rounded-lg bg-card-foreground/5 dark:bg-card-foreground/10 min-h-[300px]">
@@ -328,9 +369,9 @@ export default function DashboardOverview() {
                             <YAxis dataKey="name" type="category" width={100} stroke="hsl(var(--muted-foreground))" fontSize={12}
                                 tick={({ x, y, payload }) => {
                                     const deviceConfig = deviceTypeData.find(d => d.name === payload.value);
-                                    const DeviceIconComponent = deviceConfig?.icon || Users;
+                                    const DeviceIconComponent = deviceConfig?.icon || Users; // Default to Users icon if not found
                                     return (
-                                        <g transform={`translate(${x - 25},${y})`}>
+                                        <g transform={`translate(${x - 25},${y})`}> {/* Adjusted x to pull icon further left */}
                                             <DeviceIconComponent className="h-4 w-4 inline -translate-y-0.5 mr-1.5 text-muted-foreground" />
                                             <text x={10} y={0} dy={4} textAnchor="start" fill="hsl(var(--muted-foreground))" fontSize={12}>
                                                 {payload.value}
@@ -355,7 +396,7 @@ export default function DashboardOverview() {
                 }
                 </div>
                 <CardDescription className="text-xs text-muted-foreground mt-2 px-1">
-                  Counts visits based on client-side screen width detection.
+                  Counts visits based on client-side screen width detection from the `visitor_logs` table.
                 </CardDescription>
            </div>
         </CardContent>
@@ -382,35 +423,10 @@ export default function DashboardOverview() {
         <CardFooter>
             <CardDescription className="text-xs">
                 Actual storage and database size metrics are best viewed directly in your Supabase project dashboard.
-                Implementing direct client-side fetching for these metrics is complex and typically requires admin-level API access not suitable for frontend exposure.
             </CardDescription>
         </CardFooter>
       </Card>
+
     </div>
   );
 }
-```
-
-**Explanation of Changes:**
-
-1.  **New Card for "Supabase Usage (Placeholders)":**
-    *   A new `Card` component is added to group the storage and database size metrics.
-    *   The `CardTitle` uses `DatabaseIcon` from `lucide-react` (I've added this import).
-2.  **`StatCard` for "Total Bucket Storage Used":**
-    *   **Title:** "Total Bucket Storage Used"
-    *   **Value:** "N/A" (since we can't fetch it easily from the client).
-    *   **Icon:** `HardDrive` from `lucide-react`.
-    *   **Description:** "See Supabase Dashboard. Client-side fetching not feasible."
-    *   `isLoading` is set to `false` as there's no active fetching.
-3.  **`StatCard` for "Database Size":**
-    *   **Title:** "Database Size"
-    *   **Value:** "N/A"
-    *   **Icon:** `DatabaseIcon` (alias for `Database` from `lucide-react`).
-    *   **Description:** "See Supabase Dashboard. Client-side fetching not feasible."
-    *   `isLoading` is set to `false`.
-4.  **`CardFooter` with Explanation:**
-    *   A `CardFooter` is added to this new card with a `CardDescription` explaining why these metrics are placeholders and where to find the actual data.
-5.  **Removed Placeholder Charts (to make space):**
-    *   The placeholder bar charts for "Top Traffic Sources" and "Peak Visit Hours" have been removed from the "Visitor Analytics" section to simplify the UI and make space for the new "Supabase Usage" card. The "Visitor Analytics" card content now uses `md:grid-cols-1` since it only contains the "Visitors by Device Type" chart.
-
-This update adds the requested UI elements for Supabase usage while clearly communicating the current limitations on dynamically fetching this specific data from the client side.
