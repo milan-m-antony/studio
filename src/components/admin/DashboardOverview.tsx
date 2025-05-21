@@ -3,11 +3,11 @@
 
 import React, { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Eye, Brain, FolderKanban, LineChart, Users, Download, Mail, Link as LinkIcon, BarChart3, Clock, TrendingUp, AlertCircle, ShoppingBag } from 'lucide-react'; // Added ShoppingBag
+import { Eye, Brain, FolderKanban, LineChart, Users, Download, Mail, Link as LinkIcon, BarChart3, Clock, TrendingUp, AlertCircle, ShoppingBag, Loader2 } from 'lucide-react';
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, XAxis, YAxis, Tooltip as RechartsTooltip, Legend as RechartsLegend, Cell } from 'recharts';
 import { supabase } from '@/lib/supabaseClient';
 import { subDays, format } from 'date-fns';
-import type { Project, Skill, ProjectView, SkillInteraction } from '@/types/supabase';
+import type { Project, Skill, ProjectView, SkillInteraction } from '@/types/supabase'; // Ensure SkillInteraction is imported
 
 interface MostViewedProjectData {
   title: string | null;
@@ -19,10 +19,11 @@ interface MostInteractedSkillData {
   interactions: number | null;
 }
 
+// Placeholder data for charts
 const placeholderDeviceData = [
-  { name: 'Desktop', visitors: 450, color: 'hsl(var(--chart-1))' }, 
-  { name: 'Mobile', visitors: 750, color: 'hsl(var(--chart-2))' },  
-  { name: 'Tablet', visitors: 120, color: 'hsl(var(--chart-4))' },  
+  { name: 'Desktop', visitors: 450, color: 'hsl(var(--chart-1))' },
+  { name: 'Mobile', visitors: 750, color: 'hsl(var(--chart-2))' },
+  { name: 'Tablet', visitors: 120, color: 'hsl(var(--chart-4))' },
 ];
 
 const placeholderTrafficSourceData = [
@@ -65,8 +66,12 @@ export default function DashboardOverview() {
 
   useEffect(() => {
     const fetchDashboardData = async () => {
-      // Fetch Total Project Views
       setIsLoadingTotalProjectViews(true);
+      setIsLoadingMostViewedProject(true);
+      setIsLoadingMostInteractedSkill(true);
+      setIsLoadingRecentSubmissions(true);
+
+      // Fetch Total Project Views
       const { count: viewsCount, error: viewsError } = await supabase
         .from('project_views')
         .select('*', { count: 'exact', head: true });
@@ -75,22 +80,20 @@ export default function DashboardOverview() {
       setIsLoadingTotalProjectViews(false);
 
       // Fetch Most Viewed Project
-      setIsLoadingMostViewedProject(true);
-      const { data: allViews, error: allViewsError } = await supabase
+      const { data: allProjectViews, error: allProjectViewsError } = await supabase
         .from('project_views')
-        .select('project_id'); // Only select the necessary column
+        .select('project_id');
       
-      if (allViewsError) {
-        console.error("Error fetching all project views for aggregation:", allViewsError);
+      if (allProjectViewsError) {
+        console.error("Error fetching all project views for aggregation:", allProjectViewsError);
         setMostViewedProjectData({ title: 'Error Loading Data', views: 0 });
-      } else if (allViews && allViews.length > 0) {
+      } else if (allProjectViews && allProjectViews.length > 0) {
         const viewCounts: Record<string, number> = {};
-        allViews.forEach(view => {
-          if (view.project_id) { // Ensure project_id is not null
+        allProjectViews.forEach(view => {
+          if (view.project_id) {
             viewCounts[view.project_id] = (viewCounts[view.project_id] || 0) + 1;
           }
         });
-
         let maxViews = 0;
         let mostViewedId: string | null = null;
         for (const projectId in viewCounts) {
@@ -99,7 +102,6 @@ export default function DashboardOverview() {
             mostViewedId = projectId;
           }
         }
-
         if (mostViewedId) {
           const { data: projectData, error: projectError } = await supabase
             .from('projects')
@@ -121,28 +123,27 @@ export default function DashboardOverview() {
       setIsLoadingMostViewedProject(false);
 
       // Fetch Most Interacted Skill
-      setIsLoadingMostInteractedSkill(true);
+      // Ensure 'skill_interactions' table exists in your Supabase project.
       const { data: allInteractions, error: allInteractionsError, status: interactionsStatus, statusText: interactionsStatusText } = await supabase
         .from('skill_interactions')
         .select('skill_id');
 
       if (allInteractionsError) {
-        let errorMessage = 'Error fetching skill interactions for aggregation. ';
+        let errorMessage = `Error fetching skill interactions for aggregation. Message: ${allInteractionsError.message}`;
         if (typeof allInteractionsError === 'object' && allInteractionsError !== null) {
-          const supabaseError = allInteractionsError as { message?: string; details?: string; hint?: string; code?: string };
-          errorMessage += `Message: ${supabaseError.message || 'N/A'}, Details: ${supabaseError.details || 'N/A'}, Hint: ${supabaseError.hint || 'N/A'}, Code: ${supabaseError.code || 'N/A'}. `;
+            const supabaseError = allInteractionsError as any; // Cast to any to access potential properties
+            errorMessage += `, Details: ${supabaseError.details || 'N/A'}, Hint: ${supabaseError.hint || 'N/A'}, Code: ${supabaseError.code || 'N/A'}`;
         }
-        errorMessage += `Status: ${interactionsStatus || 'N/A'} ${interactionsStatusText || 'N/A'}. Please ensure the 'skill_interactions' table exists and RLS policies allow reads for authenticated admins.`;
-        console.error(errorMessage, allInteractionsError); // Log the full error object as well
+        errorMessage += `. Status: ${interactionsStatus || 'N/A'} ${interactionsStatusText || 'N/A'}. Please ensure the 'skill_interactions' table exists and RLS policies allow reads.`;
+        console.error(errorMessage, allInteractionsError);
         setMostInteractedSkillData({ name: 'Error Loading Data', interactions: 0 });
       } else if (allInteractions && allInteractions.length > 0) {
         const interactionCounts: Record<string, number> = {};
         allInteractions.forEach(interaction => {
-          if (interaction.skill_id) { // Ensure skill_id is not null
+          if (interaction.skill_id) {
             interactionCounts[interaction.skill_id] = (interactionCounts[interaction.skill_id] || 0) + 1;
           }
         });
-        
         let maxInteractions = 0;
         let mostInteractedSkillId: string | null = null;
         for (const skillId in interactionCounts) {
@@ -151,7 +152,6 @@ export default function DashboardOverview() {
             mostInteractedSkillId = skillId;
           }
         }
-
         if (mostInteractedSkillId) {
           const { data: skillData, error: skillError } = await supabase
             .from('skills')
@@ -173,7 +173,6 @@ export default function DashboardOverview() {
       setIsLoadingMostInteractedSkill(false);
 
       // Fetch Recent Contact Submissions Count
-      setIsLoadingRecentSubmissions(true);
       const sevenDaysAgo = subDays(new Date(), 7).toISOString();
       const { count: submissionsCount, error: submissionsError } = await supabase
         .from('contact_submissions')
@@ -203,14 +202,14 @@ export default function DashboardOverview() {
         <CardContent className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           <StatCard 
             title="Total Project Views" 
-            value={isLoadingTotalProjectViews ? "..." : (totalProjectViews ?? 0)} 
+            value={isLoadingTotalProjectViews ? <Loader2 className="h-6 w-6 animate-spin" /> : (totalProjectViews ?? 0)} 
             icon={Eye} 
             description="Across all projects" 
             isLoading={isLoadingTotalProjectViews} 
           />
           <StatCard 
             title="Most Viewed Project" 
-            value={isLoadingMostViewedProject ? "..." : `${mostViewedProjectData.title || 'N/A'} (${mostViewedProjectData.views ?? 0} views)`}
+            value={isLoadingMostViewedProject ? <Loader2 className="h-6 w-6 animate-spin" /> : `${mostViewedProjectData.title || 'N/A'} (${mostViewedProjectData.views ?? 0} views)`}
             icon={TrendingUp} 
             description="Highest single project engagement" 
             isLoading={isLoadingMostViewedProject}
@@ -218,7 +217,7 @@ export default function DashboardOverview() {
           />
           <StatCard 
             title="Most Interacted Skill" 
-            value={isLoadingMostInteractedSkill ? "..." : `${mostInteractedSkillData.name || 'N/A'} (${mostInteractedSkillData.interactions ?? 0} interactions)`}
+            value={isLoadingMostInteractedSkill ? <Loader2 className="h-6 w-6 animate-spin" /> : `${mostInteractedSkillData.name || 'N/A'} (${mostInteractedSkillData.interactions ?? 0} interactions)`}
             icon={Brain} 
             description="Based on user interactions (requires tracking)" 
             isLoading={isLoadingMostInteractedSkill}
@@ -232,19 +231,19 @@ export default function DashboardOverview() {
           <CardTitle className="text-xl flex items-center"><Download className="mr-2 h-6 w-6 text-primary" />Resume & Submissions</CardTitle>
         </CardHeader>
         <CardContent className="grid gap-4 md:grid-cols-2">
-          <StatCard title="Total Resume Downloads" value="N/A Yet" icon={Download} description="Track PDF downloads (requires setup)" isLoading={true}/>
-          <StatCard title="Contact Submissions (7 Days)" value={isLoadingRecentSubmissions ? "..." : (recentSubmissionsCount ?? 0)} icon={Mail} description="New messages from contact form" isLoading={isLoadingRecentSubmissions}/>
+          <StatCard title="Total Resume Downloads" value={isLoadingTotalProjectViews ? <Loader2 className="h-6 w-6 animate-spin" /> : "N/A Yet"} icon={Download} description="Track PDF downloads (requires setup)" isLoading={true}/>
+          <StatCard title="Contact Submissions (7 Days)" value={isLoadingRecentSubmissions ? <Loader2 className="h-6 w-6 animate-spin" /> : (recentSubmissionsCount ?? 0)} icon={Mail} description="New messages from contact form" isLoading={isLoadingRecentSubmissions}/>
         </CardContent>
       </Card>
 
-      <Card className="shadow-sm">
+       <Card className="shadow-sm">
         <CardHeader>
           <CardTitle className="text-xl flex items-center"><Users className="mr-2 h-6 w-6 text-primary" />Visitor Analytics (Placeholders)</CardTitle>
           <CardDescription>Insights into your audience. (Requires dedicated analytics integration).</CardDescription>
         </CardHeader>
         <CardContent className="grid gap-4 md:grid-cols-2 lg:grid-cols-2">
-           <StatCard title="Visitors by Device" value="N/A" icon={Users} description="Mobile / Desktop / Tablet" isLoading={true}/>
-           <StatCard title="Top Traffic Sources" value="N/A" icon={LinkIcon} description="e.g., GitHub, LinkedIn, Direct" isLoading={true}/>
+           <StatCard title="Visitors by Device" value={<Loader2 className="h-6 w-6 animate-spin" />} icon={Users} description="Mobile / Desktop / Tablet" isLoading={true}/>
+           <StatCard title="Top Traffic Sources" value={<Loader2 className="h-6 w-6 animate-spin" />} icon={LinkIcon} description="e.g., GitHub, LinkedIn, Direct" isLoading={true}/>
         </CardContent>
          <CardContent>
             <h3 className="text-lg font-semibold mb-2 text-muted-foreground mt-4">Visitors by Device Type (Placeholder Chart)</h3>
@@ -260,7 +259,7 @@ export default function DashboardOverview() {
                 />
                 <Bar dataKey="visitors" name="Visitors" radius={[0, 4, 4, 0]}>
                     {placeholderDeviceData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.color} />
+                        <Cell key={`cell-device-${index}`} fill={entry.color} />
                     ))}
                 </Bar>
                 </BarChart>
@@ -280,7 +279,7 @@ export default function DashboardOverview() {
                 />
                 <Bar dataKey="visitors" name="Visitors" radius={[4, 4, 0, 0]}>
                     {placeholderTrafficSourceData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.color} />
+                        <Cell key={`cell-source-${index}`} fill={entry.color} />
                     ))}
                 </Bar>
                 </BarChart>
@@ -295,7 +294,7 @@ export default function DashboardOverview() {
         <CardContent className="text-sm text-yellow-600 dark:text-yellow-400/80 space-y-2">
             <p><strong>Event Tracking Needed:</strong> "Most Interacted Skill", "Total Resume Downloads", and some "Visitor Analytics" require client-side event tracking (e.g., logging to Supabase when users click/view items on your public site).</p>
             <p><strong>Full Visitor Analytics:</strong> For comprehensive visitor analytics (device types, traffic sources, peak hours), integrating a dedicated service like Vercel Analytics, Google Analytics, or Plausible is recommended.</p>
-            <p><strong>Placeholder Charts:</strong> Charts currently use placeholder data. Real data fetching and processing logic would be needed for them to be meaningful.</p>
+            <p><strong>Placeholder Data:</strong> Charts currently use placeholder data. Real data fetching and processing logic would be needed for them to be meaningful.</p>
         </CardContent>
       </Card>
 
