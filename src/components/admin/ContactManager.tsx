@@ -88,110 +88,23 @@ export default function ContactManager() {
   const [replyMessage, setReplyMessage] = useState('');
   const [isSendingReply, setIsSendingReply] = useState(false);
 
-  const fetchContactDetails = async () => {
-    setIsLoadingContactDetails(true);
-    const { data, error } = await supabase.from('contact_page_details').select('*').eq('id', PRIMARY_CONTACT_DETAILS_ID).maybeSingle();
-    if (error) toast({ title: "Error", description: `Could not fetch contact details: ${error.message}`, variant: "destructive" });
-    else if (data) contactDetailsForm.reset(data);
-    setIsLoadingContactDetails(false);
-  };
+  const fetchContactDetails = async () => { setIsLoadingContactDetails(true); const { data, error } = await supabase.from('contact_page_details').select('*').eq('id', PRIMARY_CONTACT_DETAILS_ID).maybeSingle(); if (error) {toast({ title: "Error", description: `Could not fetch contact details: ${error.message}`, variant: "destructive" }); console.error("Error fetching contact details:", error);} else if (data) contactDetailsForm.reset(data as ContactPageDetailsFormData); setIsLoadingContactDetails(false); };
+  const fetchSocialLinks = async () => { setIsLoadingSocialLinks(true); const { data, error } = await supabase.from('social_links').select('*').order('sort_order', { ascending: true }); if (error) { toast({ title: "Error", description: `Could not fetch social links: ${error.message}`, variant: "destructive" }); console.error("Error fetching social links:", error); } else setSocialLinks((data || []).map(link => ({ ...link, icon_image_url: link.icon_image_url || null }))); setIsLoadingSocialLinks(false);};
+  const fetchSubmissions = async () => { setIsLoadingSubmissions(true); let query = supabase.from('contact_submissions').select('*').order('submitted_at', { ascending: false }); if (statusFilter !== 'All') { query = query.eq('status', statusFilter); } const { data, error } = await query; if (error) {toast({ title: "Error", description: `Could not fetch submissions: ${error.message}`, variant: "destructive" }); console.error("Error fetching submissions:", error); } else setSubmissions(data || []); setIsLoadingSubmissions(false); };
 
-  const fetchSocialLinks = async () => {
-    setIsLoadingSocialLinks(true);
-    const { data, error } = await supabase.from('social_links').select('*').order('sort_order', { ascending: true });
-    if (error) toast({ title: "Error", description: `Could not fetch social links: ${error.message}`, variant: "destructive" });
-    else setSocialLinks((data || []).map(link => ({ ...link, icon_image_url: link.icon_image_url || null })));
-    setIsLoadingSocialLinks(false);
-  };
+  useEffect(() => { fetchContactDetails(); fetchSocialLinks(); }, []);
+  useEffect(() => { fetchSubmissions(); }, [statusFilter]);
 
-  const fetchSubmissions = async () => {
-    setIsLoadingSubmissions(true);
-    let query = supabase.from('contact_submissions').select('*').order('submitted_at', { ascending: false });
-    if (statusFilter !== 'All') {
-      query = query.eq('status', statusFilter);
-    }
-    const { data, error } = await query;
-    if (error) toast({ title: "Error", description: `Could not fetch submissions: ${error.message}`, variant: "destructive" });
-    else setSubmissions(data || []);
-    setIsLoadingSubmissions(false);
-  };
-
-  useEffect(() => {
-    fetchContactDetails();
-    fetchSocialLinks();
-  }, []);
-
-  useEffect(() => {
-    fetchSubmissions();
-  }, [statusFilter]);
-
-  const onContactDetailsSubmit: SubmitHandler<ContactPageDetailsFormData> = async (formData) => {
-    setIsLoadingContactDetails(true);
-    const dataToUpsert = { ...formData, id: PRIMARY_CONTACT_DETAILS_ID, updated_at: new Date().toISOString() };
-    const { error } = await supabase.from('contact_page_details').upsert(dataToUpsert, { onConflict: 'id' });
-    if (error) toast({ title: "Error", description: `Failed to save contact details: ${error.message}`, variant: "destructive" });
-    else { 
-        toast({ title: "Success", description: "Contact details saved." }); 
-        fetchContactDetails(); 
-        router.refresh(); 
-    }
-    setIsLoadingContactDetails(false);
-  };
-
-  const onSocialLinkSubmit: SubmitHandler<SocialLinkFormData> = async (formData) => {
-    const dataToSave = { ...formData, icon_image_url: formData.icon_image_url?.trim() === '' ? null : formData.icon_image_url, sort_order: Number(formData.sort_order) || 0 };
-    let response;
-    if (formData.id) {
-      response = await supabase.from('social_links').update(dataToSave).eq('id', formData.id).select();
-    } else {
-      const { id, ...insertData } = dataToSave; 
-      response = await supabase.from('social_links').insert(insertData).select();
-    }
-    if (response.error) toast({ title: "Error", description: `Failed to save social link: ${response.error.message}`, variant: "destructive" });
-    else { toast({ title: "Success", description: `Social link ${formData.id ? 'updated' : 'added'}.` }); fetchSocialLinks(); setIsSocialLinkModalOpen(false); router.refresh(); }
-  };
-
-  const handleDeleteSocialLink = async () => {
-    if (!socialLinkToDelete) return;
-    const { error } = await supabase.from('social_links').delete().eq('id', socialLinkToDelete.id);
-    if (error) toast({ title: "Error", description: `Failed to delete social link: ${error.message}`, variant: "destructive" });
-    else { toast({ title: "Success", description: "Social link deleted." }); fetchSocialLinks(); router.refresh(); }
-    setShowSocialLinkDeleteConfirm(false); setSocialLinkToDelete(null);
-  };
-
-  const handleOpenSocialLinkModal = (link?: SocialLink) => {
-    setCurrentSocialLink(link || null);
-    socialLinkForm.reset(link ? { ...link, icon_image_url: link.icon_image_url || '', sort_order: link.sort_order ?? 0 } : { label: '', icon_image_url: '', url: '', display_text: '', sort_order: 0 });
-    setIsSocialLinkModalOpen(true);
-  };
+  const onContactDetailsSubmit: SubmitHandler<ContactPageDetailsFormData> = async (formData) => { setIsLoadingContactDetails(true); const dataToUpsert = { ...formData, id: PRIMARY_CONTACT_DETAILS_ID, updated_at: new Date().toISOString() }; const { error } = await supabase.from('contact_page_details').upsert(dataToUpsert, { onConflict: 'id' }); if (error) {toast({ title: "Error", description: `Failed to save contact details: ${error.message}`, variant: "destructive" }); console.error("Error saving contact details:", error); } else { toast({ title: "Success", description: "Contact details saved." }); fetchContactDetails(); router.refresh(); } setIsLoadingContactDetails(false); };
+  const onSocialLinkSubmit: SubmitHandler<SocialLinkFormData> = async (formData) => { const dataToSave = { ...formData, icon_image_url: formData.icon_image_url?.trim() === '' ? null : formData.icon_image_url, sort_order: Number(formData.sort_order) || 0 }; let response; if (formData.id) { response = await supabase.from('social_links').update(dataToSave).eq('id', formData.id).select(); } else { const { id, ...insertData } = dataToSave; response = await supabase.from('social_links').insert(insertData).select(); } if (response.error) {toast({ title: "Error", description: `Failed to save social link: ${response.error.message}`, variant: "destructive" }); console.error("Error saving social link:", response.error); } else { toast({ title: "Success", description: `Social link ${formData.id ? 'updated' : 'added'}.` }); fetchSocialLinks(); setIsSocialLinkModalOpen(false); router.refresh(); }};
+  const handleDeleteSocialLink = async () => { if (!socialLinkToDelete) return; const { error } = await supabase.from('social_links').delete().eq('id', socialLinkToDelete.id); if (error) {toast({ title: "Error", description: `Failed to delete social link: ${error.message}`, variant: "destructive" }); console.error("Error deleting social link:", error); } else { toast({ title: "Success", description: "Social link deleted." }); fetchSocialLinks(); router.refresh(); } setShowSocialLinkDeleteConfirm(false); setSocialLinkToDelete(null); };
+  const handleOpenSocialLinkModal = (link?: SocialLink) => { setCurrentSocialLink(link || null); socialLinkForm.reset(link ? { ...link, icon_image_url: link.icon_image_url || '', sort_order: link.sort_order ?? 0 } : { label: '', icon_image_url: '', url: '', display_text: '', sort_order: 0 }); setIsSocialLinkModalOpen(true); };
   const triggerSocialLinkDeleteConfirmation = (link: SocialLink) => { setSocialLinkToDelete(link); setShowSocialLinkDeleteConfirm(true); };
-
   const handleViewMessage = (submission: ContactSubmission) => { setSelectedSubmission(submission); setIsViewMessageModalOpen(true); };
-  
-  const handleUpdateSubmissionStatus = async (submissionId: string, newStatus: SubmissionStatus) => {
-    const { error } = await supabase.from('contact_submissions').update({ status: newStatus }).eq('id', submissionId);
-    if (error) toast({ title: "Error", description: `Failed to update status: ${error.message}`, variant: "destructive" });
-    else { toast({ title: "Success", description: "Submission status updated." }); fetchSubmissions(); }
-  };
-
-  const handleToggleStar = async (submission: ContactSubmission) => {
-    const { error } = await supabase.from('contact_submissions').update({ is_starred: !submission.is_starred }).eq('id', submission.id);
-    if (error) toast({ title: "Error", description: `Failed to update star: ${error.message}`, variant: "destructive" });
-    else { toast({ title: "Success", description: "Star status updated." }); fetchSubmissions(); }
-  };
-
-  const handleDeleteSubmission = async () => {
-    if (!submissionToDeleteForDialog) return;
-    const { error } = await supabase.from('contact_submissions').delete().eq('id', submissionToDeleteForDialog.id);
-    if (error) toast({ title: "Error", description: `Failed to delete submission: ${error.message}`, variant: "destructive" });
-    else { toast({ title: "Success", description: "Submission deleted." }); fetchSubmissions(); }
-    setShowSubmissionDeleteConfirmDialog(false); setSubmissionToDeleteForDialog(null);
-  };
-
-  const triggerSubmissionDeleteConfirmation = (submission: ContactSubmission) => { 
-    setSubmissionToDeleteForDialog(submission); 
-    setShowSubmissionDeleteConfirmDialog(true); 
-  };
+  const handleUpdateSubmissionStatus = async (submissionId: string, newStatus: SubmissionStatus) => { const { error } = await supabase.from('contact_submissions').update({ status: newStatus }).eq('id', submissionId); if (error) {toast({ title: "Error", description: `Failed to update status: ${error.message}`, variant: "destructive" }); console.error("Error updating submission status:", error); } else { toast({ title: "Success", description: "Submission status updated." }); fetchSubmissions(); }};
+  const handleToggleStar = async (submission: ContactSubmission) => { const { error } = await supabase.from('contact_submissions').update({ is_starred: !submission.is_starred }).eq('id', submission.id); if (error) {toast({ title: "Error", description: `Failed to update star: ${error.message}`, variant: "destructive" }); console.error("Error toggling star:", error); } else { toast({ title: "Success", description: "Star status updated." }); fetchSubmissions(); }};
+  const handleDeleteSubmission = async () => { if (!submissionToDeleteForDialog) return; const { error } = await supabase.from('contact_submissions').delete().eq('id', submissionToDeleteForDialog.id); if (error) {toast({ title: "Error", description: `Failed to delete submission: ${error.message}`, variant: "destructive" }); console.error("Error deleting submission:", error); } else { toast({ title: "Success", description: "Submission deleted." }); fetchSubmissions(); } setShowSubmissionDeleteConfirmDialog(false); setSubmissionToDeleteForDialog(null); };
+  const triggerSubmissionDeleteConfirmation = (submission: ContactSubmission) => { setSubmissionToDeleteForDialog(submission); setShowSubmissionDeleteConfirmDialog(true); };
 
   const handleOpenReplyModal = (submission: ContactSubmission) => {
     setSubmissionToReplyTo(submission);
@@ -211,7 +124,7 @@ export default function ContactManager() {
     }
     if (!submissionToReplyTo.id || !submissionToReplyTo.email || !submissionToReplyTo.name) {
       console.error("[ContactManager] Submission data incomplete for reply:", submissionToReplyTo);
-      toast({ title: "Error", description: "Submission data is incomplete for sending a reply.", variant: "destructive" });
+      toast({ title: "Error", description: "Submission data is incomplete for sending a reply. Please ensure it has ID, email, and name.", variant: "destructive" });
       return;
     }
 
@@ -232,39 +145,40 @@ export default function ContactManager() {
       if (functionError) {
         console.error("[ContactManager] Error invoking Edge Function (raw):", JSON.stringify(functionError, null, 2));
         let specificMessage = "Failed to send reply. Edge Function call failed.";
-        // Attempt to get more specific error message if available from Supabase's FunctionError structure
         if (typeof functionError === 'object' && functionError !== null) {
-          const errDetails = functionError as any; 
-          if (errDetails.message && typeof errDetails.message === 'string') {
-            specificMessage = `Failed to send reply: ${errDetails.message}`;
-          } else if (errDetails.details && typeof errDetails.details === 'string') {
-            specificMessage = `Failed to send reply: ${errDetails.details}`;
-          } else if (errDetails.error_description && typeof errDetails.error_description === 'string') {
-            specificMessage = `Failed to send reply: ${errDetails.error_description}`;
-          } else if (errDetails.name === "FunctionsHttpError" && errDetails.context && typeof errDetails.context === 'object' && 'message' in errDetails.context && typeof (errDetails.context as any).message === 'string') {
-             specificMessage = `Edge Function Error: ${(errDetails.context as any).message}. Check Edge Function logs.`;
-          } else if (errDetails.name === "FunctionsRelayError" || errDetails.name === "FunctionsFetchError") {
-             specificMessage = "Network error or Edge Function not reachable. Check Edge Function status and logs.";
+          if ((functionError as any).message) {
+            specificMessage = (functionError as any).message;
+          } else if ((functionError as any).name === 'FunctionsHttpError' || (functionError as any).name === 'FunctionsRelayError' || (functionError as any).name === 'FunctionsFetchError') {
+             specificMessage = "Failed to connect to the Edge Function. Please check its deployment status, CORS settings, and logs in your Supabase dashboard.";
           }
         }
-        toast({ title: "Function Invocation Error", description: specificMessage, variant: "destructive", duration: 9000 });
-      } else if (functionData && functionData.error) { 
+        throw new Error(specificMessage);
+      }
+      
+      if (functionData && functionData.error) { 
          console.error("[ContactManager] Error from Edge Function logic:", JSON.stringify(functionData.error, null, 2));
          toast({ title: "Reply Service Error", description: (typeof functionData.error === 'string' ? functionData.error : JSON.stringify(functionData.error)) + " Check Edge Function logs.", variant: "destructive", duration: 9000 });
       } else {
-        toast({ title: "Reply Sent", description: functionData?.message || "Your reply has been processed by the server." });
+        toast({ title: "Reply Sent", description: functionData?.message || "Your reply has been processed." });
         setIsReplyModalOpen(false);
         setReplyMessage('');
         fetchSubmissions(); 
       }
-    } catch (error: any) {
-      console.error("[ContactManager] Unexpected client-side error sending reply:", error);
-      toast({ title: "Client-Side Error", description: error.message || "An unexpected client-side error occurred. Check console.", variant: "destructive" });
+    } catch (err: any) {
+      console.error("[ContactManager] Caught error after trying to invoke Edge Function:", err);
+      let detailedErrorMessage = "An unknown error occurred. Please check the console and Edge Function logs in your Supabase dashboard.";
+      if (err && err.message) {
+        detailedErrorMessage = err.message;
+      }
+      // Check if the error is a FunctionsHttpError and the context is empty, indicating a more generic failure
+      if (err.name === 'FunctionsHttpError' && err.context && Object.keys(err.context).length === 0) {
+        detailedErrorMessage = "Failed to communicate with the Edge Function. It might be unavailable, not deployed correctly, or there could be CORS issues. Please check the function's status and logs in your Supabase dashboard.";
+      }
+      toast({ title: "Reply Failed", description: detailedErrorMessage, variant: "destructive" });
     } finally {
       setIsSendingReply(false);
     }
   };
-
 
   return (
     <div className="space-y-8">
@@ -498,3 +412,4 @@ export default function ContactManager() {
   );
 }
     
+
