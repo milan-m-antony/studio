@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useEffect, useState, type ChangeEvent } from 'react';
@@ -7,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { PlusCircle, Edit, Trash2, Mail, Link as LinkIcon, Phone, MapPin, Save, MessageSquare, Star, Eye, Filter, Send, Loader2, ImageIcon as DefaultSocialIcon, ChevronDown, Tag as TagIcon } from 'lucide-react';
-import NextImage from 'next/image';
+import NextImage from 'next/image'; // Ensure NextImage is imported for social link icons
 import { supabase } from '@/lib/supabaseClient';
 import type { ContactPageDetail, SocialLink, ContactSubmission, SubmissionStatus } from '@/types/supabase';
 import {
@@ -28,40 +29,44 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import * as AccordionPrimitive from "@radix-ui/react-accordion";
 
+// Fixed ID for the single contact_page_details entry
 const PRIMARY_CONTACT_DETAILS_ID = '00000000-0000-0000-0000-000000000005';
 
 const contactPageDetailsSchema = z.object({
   id: z.string().uuid().default(PRIMARY_CONTACT_DETAILS_ID),
   address: z.string().optional().nullable(),
   phone: z.string().optional().nullable(),
-  phone_href: z.string().optional().nullable(),
+  phone_href: z.string().optional().nullable(), // e.g., tel:+12345
   email: z.string().email({ message: "Invalid email address" }).optional().or(z.literal("")).nullable(),
-  email_href: z.string().optional().nullable(),
+  email_href: z.string().optional().nullable(), // e.g., mailto:user@example.com
 });
 type ContactPageDetailsFormData = z.infer<typeof contactPageDetailsSchema>;
 
 const socialLinkSchema = z.object({
   id: z.string().uuid().optional(),
   label: z.string().min(1, "Label is required"),
-  icon_image_url: z.string().url("Must be a valid URL if provided.").optional().or(z.literal("")).nullable(),
+  icon_image_url: z.string().url("Must be a valid URL if provided.").optional().or(z.literal("")).nullable(), // Changed from icon_name
   url: z.string().url("Must be a valid URL"),
-  display_text: z.string().optional().nullable(),
+  display_text: z.string().optional().nullable(), // Optional text to display instead of URL
   sort_order: z.coerce.number().optional().default(0),
 });
 type SocialLinkFormData = z.infer<typeof socialLinkSchema>;
 
 const submissionStatuses: SubmissionStatus[] = ['New', 'Replied', 'Archived'];
 
+
 export default function ContactManager() {
   const router = useRouter();
   const { toast } = useToast();
 
+  // --- State for Contact Page Details ---
   const [isLoadingContactDetails, setIsLoadingContactDetails] = useState(false);
   const contactDetailsForm = useForm<ContactPageDetailsFormData>({
     resolver: zodResolver(contactPageDetailsSchema),
     defaultValues: { id: PRIMARY_CONTACT_DETAILS_ID, address: '', phone: '', phone_href: '', email: '', email_href: '' }
   });
 
+  // --- State for Social Links ---
   const [socialLinks, setSocialLinks] = useState<SocialLink[]>([]);
   const [isLoadingSocialLinks, setIsLoadingSocialLinks] = useState(false);
   const [isSocialLinkModalOpen, setIsSocialLinkModalOpen] = useState(false);
@@ -74,6 +79,8 @@ export default function ContactManager() {
   });
   const watchedSocialLinkIconUrlInModal = socialLinkForm.watch("icon_image_url");
 
+
+  // --- State for Contact Submissions ---
   const [submissions, setSubmissions] = useState<ContactSubmission[]>([]);
   const [isLoadingSubmissions, setIsLoadingSubmissions] = useState(false);
   const [selectedSubmission, setSelectedSubmission] = useState<ContactSubmission | null>(null);
@@ -87,6 +94,8 @@ export default function ContactManager() {
   const [replyMessage, setReplyMessage] = useState('');
   const [isSendingReply, setIsSendingReply] = useState(false);
 
+
+  // --- Data Fetching ---
   const fetchContactDetails = async () => { setIsLoadingContactDetails(true); const { data, error } = await supabase.from('contact_page_details').select('*').eq('id', PRIMARY_CONTACT_DETAILS_ID).maybeSingle(); if (error) {toast({ title: "Error", description: `Could not fetch contact details: ${error.message}`, variant: "destructive" }); console.error("Error fetching contact details:", error);} else if (data) contactDetailsForm.reset(data as ContactPageDetailsFormData); setIsLoadingContactDetails(false); };
   const fetchSocialLinks = async () => { setIsLoadingSocialLinks(true); const { data, error } = await supabase.from('social_links').select('*').order('sort_order', { ascending: true }); if (error) { toast({ title: "Error", description: `Could not fetch social links: ${error.message}`, variant: "destructive" }); console.error("Error fetching social links:", error); } else setSocialLinks((data || []).map(link => ({ ...link, icon_image_url: link.icon_image_url || null }))); setIsLoadingSocialLinks(false);};
   const fetchSubmissions = async () => { setIsLoadingSubmissions(true); let query = supabase.from('contact_submissions').select('*').order('submitted_at', { ascending: false }); if (statusFilter !== 'All') { query = query.eq('status', statusFilter); } const { data, error } = await query; if (error) {toast({ title: "Error", description: `Could not fetch submissions: ${error.message}`, variant: "destructive" }); console.error("Error fetching submissions:", error); } else setSubmissions(data || []); setIsLoadingSubmissions(false); };
@@ -94,12 +103,18 @@ export default function ContactManager() {
   useEffect(() => { fetchContactDetails(); fetchSocialLinks(); }, []);
   useEffect(() => { fetchSubmissions(); }, [statusFilter]);
 
+  // --- Submit Handlers ---
   const onContactDetailsSubmit: SubmitHandler<ContactPageDetailsFormData> = async (formData) => { setIsLoadingContactDetails(true); const dataToUpsert = { ...formData, id: PRIMARY_CONTACT_DETAILS_ID, updated_at: new Date().toISOString() }; const { error } = await supabase.from('contact_page_details').upsert(dataToUpsert, { onConflict: 'id' }); if (error) {toast({ title: "Error", description: `Failed to save contact details: ${error.message}`, variant: "destructive" }); console.error("Error saving contact details:", error); } else { toast({ title: "Success", description: "Contact details saved." }); fetchContactDetails(); router.refresh(); } setIsLoadingContactDetails(false); };
   const onSocialLinkSubmit: SubmitHandler<SocialLinkFormData> = async (formData) => { const dataToSave = { ...formData, icon_image_url: formData.icon_image_url?.trim() === '' ? null : formData.icon_image_url, sort_order: Number(formData.sort_order) || 0 }; let response; if (formData.id) { response = await supabase.from('social_links').update(dataToSave).eq('id', formData.id).select(); } else { const { id, ...insertData } = dataToSave; response = await supabase.from('social_links').insert(insertData).select(); } if (response.error) {toast({ title: "Error", description: `Failed to save social link: ${response.error.message}`, variant: "destructive" }); console.error("Error saving social link:", response.error); } else { toast({ title: "Success", description: `Social link ${formData.id ? 'updated' : 'added'}.` }); fetchSocialLinks(); setIsSocialLinkModalOpen(false); router.refresh(); }};
+  
+  // --- Delete Handlers ---
   const handleDeleteSocialLink = async () => { if (!socialLinkToDelete) return; const { error } = await supabase.from('social_links').delete().eq('id', socialLinkToDelete.id); if (error) {toast({ title: "Error", description: `Failed to delete social link: ${error.message}`, variant: "destructive" }); console.error("Error deleting social link:", error); } else { toast({ title: "Success", description: "Social link deleted." }); fetchSocialLinks(); router.refresh(); } setShowSocialLinkDeleteConfirm(false); setSocialLinkToDelete(null); };
+  
+  // --- Modal Openers ---
   const handleOpenSocialLinkModal = (link?: SocialLink) => { setCurrentSocialLink(link || null); socialLinkForm.reset(link ? { ...link, icon_image_url: link.icon_image_url || '', sort_order: link.sort_order ?? 0 } : { label: '', icon_image_url: '', url: '', display_text: '', sort_order: 0 }); setIsSocialLinkModalOpen(true); };
   const triggerSocialLinkDeleteConfirmation = (link: SocialLink) => { setSocialLinkToDelete(link); setShowSocialLinkDeleteConfirm(true); };
   
+  // --- Submission Handlers ---
   const handleViewMessage = (submission: ContactSubmission) => { setSelectedSubmission(submission); setIsViewMessageModalOpen(true); };
   const handleUpdateSubmissionStatus = async (submissionId: string, newStatus: SubmissionStatus) => { const { error } = await supabase.from('contact_submissions').update({ status: newStatus }).eq('id', submissionId); if (error) {toast({ title: "Error", description: `Failed to update status: ${error.message}`, variant: "destructive" }); console.error("Error updating submission status:", error); } else { toast({ title: "Success", description: "Submission status updated." }); fetchSubmissions(); }};
   const handleToggleStar = async (submission: ContactSubmission) => { const { error } = await supabase.from('contact_submissions').update({ is_starred: !submission.is_starred }).eq('id', submission.id); if (error) {toast({ title: "Error", description: `Failed to update star: ${error.message}`, variant: "destructive" }); console.error("Error toggling star:", error); } else { toast({ title: "Success", description: "Star status updated." }); fetchSubmissions(); }};
@@ -116,9 +131,9 @@ export default function ContactManager() {
     setIsReplyModalOpen(true);
   };
 
-  const handleSendReply = async () => {
+ const handleSendReply = async () => {
     if (!submissionToReplyTo || !submissionToReplyTo.id || !submissionToReplyTo.email || !submissionToReplyTo.name) {
-      toast({ title: "Reply Error", description: "Critical submission information is missing for reply.", variant: "destructive"});
+      toast({ title: "Reply Error", description: "Critical submission information is missing. Cannot send reply.", variant: "destructive" });
       return;
     }
     if (!replyMessage.trim()) {
@@ -133,7 +148,7 @@ export default function ContactManager() {
       recipientEmail: submissionToReplyTo.email,
       recipientName: submissionToReplyTo.name,
     };
-    console.log("[ContactManager] Payload for Edge Function (email content generated by function):", payload);
+    console.log("[ContactManager] Invoking 'send-contact-reply' Edge Function with payload:", payload, " (Email content/styling is handled by the Edge Function)");
 
     try {
       const { data: functionData, error: functionError } = await supabase.functions.invoke('send-contact-reply', {
@@ -144,15 +159,12 @@ export default function ContactManager() {
         console.error("[ContactManager] Error invoking Edge Function (raw):", JSON.stringify(functionError, null, 2));
         let specificMessage = "Failed to send reply. Edge Function call failed.";
         if (typeof functionError === 'object' && functionError !== null) {
-          const supabaseFuncError = functionError as any; 
-          if (supabaseFuncError.message && typeof supabaseFuncError.message === 'string' && supabaseFuncError.message.length > 0) {
-            specificMessage = supabaseFuncError.message;
+          if ('message' in functionError && typeof (functionError as any).message === 'string' && (functionError as any).message.length > 0) {
+            specificMessage = (functionError as any).message;
           }
-          if (supabaseFuncError.name === 'FunctionsHttpError' || supabaseFuncError.name === 'FunctionsRelayError' || supabaseFuncError.name === 'FunctionsFetchError') {
-             if(Object.keys(supabaseFuncError.context || {}).length === 0){
-                specificMessage = "Edge Function call failed or returned an error. Please check Supabase Edge Function logs for details (e.g., missing secrets, code errors, CORS, or email provider issues).";
-             } else {
-                specificMessage = "Communication error with the reply service. Check Supabase Edge Function status and logs.";
+          if (functionError.name === 'FunctionsHttpError' || functionError.name === 'FunctionsRelayError' || functionError.name === 'FunctionsFetchError') {
+             if (!(functionError as any).context || Object.keys((functionError as any).context).length === 0) {
+                 specificMessage = "Edge Function call failed or returned an error. Please check Supabase Edge Function logs for details (e.g., missing secrets, code errors, CORS, or email provider issues).";
              }
           }
         }
@@ -160,7 +172,7 @@ export default function ContactManager() {
           title: "Reply Service Error",
           description: specificMessage,
           variant: "destructive",
-          duration: 9000 
+          duration: 9000
         });
         setIsSendingReply(false);
         return; 
@@ -172,13 +184,15 @@ export default function ContactManager() {
       } else {
         toast({ 
             title: "Reply Processed", 
-            description: functionData?.message || `Your reply to ${submissionToReplyTo.email} has been processed by the system. Email generation and sending occurs in the Edge Function.`, 
+            description: functionData?.message || `Your reply to ${submissionToReplyTo.email} has been processed. Email generation and styled sending is handled by the Edge Function.`, 
             variant: "default",
             duration: 7000 
         });
         setIsReplyModalOpen(false);
         setReplyMessage('');
+        // Optimistically update status, or rely on fetchSubmissions if Edge Function handles it
         handleUpdateSubmissionStatus(submissionToReplyTo.id, 'Replied'); 
+        fetchSubmissions(); // Re-fetch to get latest notes and ensure status consistency
       }
     } catch (err: any) {
       console.error("[ContactManager] Unexpected error during send reply:", err);
@@ -216,7 +230,7 @@ export default function ContactManager() {
       </Card>
 
       <Card className="shadow-lg">
-        <CardHeader><CardTitle className="flex items-center justify-between">Manage Social Links <LinkIcon className="h-6 w-6 text-primary" /></CardTitle><CardDescription>Add, edit, or delete social media links. Provide an image URL for icons.</CardDescription></CardHeader>
+        <CardHeader><CardTitle className="flex items-center justify-between">Manage Social Links <LinkIcon className="h-6 w-6 text-primary" /></CardTitle><CardDescription>Add, edit, or delete social media links. Provide an image URL for custom icons.</CardDescription></CardHeader>
         <CardContent>
           <div className="mb-6 text-right"><Button onClick={() => handleOpenSocialLinkModal()} className="w-full sm:w-auto"><PlusCircle className="mr-2 h-4 w-4" /> Add Social Link</Button></div>
           {isLoadingSocialLinks ? (<p className="text-center text-muted-foreground">Loading social links...</p>) : socialLinks.length === 0 ? (<p className="text-muted-foreground text-center py-4">No social links found.</p>) : (
@@ -433,8 +447,5 @@ export default function ContactManager() {
     </div>
   );
 }
-    
 
     
-
-
