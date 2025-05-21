@@ -18,7 +18,7 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabaseClient'; 
-import type { SiteSettings, User as SupabaseUserType, AdminActivityLog } from '@/types/supabase';
+import type { SiteSettings, User as SupabaseUserType } from '@/types/supabase'; // AdminActivityLog might be moved later
 import { useToast } from "@/hooks/use-toast";
 import {
   AlertDialog,
@@ -62,24 +62,21 @@ const adminNavItems: AdminNavItem[] = [
   { key: 'settings', label: 'Settings', icon: SettingsIcon },
 ];
 
-// Define deletable sections for the Danger Zone
-// Ensure 'tables' and 'buckets' arrays match your database schema and storage setup.
 const deletableSectionsConfig = [
     { key: 'hero', label: 'Hero Section Content', tables: ['hero_content'], buckets: [] },
     { key: 'about', label: 'About Section Content', tables: ['about_content'], buckets: ['about-images'] },
-    { key: 'projects', label: 'All Projects & Project Views', tables: ['projects', 'project_views'], buckets: ['project-images'] },
-    { key: 'skills', label: 'All Skills, Categories & Interactions', tables: ['skills', 'skill_categories', 'skill_interactions'], buckets: ['category-icons', 'skill-icons'] },
-    { key: 'journey', label: 'Journey/Timeline Events', tables: ['timeline_events'], buckets: [] }, // Add bucket if timeline items have unique uploaded images
+    { key: 'projects', label: 'All Projects Data', tables: ['projects'], buckets: ['project-images'] },
+    { key: 'project_views_analytics', label: 'Project Views Data (Analytics)', tables: ['project_views'], buckets: [] },
+    { key: 'skills', label: 'All Skills & Categories Data', tables: ['skills', 'skill_categories'], buckets: ['category-icons', 'skill-icons'] },
+    { key: 'skill_interactions_analytics', label: 'Skill Interactions Data (Analytics)', tables: ['skill_interactions'], buckets: [] },
+    { key: 'journey', label: 'Journey/Timeline Events Data', tables: ['timeline_events'], buckets: [] },
     { key: 'certifications', label: 'All Certifications Data', tables: ['certifications'], buckets: ['certification-images'] },
-    { key: 'resume', label: 'All Resume Data (Meta, Experience, Edu, Skills, Lang)', tables: ['resume_meta', 'resume_experience', 'resume_education', 'resume_key_skills', 'resume_key_skill_categories', 'resume_languages'], buckets: ['resume-pdfs', 'resume-experience-icons', 'resume-education-icons', 'resume-language-icons'] },
-    { key: 'contact_page_content', label: 'Contact Page Details & Social Links', tables: ['contact_page_details', 'social_links'], buckets: [] },
+    { key: 'resume', label: 'All Resume Data (Meta, Experience, Education, Skills, Languages)', tables: ['resume_meta', 'resume_experience', 'resume_education', 'resume_key_skills', 'resume_key_skill_categories', 'resume_languages'], buckets: ['resume-pdfs', 'resume-experience-icons', 'resume-education-icons', 'resume-language-icons'] },
+    { key: 'resume_downloads_analytics', label: 'Resume Downloads Data (Analytics)', tables: ['resume_downloads'], buckets: [] },
+    { key: 'contact_page_content', label: 'Contact Page Details & Page Social Links', tables: ['contact_page_details', 'social_links'], buckets: [] },
     { key: 'contact_submissions', label: 'All Contact Form Submissions', tables: ['contact_submissions'], buckets: [] },
     { key: 'legal_docs', label: 'Legal Documents Content', tables: ['legal_documents'], buckets: [] },
     { key: 'activity_log', label: 'Admin Activity Log', tables: ['admin_activity_log'], buckets: [] },
-    // New entries for specific analytics data feeding the dashboard overview
-    { key: 'project_views_analytics', label: 'Project Views Data (Analytics)', tables: ['project_views'], buckets: [] },
-    { key: 'skill_interactions_analytics', label: 'Skill Interactions Data (Analytics)', tables: ['skill_interactions'], buckets: [] },
-    { key: 'resume_downloads_analytics', label: 'Resume Downloads Data (Analytics)', tables: ['resume_downloads'], buckets: [] },
   ] as const; 
   
 type DeletableSectionKey = typeof deletableSectionsConfig[number]['key'];
@@ -115,8 +112,7 @@ export default function AdminDashboardPage() {
   const [deleteCountdown, setDeleteCountdown] = useState(5);
   const [isDeletingData, setIsDeletingData] = useState(false);
   const deleteCountdownIntervalRef = React.useRef<NodeJS.Timeout | null>(null);
-  const [authListener, setAuthListener] = useState<any>(null); // To store the auth subscription
-
+  // const [authListener, setAuthListener] = useState<any>(null); // Removed: This state was causing infinite loop
 
   useEffect(() => {
     setIsMounted(true);
@@ -140,7 +136,7 @@ export default function AdminDashboardPage() {
         setPasswordInput('');   
         setError('');      
         setActiveSection('dashboard'); 
-        router.replace('/admin/dashboard'); // Ensure redirect to login view on sign out
+        router.replace('/admin/dashboard'); 
       } else if (event === 'SIGNED_IN' && session?.user) {
          if (activeSection === 'settings') { 
              fetchSiteSettings();
@@ -149,8 +145,8 @@ export default function AdminDashboardPage() {
         setCurrentUser(session.user);
       }
     });
-    setAuthListener(subscription); // Store the subscription
-    
+    // setAuthListener(subscription); // Removed this line
+
     const getInitialSession = async () => {
         console.log("[AdminDashboardPage] Checking initial session on mount.");
         const { data: { session }, error: sessionError } = await supabase.auth.getSession();
@@ -174,12 +170,12 @@ export default function AdminDashboardPage() {
 
     return () => {
       console.log("[AdminDashboardPage] Unmounting, unsubscribing auth listener.");
-      authListener?.unsubscribe(); // Correctly unsubscribe
+      subscription?.unsubscribe(); // Use subscription directly from closure
       if (deleteCountdownIntervalRef.current) {
         clearInterval(deleteCountdownIntervalRef.current);
       }
     };
-  }, [activeSection, router, authListener]); // Added authListener and router to dependency array
+  }, [activeSection, router]); // Removed authListener from dependency array
 
 
   const fetchSiteSettings = async () => {
@@ -275,7 +271,7 @@ export default function AdminDashboardPage() {
     setIsLoadingAuth(true);
     
     const trimmedEmail = emailInput.trim();
-    const trimmedPassword = passwordInput; // Password should not be trimmed before sending to Supabase Auth
+    const trimmedPassword = passwordInput; 
 
     console.log("[AdminDashboardPage] Attempting Supabase login for email:", trimmedEmail);
     
@@ -302,7 +298,8 @@ export default function AdminDashboardPage() {
       } catch (logError) {
         console.error("Error logging admin login:", logError);
       }
-      router.replace('/admin/dashboard'); // Re-evaluate route now that user is set
+      // No longer need to set localStorage as Supabase session is now used.
+      // router.replace('/admin/dashboard'); // This can cause issues if already on the page; onAuthStateChange handles UI update
     } else {
         setError("An unexpected error occurred during login. No user data returned.");
         toast({ title: "Login Error", description: "An unexpected error occurred. Please try again.", variant: "destructive" });
@@ -359,17 +356,24 @@ export default function AdminDashboardPage() {
 
   const handlePasswordConfirmForDelete = async () => {
     if (!currentUser || !currentUser.email) {
-      toast({ title: "Authentication Error", description: "Cannot verify password.", variant: "destructive"});
+      toast({ title: "Authentication Error", description: "Cannot verify password. User email not found.", variant: "destructive"});
       return;
     }
     
-    const { error: reauthError } = await supabase.auth.signInWithPassword({
+    // Re-authenticate with password to confirm identity before destructive action
+    const { error: reauthError } = await supabase.auth.reauthenticate(); // This will use the current session's provider
+    // For password re-auth, Supabase might require more specific handling or a custom flow
+    // For simplicity here, we'll assume the user's current session is recent enough,
+    // OR we can attempt a signInWithPassword again, which acts as re-authentication.
+    // Let's use signInWithPassword for a more explicit check with the provided password.
+
+    const { data: reauthData, error: signInForReauthError } = await supabase.auth.signInWithPassword({
         email: currentUser.email,
-        password: adminPasswordConfirm,
+        password: adminPasswordConfirm, // The password typed into the modal
     });
 
-    if (reauthError) {
-        console.error("[AdminDashboardPage] Re-authentication for delete failed:", reauthError);
+    if (signInForReauthError || !reauthData.user) {
+        console.error("[AdminDashboardPage] Re-authentication for delete failed:", signInForReauthError);
         toast({ title: "Password Incorrect", description: "The admin password entered is incorrect.", variant: "destructive"});
         return;
     }
@@ -414,13 +418,13 @@ export default function AdminDashboardPage() {
 
     try {
       console.log('[AdminDashboardPage] Invoking danger-delete-all-data Edge Function with sections:', selectedSectionKeys);
-      const { error: functionError, data: functionData } = await supabase.functions.invoke('danger-delete-all-data', {
-        body: { sections_to_delete: selectedSectionKeys } // Send the keys of selected sections
+      const { data: functionData, error: functionError } = await supabase.functions.invoke('danger-delete-all-data', {
+        body: { sections_to_delete: selectedSectionKeys } 
       });
 
       if (functionError) {
         console.error("[AdminDashboardPage] Error invoking Edge Function (raw):", JSON.stringify(functionError, null, 2));
-        let detailedMessage = functionError.message || "Function invocation failed.";
+        let detailedMessage = "Function invocation failed. Check Edge Function logs.";
         if (functionError.message?.includes("Function not found")) {
             detailedMessage = "The 'danger-delete-all-data' Edge Function could not be found. Ensure it's deployed.";
         } else if (functionError.name === 'FunctionsHttpError' || functionError.name === 'FunctionsRelayError' || functionError.name === 'FunctionsFetchError') {
@@ -456,6 +460,7 @@ export default function AdminDashboardPage() {
       setShowDeleteDataConfirmModal(false);
     }
   };
+
 
   if (!isMounted || isLoadingAuth) {
     return (
@@ -587,7 +592,7 @@ export default function AdminDashboardPage() {
             <Card className="border-destructive shadow-lg">
                 <CardHeader>
                     <CardTitle className="text-destructive flex items-center gap-2"><AlertTriangle className="h-6 w-6"/>Danger Zone</CardTitle>
-                    <CardDescription className="text-destructive/80">These actions are irreversible and can lead to data loss from your database and associated storage.</CardDescription>
+                    <CardDescription className="text-destructive/80">These actions are irreversible and can lead to data loss from your database and associated storage files.</CardDescription>
                 </CardHeader>
                 <CardContent>
                     <div className="space-y-4">
@@ -707,3 +712,5 @@ export default function AdminDashboardPage() {
     </AdminPageLayout>
   );
 }
+
+    
