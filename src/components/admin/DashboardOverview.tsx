@@ -20,16 +20,16 @@ interface MostInteractedSkillData {
 }
 
 const placeholderDeviceData = [
-  { name: 'Desktop', visitors: 450, color: '#1E88E5' }, // Blue
-  { name: 'Mobile', visitors: 750, color: '#43A047' },  // Green
-  { name: 'Tablet', visitors: 120, color: '#FB8C00' },  // Orange
+  { name: 'Desktop', visitors: 450, color: 'hsl(var(--chart-1))' }, 
+  { name: 'Mobile', visitors: 750, color: 'hsl(var(--chart-2))' },  
+  { name: 'Tablet', visitors: 120, color: 'hsl(var(--chart-4))' },  
 ];
 
 const placeholderTrafficSourceData = [
-    { name: 'GitHub', visitors: 300, color: '#6E5494' },
-    { name: 'LinkedIn', visitors: 250, color: '#0077B5' },
-    { name: 'Google', visitors: 400, color: '#4285F4' },
-    { name: 'Direct', visitors: 150, color: '#757575' },
+    { name: 'GitHub', visitors: 300, color: 'hsl(var(--chart-1))' },
+    { name: 'LinkedIn', visitors: 250, color: 'hsl(var(--chart-2))' },
+    { name: 'Google', visitors: 400, color: 'hsl(var(--chart-3))' },
+    { name: 'Direct', visitors: 150, color: 'hsl(var(--chart-5))' },
 ];
 
 
@@ -78,15 +78,15 @@ export default function DashboardOverview() {
       setIsLoadingMostViewedProject(true);
       const { data: allViews, error: allViewsError } = await supabase
         .from('project_views')
-        .select('project_id');
+        .select('project_id'); // Only select the necessary column
       
       if (allViewsError) {
         console.error("Error fetching all project views for aggregation:", allViewsError);
-        setMostViewedProjectData({ title: 'Error', views: 0 });
+        setMostViewedProjectData({ title: 'Error Loading Data', views: 0 });
       } else if (allViews && allViews.length > 0) {
         const viewCounts: Record<string, number> = {};
         allViews.forEach(view => {
-          if (view.project_id) {
+          if (view.project_id) { // Ensure project_id is not null
             viewCounts[view.project_id] = (viewCounts[view.project_id] || 0) + 1;
           }
         });
@@ -108,7 +108,7 @@ export default function DashboardOverview() {
             .single();
           if (projectError) {
             console.error("Error fetching most viewed project title:", projectError);
-            setMostViewedProjectData({ title: 'N/A', views: maxViews });
+            setMostViewedProjectData({ title: 'N/A (Project Error)', views: maxViews });
           } else {
             setMostViewedProjectData({ title: projectData?.title || 'Unknown Project', views: maxViews });
           }
@@ -116,23 +116,29 @@ export default function DashboardOverview() {
           setMostViewedProjectData({ title: 'N/A', views: 0 });
         }
       } else {
-        setMostViewedProjectData({ title: 'N/A', views: 0 });
+        setMostViewedProjectData({ title: 'N/A (No Views)', views: 0 });
       }
       setIsLoadingMostViewedProject(false);
 
       // Fetch Most Interacted Skill
       setIsLoadingMostInteractedSkill(true);
-      const { data: allInteractions, error: allInteractionsError } = await supabase
+      const { data: allInteractions, error: allInteractionsError, status: interactionsStatus, statusText: interactionsStatusText } = await supabase
         .from('skill_interactions')
         .select('skill_id');
 
       if (allInteractionsError) {
-        console.error("Error fetching skill interactions for aggregation:", allInteractionsError);
-        setMostInteractedSkillData({ name: 'Error', interactions: 0 });
+        let errorMessage = 'Error fetching skill interactions for aggregation. ';
+        if (typeof allInteractionsError === 'object' && allInteractionsError !== null) {
+          const supabaseError = allInteractionsError as { message?: string; details?: string; hint?: string; code?: string };
+          errorMessage += `Message: ${supabaseError.message || 'N/A'}, Details: ${supabaseError.details || 'N/A'}, Hint: ${supabaseError.hint || 'N/A'}, Code: ${supabaseError.code || 'N/A'}. `;
+        }
+        errorMessage += `Status: ${interactionsStatus || 'N/A'} ${interactionsStatusText || 'N/A'}. Please ensure the 'skill_interactions' table exists and RLS policies allow reads for authenticated admins.`;
+        console.error(errorMessage, allInteractionsError); // Log the full error object as well
+        setMostInteractedSkillData({ name: 'Error Loading Data', interactions: 0 });
       } else if (allInteractions && allInteractions.length > 0) {
         const interactionCounts: Record<string, number> = {};
         allInteractions.forEach(interaction => {
-          if (interaction.skill_id) {
+          if (interaction.skill_id) { // Ensure skill_id is not null
             interactionCounts[interaction.skill_id] = (interactionCounts[interaction.skill_id] || 0) + 1;
           }
         });
@@ -154,7 +160,7 @@ export default function DashboardOverview() {
             .single();
           if (skillError) {
             console.error("Error fetching most interacted skill name:", skillError);
-            setMostInteractedSkillData({ name: 'N/A', interactions: maxInteractions });
+            setMostInteractedSkillData({ name: 'N/A (Skill Error)', interactions: maxInteractions });
           } else {
             setMostInteractedSkillData({ name: skillData?.name || 'Unknown Skill', interactions: maxInteractions });
           }
@@ -162,10 +168,9 @@ export default function DashboardOverview() {
           setMostInteractedSkillData({ name: 'N/A', interactions: 0 });
         }
       } else {
-        setMostInteractedSkillData({ name: 'N/A', interactions: 0 });
+        setMostInteractedSkillData({ name: 'N/A (No Interactions)', interactions: 0 });
       }
       setIsLoadingMostInteractedSkill(false);
-
 
       // Fetch Recent Contact Submissions Count
       setIsLoadingRecentSubmissions(true);
@@ -195,10 +200,10 @@ export default function DashboardOverview() {
         <CardHeader>
           <CardTitle className="text-xl flex items-center"><ShoppingBag className="mr-2 h-6 w-6 text-primary" />Project & Skill Engagement</CardTitle>
         </CardHeader>
-        <CardContent className="grid gap-4 md:grid-cols-2 lg:grid-cols-3"> {/* Changed to lg:grid-cols-3 */}
+        <CardContent className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           <StatCard 
             title="Total Project Views" 
-            value={totalProjectViews ?? "..."} 
+            value={isLoadingTotalProjectViews ? "..." : (totalProjectViews ?? 0)} 
             icon={Eye} 
             description="Across all projects" 
             isLoading={isLoadingTotalProjectViews} 
@@ -209,17 +214,16 @@ export default function DashboardOverview() {
             icon={TrendingUp} 
             description="Highest single project engagement" 
             isLoading={isLoadingMostViewedProject}
-            valueClassName="truncate text-lg sm:text-2xl"
+            valueClassName="truncate text-lg sm:text-xl" 
           />
           <StatCard 
             title="Most Interacted Skill" 
             value={isLoadingMostInteractedSkill ? "..." : `${mostInteractedSkillData.name || 'N/A'} (${mostInteractedSkillData.interactions ?? 0} interactions)`}
             icon={Brain} 
-            description="Based on skill interactions" 
+            description="Based on user interactions (requires tracking)" 
             isLoading={isLoadingMostInteractedSkill}
-            valueClassName="truncate text-lg sm:text-2xl"
+            valueClassName="truncate text-lg sm:text-xl"
           />
-          {/* Removed Project Category Popularity Card */}
         </CardContent>
       </Card>
 
@@ -229,7 +233,7 @@ export default function DashboardOverview() {
         </CardHeader>
         <CardContent className="grid gap-4 md:grid-cols-2">
           <StatCard title="Total Resume Downloads" value="N/A Yet" icon={Download} description="Track PDF downloads (requires setup)" isLoading={true}/>
-          <StatCard title="Contact Submissions (7 Days)" value={recentSubmissionsCount ?? "..."} icon={Mail} description="New messages from contact form" isLoading={isLoadingRecentSubmissions}/>
+          <StatCard title="Contact Submissions (7 Days)" value={isLoadingRecentSubmissions ? "..." : (recentSubmissionsCount ?? 0)} icon={Mail} description="New messages from contact form" isLoading={isLoadingRecentSubmissions}/>
         </CardContent>
       </Card>
 
@@ -238,10 +242,9 @@ export default function DashboardOverview() {
           <CardTitle className="text-xl flex items-center"><Users className="mr-2 h-6 w-6 text-primary" />Visitor Analytics (Placeholders)</CardTitle>
           <CardDescription>Insights into your audience. (Requires dedicated analytics integration).</CardDescription>
         </CardHeader>
-        <CardContent className="grid gap-4 md:grid-cols-2 lg:grid-cols-2"> {/* Changed to lg:grid-cols-2 */}
+        <CardContent className="grid gap-4 md:grid-cols-2 lg:grid-cols-2">
            <StatCard title="Visitors by Device" value="N/A" icon={Users} description="Mobile / Desktop / Tablet" isLoading={true}/>
            <StatCard title="Top Traffic Sources" value="N/A" icon={LinkIcon} description="e.g., GitHub, LinkedIn, Direct" isLoading={true}/>
-           {/* Removed Peak Visit Hours and External Link Clicks for now to fit in 2 cols */}
         </CardContent>
          <CardContent>
             <h3 className="text-lg font-semibold mb-2 text-muted-foreground mt-4">Visitors by Device Type (Placeholder Chart)</h3>
@@ -299,3 +302,5 @@ export default function DashboardOverview() {
     </div>
   );
 }
+
+    
