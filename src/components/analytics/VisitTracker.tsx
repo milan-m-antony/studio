@@ -15,62 +15,96 @@ const getDeviceType = (): VisitorLog['device_type'] => {
   return 'Desktop';
 };
 
+const ADMIN_SITE_SETTINGS_ID = 'global_settings'; // Ensure this matches your settings table ID
+
 export default function VisitTracker() {
   const pathname = usePathname();
 
   useEffect(() => {
-    // Only run tracking on the client-side and not for admin paths
-    if (typeof window !== 'undefined' && !pathname.startsWith('/admin') && !pathname.startsWith('/maintenance')) {
-      const logVisit = async () => {
-        let isTrackingEnabled = true; // Default to true
-        try {
-            const { data: settings, error: settingsError } = await supabase
-                .from('site_settings')
-                .select('is_analytics_tracking_enabled')
-                .eq('id', 'global_settings')
-                .maybeSingle();
+    console.log('[VisitTracker] Component mounted. Pathname:', pathname);
 
-            if (settingsError) {
-                console.warn('VisitTracker: Error fetching site_settings:', settingsError.message);
-            } else if (settings && settings.is_analytics_tracking_enabled === false) {
-                isTrackingEnabled = false;
-                console.log('VisitTracker: Analytics tracking is globally disabled.');
-            }
-        } catch (e: any) {
-            console.warn('VisitTracker: Exception fetching site_settings:', e.message);
+    // Only run tracking on the client-side
+    if (typeof window === 'undefined') {
+      console.log('[VisitTracker] Exiting: Not client-side.');
+      return;
+    }
+
+    if (pathname.startsWith('/admin') || pathname.startsWith('/maintenance')) {
+      console.log('[VisitTracker] Exiting: Admin or maintenance path.');
+      return;
+    }
+
+    const logVisit = async () => {
+      let isTrackingGloballyEnabled = true; // Default to true if setting fetch fails
+      try {
+        console.log('[VisitTracker] Fetching site settings for analytics tracking status...');
+        const { data: settings, error: settingsError } = await supabase
+            .from('site_settings')
+            .select('is_analytics_tracking_enabled')
+            .eq('id', ADMIN_SITE_SETTINGS_ID)
+            .maybeSingle();
+
+        if (settingsError) {
+            console.warn('[VisitTracker] Error fetching site_settings:', settingsError.message);
+            // Proceed with tracking if settings can't be fetched, or decide to disable.
+        } else if (settings && settings.is_analytics_tracking_enabled === false) {
+            isTrackingGloballyEnabled = false;
+            console.log('[VisitTracker] Analytics tracking is globally disabled in site_settings.');
+        } else if (settings && settings.is_analytics_tracking_enabled === true) {
+            console.log('[VisitTracker] Analytics tracking is globally enabled in site_settings.');
+        } else {
+            console.log('[VisitTracker] No specific analytics tracking setting found or setting is null, defaulting to enabled.');
         }
+      } catch (e: any) {
+          console.warn('[VisitTracker] Exception fetching site_settings:', e.message);
+          // Proceed with tracking if settings can't be fetched
+      }
 
-        if (!isTrackingEnabled) {
-            return; 
-        }
+      if (!isTrackingGloballyEnabled) {
+          console.log('[VisitTracker] Exiting: Global analytics tracking is disabled.');
+          return;
+      }
 
-        const device_type = getDeviceType();
-        const path_visited = pathname;
-        const user_agent_string = navigator.userAgent;
-        
-        console.log(`VisitTracker: Logging visit - Path: ${path_visited}, Device: ${device_type}`);
-
-        const { error } = await supabase
-          .from('visitor_logs')
-          .insert([{ device_type, path_visited, user_agent_string }]);
-
-        if (error) {
-          console.warn('VisitTracker: Failed to log visit:', error.message);
-        }
+      const device_type = getDeviceType();
+      const path_visited = pathname;
+      const user_agent_string = navigator.userAgent;
+      
+      const visitData: Omit<VisitorLog, 'id' | 'visited_at'> = {
+        device_type,
+        path_visited,
+        user_agent_string,
+        // viewer_identifier: 'some_session_id_or_fingerprint', // Optional: for more advanced tracking
       };
 
-      // Log visit once per session for a given path to reduce noise,
-      // or use a more sophisticated session tracking.
-      // For simplicity, we'll log every time this component mounts for a new path.
-      const sessionKey = `visit_logged_${pathname}`;
-      if (!sessionStorage.getItem(sessionKey)) {
-        logVisit();
-        sessionStorage.setItem(sessionKey, 'true');
+      console.log('[VisitTracker] Attempting to log visit with data:', visitData);
+
+      const { data: insertData, error: insertError } = await supabase
+        .from('visitor_logs')
+        .insert([visitData]);
+
+      if (insertError) {
+        console.error('[VisitTracker] Failed to log visit to Supabase:', JSON.stringify(insertError, null, 2));
+        // Check for specific RLS violation error
+        if (insertError.message.toLowerCase().includes('violates row-level security policy')) {
+          console.error('[VisitTracker] RLS VIOLATION: Ensure "Public can insert visitor_logs" policy is active and correct on your visitor_logs table.');
+        }
       } else {
-        // Optionally re-log if enough time has passed, or just log once per session per path
-        // console.log(`VisitTracker: Visit to ${pathname} already logged this session.`);
+        console.log('[VisitTracker] Visit logged successfully to Supabase. Inserted data:', insertData);
       }
+    };
+
+    // Log visit once per session for a given path to reduce noise,
+    // or use a more sophisticated session tracking.
+    const sessionKey = `visit_logged_${pathname}`;
+    if (!sessionStorage.getItem(sessionKey)) {
+      console.log(`[VisitTracker] No session lock for ${pathname}. Proceeding to log visit.`);
+      logVisit();
+      sessionStorage.setItem(sessionKey, 'true');
+    } else {
+      console.log(`[VisitTracker] Visit to ${pathname} already logged this session. Skipping.`);
     }
+    
+  // Only re-run if pathname changes significantly (not for hash changes)
   }, [pathname]); 
 
   return null; 
