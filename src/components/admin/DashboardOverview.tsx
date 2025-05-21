@@ -1,4 +1,3 @@
-
 // src/components/admin/DashboardOverview.tsx
 "use client";
 
@@ -8,12 +7,7 @@ import { Eye, Brain, FolderKanban, LineChart, Users, Download, Mail, Link as Lin
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, XAxis, YAxis, Tooltip as RechartsTooltip, Legend as RechartsLegend, Cell } from 'recharts';
 import { supabase } from '@/lib/supabaseClient';
 import { subDays, format } from 'date-fns';
-import type { Project, Skill, ProjectView, SkillInteraction, ResumeDownload, ContactSubmission } from '@/types/supabase'; // Added ResumeDownload, ContactSubmission
-
-interface AggregatedData {
-  id: string;
-  count: number;
-}
+import type { Project, Skill, ContactSubmission, ResumeDownload, ProjectView, SkillInteraction } from '@/types/supabase';
 
 interface MostViewedProjectData {
   title: string | null;
@@ -25,7 +19,6 @@ interface MostInteractedSkillData {
   interactions: number | null;
 }
 
-// Placeholder data for charts
 const placeholderDeviceData = [
   { name: 'Desktop', visitors: 450, color: 'hsl(var(--chart-1))' },
   { name: 'Mobile', visitors: 750, color: 'hsl(var(--chart-2))' },
@@ -82,15 +75,19 @@ export default function DashboardOverview() {
       setIsLoadingRecentSubmissions(true);
       setIsLoadingResumeDownloads(true);
 
-      // Fetch Total Project Views
       try {
+        // Fetch Total Project Views
         const { count: viewsCount, error: viewsError } = await supabase
           .from('project_views')
           .select('*', { count: 'exact', head: true });
-        if (viewsError) throw viewsError;
-        setTotalProjectViews(viewsCount ?? 0);
+        if (viewsError) {
+          console.error("[DashboardOverview] Error fetching total project views:", viewsError);
+          setTotalProjectViews(0); // Default to 0 on error
+        } else {
+          setTotalProjectViews(viewsCount ?? 0);
+        }
       } catch (error) {
-        console.error("[DashboardOverview] Error fetching total project views:", error);
+        console.error("[DashboardOverview] Exception fetching total project views:", error);
         setTotalProjectViews(0);
       }
       setIsLoadingTotalProjectViews(false);
@@ -101,15 +98,17 @@ export default function DashboardOverview() {
           .from('project_views')
           .select('project_id');
         
-        if (allProjectViewsError) throw allProjectViewsError;
-
-        if (allProjectViews && allProjectViews.length > 0) {
+        if (allProjectViewsError) {
+          console.error("Error fetching project views for aggregation:", JSON.stringify(allProjectViewsError, null, 2));
+          setMostViewedProjectData({ title: 'Error Loading', views: 0 });
+        } else if (allProjectViews && allProjectViews.length > 0) {
           const viewCounts: Record<string, number> = {};
           allProjectViews.forEach(view => {
             if (view.project_id) {
               viewCounts[view.project_id] = (viewCounts[view.project_id] || 0) + 1;
             }
           });
+
           let maxViews = 0;
           let mostViewedId: string | null = null;
           for (const projectId in viewCounts) {
@@ -118,6 +117,7 @@ export default function DashboardOverview() {
               mostViewedId = projectId;
             }
           }
+
           if (mostViewedId) {
             const { data: projectData, error: projectError } = await supabase
               .from('projects')
@@ -125,8 +125,8 @@ export default function DashboardOverview() {
               .eq('id', mostViewedId)
               .single();
             if (projectError) {
-              console.error("[DashboardOverview] Error fetching most viewed project title:", projectError);
-              setMostViewedProjectData({ title: 'N/A (Project Error)', views: maxViews });
+              console.error("[DashboardOverview] Error fetching title for most viewed project:", projectError);
+              setMostViewedProjectData({ title: 'Project Title Error', views: maxViews });
             } else {
               setMostViewedProjectData({ title: projectData?.title || 'Unknown Project', views: maxViews });
             }
@@ -137,7 +137,7 @@ export default function DashboardOverview() {
           setMostViewedProjectData({ title: 'N/A (No Views Yet)', views: 0 });
         }
       } catch (error) {
-         console.error("[DashboardOverview] Error processing most viewed project:", error);
+         console.error("[DashboardOverview] Exception processing most viewed project:", error);
          setMostViewedProjectData({ title: 'Error Loading Data', views: 0 });
       }
       setIsLoadingMostViewedProject(false);
@@ -145,24 +145,22 @@ export default function DashboardOverview() {
       // Fetch Most Interacted Skill
       try {
         const { data: allInteractions, error: allInteractionsError } = await supabase
-            .from('skill_interactions') // This table needs to exist
+            .from('skill_interactions')
             .select('skill_id');
 
         if (allInteractionsError) {
-            let errorMessage = `Error fetching skill interactions. Message: ${allInteractionsError.message || 'Unknown error.'}`;
+            let errorMessage = `Error fetching skill interactions. Supabase code: ${allInteractionsError.code}. Message: ${allInteractionsError.message || 'Unknown error.'}`;
             if (typeof allInteractionsError === 'object' && allInteractionsError !== null) {
-                const supabaseError = allInteractionsError as any; // Cast to access potential Supabase error properties
-                errorMessage += ` Details: ${supabaseError.details || 'N/A'}, Hint: ${supabaseError.hint || 'N/A'}, Code: ${supabaseError.code || 'N/A'}`;
-                if (supabaseError.code === '42P01') { // PostgreSQL error code for "undefined_table"
-                    errorMessage += " This likely means the 'skill_interactions' table does not exist in your database. Please create it.";
+                const supabaseError = allInteractionsError as any;
+                errorMessage += ` Details: ${supabaseError.details || 'N/A'}, Hint: ${supabaseError.hint || 'N/A'}`;
+                 if (supabaseError.code === '42P01') { // PostgreSQL error code for "undefined_table"
+                    errorMessage += " This means the 'skill_interactions' table does not exist or is not accessible. Please create it and check RLS policies.";
                 }
             }
             console.error("[DashboardOverview] Full skill interactions error object:", JSON.stringify(allInteractionsError, null, 2));
             console.error("[DashboardOverview]", errorMessage);
-            throw new Error(errorMessage); // Throwing the enriched message
-        }
-
-        if (allInteractions && allInteractions.length > 0) {
+            setMostInteractedSkillData({ name: 'Error Loading', interactions: 0 });
+        } else if (allInteractions && allInteractions.length > 0) {
             const interactionCounts: Record<string, number> = {};
             allInteractions.forEach(interaction => {
                 if (interaction.skill_id) {
@@ -184,8 +182,8 @@ export default function DashboardOverview() {
                     .eq('id', mostInteractedSkillId)
                     .single();
                 if (skillError) {
-                    console.error("[DashboardOverview] Error fetching most interacted skill name:", skillError);
-                    setMostInteractedSkillData({ name: 'N/A (Skill Error)', interactions: maxInteractions });
+                    console.error("[DashboardOverview] Error fetching name for most interacted skill:", skillError);
+                    setMostInteractedSkillData({ name: 'Skill Name Error', interactions: maxInteractions });
                 } else {
                     setMostInteractedSkillData({ name: skillData?.name || 'Unknown Skill', interactions: maxInteractions });
                 }
@@ -196,7 +194,7 @@ export default function DashboardOverview() {
             setMostInteractedSkillData({ name: 'N/A (No Interactions Yet)', interactions: 0 });
         }
       } catch (error) {
-        console.error("[DashboardOverview] Catch block for 'Most Interacted Skill' processing:", error);
+        console.error("[DashboardOverview] Exception processing most interacted skill:", error);
         setMostInteractedSkillData({ name: 'Error Loading Skill Data', interactions: 0 });
       }
       setIsLoadingMostInteractedSkill(false);
@@ -206,10 +204,14 @@ export default function DashboardOverview() {
         const { count: resumeDownloadsCount, error: resumeError } = await supabase
           .from('resume_downloads')
           .select('*', { count: 'exact', head: true });
-        if (resumeError) throw resumeError;
-        setTotalResumeDownloads(resumeDownloadsCount ?? 0);
+        if (resumeError) {
+            console.error("[DashboardOverview] Error fetching total resume downloads:", resumeError);
+            setTotalResumeDownloads(0);
+        } else {
+            setTotalResumeDownloads(resumeDownloadsCount ?? 0);
+        }
       } catch (error) {
-        console.error("[DashboardOverview] Error fetching total resume downloads:", error);
+        console.error("[DashboardOverview] Exception fetching total resume downloads:", error);
         setTotalResumeDownloads(0);
       }
       setIsLoadingResumeDownloads(false);
@@ -221,10 +223,14 @@ export default function DashboardOverview() {
           .from('contact_submissions')
           .select('*', { count: 'exact', head: true })
           .gte('submitted_at', sevenDaysAgo);
-        if (submissionsError) throw submissionsError;
-        setRecentSubmissionsCount(submissionsCount ?? 0);
+        if (submissionsError) {
+            console.error("[DashboardOverview] Error fetching recent contact submissions:", submissionsError);
+            setRecentSubmissionsCount(0);
+        } else {
+            setRecentSubmissionsCount(submissionsCount ?? 0);
+        }
       } catch (error) {
-        console.error("[DashboardOverview] Error fetching recent contact submissions:", error);
+        console.error("[DashboardOverview] Exception fetching recent contact submissions:", error);
         setRecentSubmissionsCount(0);
       }
       setIsLoadingRecentSubmissions(false);
@@ -246,30 +252,31 @@ export default function DashboardOverview() {
         <CardHeader>
           <CardTitle className="text-xl flex items-center"><ShoppingBag className="mr-2 h-6 w-6 text-primary" />Project & Skill Engagement</CardTitle>
         </CardHeader>
-        <CardContent className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        <CardContent className="grid gap-4 md:grid-cols-2 lg:grid-cols-3"> {/* Changed to lg:grid-cols-3 */}
           <StatCard 
             title="Total Project Views" 
             value={totalProjectViews ?? 0} 
             icon={Eye} 
-            description="Across all projects" 
+            description="Across all projects (based on card views)" 
             isLoading={isLoadingTotalProjectViews} 
           />
           <StatCard 
             title="Most Viewed Project" 
             value={isLoadingMostViewedProject ? "Loading..." : `${mostViewedProjectData.title || 'N/A'} (${mostViewedProjectData.views ?? 0} views)`}
             icon={TrendingUp} 
-            description="Project with highest engagement" 
+            description="Project with highest card views" 
             isLoading={isLoadingMostViewedProject}
             valueClassName="truncate text-lg sm:text-xl" 
           />
           <StatCard 
             title="Most Interacted Skill" 
-            value={isLoadingMostInteractedSkill ? "Loading..." : `${mostInteractedSkillData.name || 'N/A'} (${mostInteractedSkillData.interactions ?? 0} interactions)`}
+            value={isLoadingMostInteractedSkill ? "Loading..." : `${mostInteractedSkillData.name || 'N/A'} (${mostInteractedSkillData.interactions ?? 0} views)`}
             icon={Brain} 
-            description="Skill with most user interactions (requires tracking)" 
+            description="Skill with most card views (requires tracking)" 
             isLoading={isLoadingMostInteractedSkill}
             valueClassName="truncate text-lg sm:text-xl"
           />
+          {/* Project Category Popularity card removed */}
         </CardContent>
       </Card>
 
@@ -282,7 +289,7 @@ export default function DashboardOverview() {
             title="Total Resume Downloads" 
             value={totalResumeDownloads ?? 0} 
             icon={Download} 
-            description="Requires client-side event logging in public Resume section" 
+            description="Track PDF downloads (requires client-side event logging)" 
             isLoading={isLoadingResumeDownloads}
           />
           <StatCard 
@@ -351,14 +358,11 @@ export default function DashboardOverview() {
             <CardTitle className="text-lg flex items-center text-yellow-700 dark:text-yellow-500"><AlertCircle className="mr-2 h-5 w-5"/>Implementation Notes</CardTitle>
         </CardHeader>
         <CardContent className="text-sm text-yellow-600 dark:text-yellow-400/80 space-y-2">
-            <p><strong>"Most Interacted Skill" requires client-side tracking:</strong> Add code to your public skills display (e.g., in `SkillCard.tsx`) to log an event to the `skill_interactions` table in Supabase when a skill is viewed or clicked.</p>
-            <p><strong>"Total Resume Downloads" requires client-side tracking:</strong> Add code to your public resume section (`ResumeSectionClientView.tsx`) to log an event to `resume_downloads` when the download button is clicked (this should now be functional).</p>
-            <p><strong>Visitor Analytics & Charts:</strong> Currently use placeholder data/components. For real data, integrate a dedicated analytics service (Vercel Analytics, Google Analytics, etc.) or implement more extensive custom event logging and aggregation.</p>
+            <p><strong>"Most Interacted Skill" (tracking views):</strong> This feature is now active. It logs an interaction to the `skill_interactions` table each time a `SkillCard` is displayed on your public site.</p>
+            <p><strong>"Total Resume Downloads":</strong> This requires you to complete the client-side event logging in `ResumeSectionClientView.tsx` to insert a record into `resume_downloads` table when the download button is clicked.</p>
+            <p><strong>Visitor Analytics & Charts:</strong> These currently use placeholder data. For real data, integrate an analytics service or implement custom event logging.</p>
         </CardContent>
       </Card>
-
     </div>
   );
 }
-
-          
