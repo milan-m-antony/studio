@@ -7,7 +7,7 @@ import { Button, buttonVariants } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
-import { PlusCircle, Edit, Trash2, Mail, Link as LinkIconToUse, Phone, MapPin, Save, MessageSquare, Star, Eye, Filter, Send, Loader2, ImageIcon, ChevronDown, Tag as TagIcon } from 'lucide-react';
+import { PlusCircle, Edit, Trash2, Mail, Link as LinkIcon, Phone, MapPin, Save, MessageSquare, Star, Eye, Filter, Send, Loader2, ImageIcon, ChevronDown, Tag as TagIcon } from 'lucide-react';
 import NextImage from 'next/image';
 import { supabase } from '@/lib/supabaseClient';
 import type { ContactPageDetail, SocialLink, ContactSubmission, SubmissionStatus } from '@/types/supabase';
@@ -17,7 +17,7 @@ import {
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription as AlertDialogPrimitiveDescription, AlertDialogFooter as AlertDialogPrimitiveFooter, AlertDialogHeader as AlertDialogPrimitiveHeader, AlertDialogTitle as AlertDialogPrimitiveTitle,
 } from "@/components/ui/alert-dialog";
-import { useForm, type SubmitHandler } from "react-hook-form";
+import { useForm, type SubmitHandler, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useToast } from '@/hooks/use-toast';
@@ -28,7 +28,6 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import * as AccordionPrimitive from "@radix-ui/react-accordion";
-
 
 const PRIMARY_CONTACT_DETAILS_ID = '00000000-0000-0000-0000-000000000005';
 
@@ -120,12 +119,12 @@ export default function ContactManager() {
 
   const handleSendReply = async () => {
     if (!submissionToReplyTo) {
-      toast({ title: "Error replying", description: "No submission selected.", variant: "destructive" });
+      toast({ title: "Error Replying", description: "No submission selected for reply.", variant: "destructive" });
       return;
     }
-     if (!submissionToReplyTo.id || !submissionToReplyTo.email || !submissionToReplyTo.name) {
-      console.error("[ContactManager] Submission data incomplete for reply:", submissionToReplyTo);
+    if (!submissionToReplyTo.id || !submissionToReplyTo.email || !submissionToReplyTo.name) {
       toast({ title: "Error", description: "Submission data is incomplete. Cannot send reply.", variant: "destructive" });
+      console.error("Incomplete submission data for reply:", submissionToReplyTo);
       return;
     }
     if (!replyMessage.trim()) {
@@ -150,35 +149,30 @@ export default function ContactManager() {
       if (functionError) {
         console.error("[ContactManager] Error invoking Edge Function (raw):", JSON.stringify(functionError, null, 2));
         let specificMessage = "Failed to send reply. Edge Function call failed.";
-        // Attempt to get more specific error message if available
         if (typeof functionError === 'object' && functionError !== null) {
-            if ('message' in functionError && typeof (functionError as any).message === 'string') {
-                try {
-                    const parsedDetails = JSON.parse((functionError as any).message);
-                    if (parsedDetails && typeof parsedDetails.error === 'string') {
-                        specificMessage = parsedDetails.error;
-                    } else if (parsedDetails && typeof parsedDetails.message === 'string') {
-                        specificMessage = parsedDetails.message;
-                    } else {
-                         specificMessage = (functionError as any).message;
-                    }
-                } catch (e) {
-                    specificMessage = (functionError as any).message; // Fallback if message is not JSON
-                }
-            } else if ('details' in functionError && typeof (functionError as any).details === 'string') {
-                specificMessage = (functionError as any).details;
-            }
+          if ('message' in functionError && typeof (functionError as any).message === 'string') {
+            try {
+                const parsedDetails = JSON.parse((functionError as any).message);
+                if (parsedDetails && typeof parsedDetails.error === 'string') specificMessage = parsedDetails.error;
+                else if (parsedDetails && typeof parsedDetails.message === 'string') specificMessage = parsedDetails.message;
+                else specificMessage = (functionError as any).message;
+            } catch (e) { specificMessage = (functionError as any).message; }
+          } else if ('details' in functionError && typeof (functionError as any).details === 'string') {
+            specificMessage = (functionError as any).details;
+          } else if ('error' in functionError && typeof (functionError as any).error === 'string') {
+            specificMessage = (functionError as any).error;
+          }
         }
-        throw new Error(specificMessage); 
+        throw new Error(specificMessage);
       }
       
       if (functionData && functionData.error) { 
          console.error("[ContactManager] Error response from Edge Function logic:", JSON.stringify(functionData.error, null, 2));
-         toast({ title: "Reply Service Error", description: (typeof functionData.error === 'string' ? functionData.error : JSON.stringify(functionData.error)) + " Check Edge Function logs.", variant: "destructive", duration: 9000 });
+         toast({ title: "Reply Service Error", description: `Edge Function reported: ${typeof functionData.error === 'string' ? functionData.error : JSON.stringify(functionData.error)}`, variant: "destructive", duration: 9000 });
       } else {
         toast({ 
-            title: "Reply Sent Successfully via Gmail SMTP", 
-            description: `Your styled reply to ${submissionToReplyTo.email} has been processed. The submission status is updated.`, 
+            title: "Reply Sent", 
+            description: `Your reply to ${submissionToReplyTo.email} has been processed. Submission status updated.`, 
             variant: "default",
             duration: 7000 
         });
@@ -189,14 +183,16 @@ export default function ContactManager() {
     } catch (err: any) {
       console.error("[ContactManager] Failed to send reply via Edge Function:", err);
       let errorMessage = "Function Invocation Error";
-      if (err && err.message) { 
-        errorMessage = err.message;
-      } else if (typeof err === 'object' && err !== null && 'details' in err && typeof err.details === 'string') {
-        errorMessage = err.details;
-      } else if (typeof err === 'object' && err !== null && 'error' in err && typeof err.error === 'string') {
-        errorMessage = err.error;
-      }
-      toast({ title: "Reply Failed", description: `${errorMessage}. Please check the Edge Function logs in Supabase.`, variant: "destructive", duration: 9000 });
+      if (err && err.message) errorMessage = err.message;
+      else if (typeof err === 'object' && err !== null && 'details' in err && typeof err.details === 'string') errorMessage = err.details;
+      else if (typeof err === 'object' && err !== null && 'error' in err && typeof err.error === 'string') errorMessage = err.error;
+      
+      toast({ 
+          title: "Reply Failed", 
+          description: `${errorMessage}. Please check the Edge Function logs.`, 
+          variant: "destructive", 
+          duration: 9000 
+      });
     } finally {
       setIsSendingReply(false);
     }
@@ -225,7 +221,7 @@ export default function ContactManager() {
       </Card>
 
       <Card className="shadow-lg">
-        <CardHeader><CardTitle className="flex items-center justify-between">Manage Social Links <LinkIconToUse className="h-6 w-6 text-primary" /></CardTitle><CardDescription>Add, edit, or delete social media links. Provide a direct image URL for icons.</CardDescription></CardHeader>
+        <CardHeader><CardTitle className="flex items-center justify-between">Manage Social Links <LinkIcon className="h-6 w-6 text-primary" /></CardTitle><CardDescription>Add, edit, or delete social media links. Provide a direct image URL for icons.</CardDescription></CardHeader>
         <CardContent>
           <div className="mb-6 text-right"><Button onClick={() => handleOpenSocialLinkModal()} className="w-full sm:w-auto"><PlusCircle className="mr-2 h-4 w-4" /> Add Social Link</Button></div>
           {isLoadingSocialLinks ? (<p className="text-center text-muted-foreground">Loading social links...</p>) : socialLinks.length === 0 ? (<p className="text-muted-foreground text-center py-4">No social links found.</p>) : (
@@ -383,6 +379,9 @@ export default function ContactManager() {
                 <div><p className="text-sm font-medium text-muted-foreground">Received:</p><p>{selectedSubmission.submitted_at && isValid(parseISO(selectedSubmission.submitted_at)) ? format(parseISO(selectedSubmission.submitted_at), "PPpp") : 'Invalid Date'}</p></div>
                 <div><p className="text-sm font-medium text-muted-foreground">Status:</p><p>{selectedSubmission.status}</p></div>
                 <div><p className="text-sm font-medium text-muted-foreground">Message:</p><p className="whitespace-pre-wrap bg-muted p-3 rounded-md">{selectedSubmission.message}</p></div>
+                {selectedSubmission.notes && (
+                  <div><p className="text-sm font-medium text-muted-foreground">Admin Notes:</p><p className="whitespace-pre-wrap bg-blue-100 dark:bg-blue-900/30 p-3 rounded-md text-blue-800 dark:text-blue-300">{selectedSubmission.notes}</p></div>
+                )}
               </div>
             </ScrollArea>
             <DialogFooter>
@@ -439,4 +438,6 @@ export default function ContactManager() {
     </div>
   );
 }
+    
+
     
