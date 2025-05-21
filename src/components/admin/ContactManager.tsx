@@ -7,11 +7,11 @@ import { Button, buttonVariants } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
-import { PlusCircle, Edit, Trash2, Mail, Link as LinkIconToUse, Phone, MapPin, Save, MessageSquare, Star, Eye, Filter, Send, Loader2, ImageIcon } from 'lucide-react'; // Renamed Link to LinkIconToUse
+import { PlusCircle, Edit, Trash2, Mail, Link as LinkIconToUse, Phone, MapPin, Save, MessageSquare, Star, Eye, Filter, Send, Loader2, ImageIcon } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
 import type { ContactPageDetail, SocialLink, ContactSubmission, SubmissionStatus } from '@/types/supabase';
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose, DialogDescription,
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose,
 } from "@/components/ui/dialog";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription as AlertDialogPrimitiveDescription, AlertDialogFooter as AlertDialogPrimitiveFooter, AlertDialogHeader as AlertDialogPrimitiveHeader, AlertDialogTitle as AlertDialogPrimitiveTitle,
@@ -31,7 +31,6 @@ import { Textarea } from '@/components/ui/textarea';
 
 const PRIMARY_CONTACT_DETAILS_ID = '00000000-0000-0000-0000-000000000005';
 
-// Zod Schemas
 const contactPageDetailsSchema = z.object({
   id: z.string().uuid().default(PRIMARY_CONTACT_DETAILS_ID),
   address: z.string().optional().nullable(),
@@ -58,14 +57,12 @@ export default function ContactManager() {
   const router = useRouter();
   const { toast } = useToast();
 
-  // Contact Details State & Form
   const [isLoadingContactDetails, setIsLoadingContactDetails] = useState(false);
   const contactDetailsForm = useForm<ContactPageDetailsFormData>({
     resolver: zodResolver(contactPageDetailsSchema),
     defaultValues: { id: PRIMARY_CONTACT_DETAILS_ID, address: '', phone: '', phone_href: '', email: '', email_href: '' }
   });
 
-  // Social Links State & Form
   const [socialLinks, setSocialLinks] = useState<SocialLink[]>([]);
   const [isLoadingSocialLinks, setIsLoadingSocialLinks] = useState(false);
   const [isSocialLinkModalOpen, setIsSocialLinkModalOpen] = useState(false);
@@ -78,23 +75,19 @@ export default function ContactManager() {
   });
   const watchedSocialLinkIconUrlInModal = socialLinkForm.watch("icon_image_url");
 
-  // Contact Submissions State
   const [submissions, setSubmissions] = useState<ContactSubmission[]>([]);
   const [isLoadingSubmissions, setIsLoadingSubmissions] = useState(false);
   const [selectedSubmission, setSelectedSubmission] = useState<ContactSubmission | null>(null);
   const [isViewMessageModalOpen, setIsViewMessageModalOpen] = useState(false);
-  const [submissionToDelete, setSubmissionToDelete] = useState<ContactSubmission | null>(null);
-  const [showSubmissionDeleteConfirm, setShowSubmissionDeleteConfirm] = useState(false);
+  const [submissionToDeleteForDialog, setSubmissionToDeleteForDialog] = useState<ContactSubmission | null>(null);
+  const [showSubmissionDeleteConfirmDialog, setShowSubmissionDeleteConfirmDialog] = useState(false);
   const [statusFilter, setStatusFilter] = useState<SubmissionStatus | 'All'>('All');
   
-  // State for Reply Modal
   const [isReplyModalOpen, setIsReplyModalOpen] = useState(false);
   const [submissionToReplyTo, setSubmissionToReplyTo] = useState<ContactSubmission | null>(null);
   const [replyMessage, setReplyMessage] = useState('');
   const [isSendingReply, setIsSendingReply] = useState(false);
 
-
-  // Fetchers
   const fetchContactDetails = async () => {
     setIsLoadingContactDetails(true);
     const { data, error } = await supabase.from('contact_page_details').select('*').eq('id', PRIMARY_CONTACT_DETAILS_ID).maybeSingle();
@@ -132,8 +125,6 @@ export default function ContactManager() {
     fetchSubmissions();
   }, [statusFilter]);
 
-
-  // Handlers for Contact Details
   const onContactDetailsSubmit: SubmitHandler<ContactPageDetailsFormData> = async (formData) => {
     setIsLoadingContactDetails(true);
     const dataToUpsert = { ...formData, id: PRIMARY_CONTACT_DETAILS_ID, updated_at: new Date().toISOString() };
@@ -147,15 +138,19 @@ export default function ContactManager() {
     setIsLoadingContactDetails(false);
   };
 
-  // Handlers for Social Links
   const onSocialLinkSubmit: SubmitHandler<SocialLinkFormData> = async (formData) => {
     const dataToSave = { ...formData, icon_image_url: formData.icon_image_url?.trim() === '' ? null : formData.icon_image_url, sort_order: Number(formData.sort_order) || 0 };
-    const { error } = formData.id
-      ? await supabase.from('social_links').update(dataToSave).eq('id', formData.id)
-      : await supabase.from('social_links').insert(dataToSave);
-    if (error) toast({ title: "Error", description: `Failed to save social link: ${error.message}`, variant: "destructive" });
+    let response;
+    if (formData.id) {
+      response = await supabase.from('social_links').update(dataToSave).eq('id', formData.id).select();
+    } else {
+      const { id, ...insertData } = dataToSave; 
+      response = await supabase.from('social_links').insert(insertData).select();
+    }
+    if (response.error) toast({ title: "Error", description: `Failed to save social link: ${response.error.message}`, variant: "destructive" });
     else { toast({ title: "Success", description: `Social link ${formData.id ? 'updated' : 'added'}.` }); fetchSocialLinks(); setIsSocialLinkModalOpen(false); router.refresh(); }
   };
+
   const handleDeleteSocialLink = async () => {
     if (!socialLinkToDelete) return;
     const { error } = await supabase.from('social_links').delete().eq('id', socialLinkToDelete.id);
@@ -163,6 +158,7 @@ export default function ContactManager() {
     else { toast({ title: "Success", description: "Social link deleted." }); fetchSocialLinks(); router.refresh(); }
     setShowSocialLinkDeleteConfirm(false); setSocialLinkToDelete(null);
   };
+
   const handleOpenSocialLinkModal = (link?: SocialLink) => {
     setCurrentSocialLink(link || null);
     socialLinkForm.reset(link ? { ...link, icon_image_url: link.icon_image_url || '', sort_order: link.sort_order ?? 0 } : { label: '', icon_image_url: '', url: '', display_text: '', sort_order: 0 });
@@ -170,7 +166,6 @@ export default function ContactManager() {
   };
   const triggerSocialLinkDeleteConfirmation = (link: SocialLink) => { setSocialLinkToDelete(link); setShowSocialLinkDeleteConfirm(true); };
 
-  // Handlers for Contact Submissions
   const handleViewMessage = (submission: ContactSubmission) => { setSelectedSubmission(submission); setIsViewMessageModalOpen(true); };
   
   const handleUpdateSubmissionStatus = async (submissionId: string, newStatus: SubmissionStatus) => {
@@ -186,21 +181,26 @@ export default function ContactManager() {
   };
 
   const handleDeleteSubmission = async () => {
-    if (!submissionToDelete) return;
-    const { error } = await supabase.from('contact_submissions').delete().eq('id', submissionToDelete.id);
+    if (!submissionToDeleteForDialog) return;
+    const { error } = await supabase.from('contact_submissions').delete().eq('id', submissionToDeleteForDialog.id);
     if (error) toast({ title: "Error", description: `Failed to delete submission: ${error.message}`, variant: "destructive" });
     else { toast({ title: "Success", description: "Submission deleted." }); fetchSubmissions(); }
-    setShowSubmissionDeleteConfirm(false); setSubmissionToDelete(null);
+    setShowSubmissionDeleteConfirmDialog(false); setSubmissionToDeleteForDialog(null);
   };
-  const triggerSubmissionDeleteConfirmation = (submission: ContactSubmission) => { setSubmissionToDelete(submission); setShowSubmissionDeleteConfirm(true); };
+
+  const triggerSubmissionDeleteConfirmation = (submission: ContactSubmission) => { 
+    setSubmissionToDeleteForDialog(submission); 
+    setShowSubmissionDeleteConfirmDialog(true); 
+  };
 
   const handleOpenReplyModal = (submission: ContactSubmission) => {
     setSubmissionToReplyTo(submission);
-    setReplyMessage('');
+    setReplyMessage(''); 
     setIsReplyModalOpen(true);
   };
 
   const handleSendReply = async () => {
+    console.log("[ContactManager] handleSendReply called");
     if (!submissionToReplyTo) {
       toast({ title: "Error", description: "No submission selected to reply to.", variant: "destructive" });
       return;
@@ -210,6 +210,7 @@ export default function ContactManager() {
       return;
     }
     if (!submissionToReplyTo.id || !submissionToReplyTo.email || !submissionToReplyTo.name) {
+      console.error("[ContactManager] Submission data incomplete for reply:", submissionToReplyTo);
       toast({ title: "Error", description: "Submission data is incomplete for sending a reply.", variant: "destructive" });
       return;
     }
@@ -221,7 +222,7 @@ export default function ContactManager() {
       recipientEmail: submissionToReplyTo.email,
       recipientName: submissionToReplyTo.name,
     };
-    console.log("[ContactManager] Payload for Edge Function (send-contact-reply):", payload);
+    console.log("[ContactManager] Payload for Edge Function:", payload);
 
     try {
       const { data: functionData, error: functionError } = await supabase.functions.invoke('send-contact-reply', {
@@ -230,33 +231,35 @@ export default function ContactManager() {
 
       if (functionError) {
         console.error("[ContactManager] Error invoking Edge Function (raw):", JSON.stringify(functionError, null, 2));
-        throw functionError;
+        let specificMessage = "Failed to send reply. Edge Function call failed.";
+        // Attempt to get more specific error message if available from Supabase's FunctionError structure
+        if (typeof functionError === 'object' && functionError !== null) {
+          const errDetails = functionError as any; 
+          if (errDetails.message && typeof errDetails.message === 'string') {
+            specificMessage = `Failed to send reply: ${errDetails.message}`;
+          } else if (errDetails.details && typeof errDetails.details === 'string') {
+            specificMessage = `Failed to send reply: ${errDetails.details}`;
+          } else if (errDetails.error_description && typeof errDetails.error_description === 'string') {
+            specificMessage = `Failed to send reply: ${errDetails.error_description}`;
+          } else if (errDetails.name === "FunctionsHttpError" && errDetails.context && typeof errDetails.context === 'object' && 'message' in errDetails.context && typeof (errDetails.context as any).message === 'string') {
+             specificMessage = `Edge Function Error: ${(errDetails.context as any).message}. Check Edge Function logs.`;
+          } else if (errDetails.name === "FunctionsRelayError" || errDetails.name === "FunctionsFetchError") {
+             specificMessage = "Network error or Edge Function not reachable. Check Edge Function status and logs.";
+          }
+        }
+        toast({ title: "Function Invocation Error", description: specificMessage, variant: "destructive", duration: 9000 });
+      } else if (functionData && functionData.error) { 
+         console.error("[ContactManager] Error from Edge Function logic:", JSON.stringify(functionData.error, null, 2));
+         toast({ title: "Reply Service Error", description: (typeof functionData.error === 'string' ? functionData.error : JSON.stringify(functionData.error)) + " Check Edge Function logs.", variant: "destructive", duration: 9000 });
+      } else {
+        toast({ title: "Reply Sent", description: functionData?.message || "Your reply has been processed by the server." });
+        setIsReplyModalOpen(false);
+        setReplyMessage('');
+        fetchSubmissions(); 
       }
-      
-      if (functionData && functionData.error) {
-         console.error("[ContactManager] Error returned from Edge Function logic:", JSON.stringify(functionData.error, null, 2));
-         throw new Error(typeof functionData.error === 'string' ? functionData.error : "An error occurred in the reply Edge Function.");
-      }
-
-      toast({ title: "Reply Sent (via Gmail SMTP)", description: functionData?.message || "Your reply has been processed by the server." });
-      setIsReplyModalOpen(false);
-      setReplyMessage('');
-      // Update status locally or re-fetch to see 'Replied' status from Edge function
-      const updatedSubmissions = submissions.map(sub => 
-        sub.id === submissionToReplyTo.id ? { ...sub, status: 'Replied' as SubmissionStatus } : sub
-      );
-      setSubmissions(updatedSubmissions);
-      // Optionally, call fetchSubmissions() after a short delay if Edge Function updates DB
-      // setTimeout(fetchSubmissions, 1000); 
     } catch (error: any) {
-      console.error("[ContactManager] Failed to send reply:", error);
-      let errorMessage = "Failed to send reply. Please ensure the Edge Function is correctly configured for Gmail SMTP.";
-      if (error.message) {
-        errorMessage = error.message;
-      } else if (typeof error === 'object' && error !== null && 'message' in error) {
-        errorMessage = (error as {details?: string, message?: string}).message || errorMessage;
-      }
-      toast({ title: "Error Sending Reply", description: errorMessage, variant: "destructive" });
+      console.error("[ContactManager] Unexpected client-side error sending reply:", error);
+      toast({ title: "Client-Side Error", description: error.message || "An unexpected client-side error occurred. Check console.", variant: "destructive" });
     } finally {
       setIsSendingReply(false);
     }
@@ -264,61 +267,58 @@ export default function ContactManager() {
 
 
   return (
-    <>
-      <Card className="mb-8 shadow-lg">
-        <CardHeader>
-          <CardTitle className="flex items-center justify-between">Manage Contact Page Information <Mail className="h-6 w-6 text-primary" /></CardTitle>
-          <CardDescription>Update address, phone, email, and social media links for your contact page.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          {isLoadingContactDetails ? (<p className="text-center text-muted-foreground">Loading contact details...</p>) : (
+    <div className="space-y-8">
+      <Card className="shadow-lg">
+        <CardHeader><CardTitle className="flex items-center justify-between">Manage Contact Page Information <Mail className="h-6 w-6 text-primary" /></CardTitle><CardDescription>Update address, phone, email, and social media links for your contact page.</CardDescription></CardHeader>
+        <CardContent>{isLoadingContactDetails ? (<p className="text-center text-muted-foreground">Loading contact details...</p>) : (
             <form onSubmit={contactDetailsForm.handleSubmit(onContactDetailsSubmit)} className="grid gap-6 py-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div><Label htmlFor="contact_address">Address</Label><Input id="contact_address" {...contactDetailsForm.register("address")} placeholder="123 Main St, Anytown, USA" /></div>
-                <div><Label htmlFor="contact_phone">Phone Display Text</Label><Input id="contact_phone" {...contactDetailsForm.register("phone")} placeholder="+1 (555) 123-4567" /></div>
-                <div><Label htmlFor="contact_phone_href">Phone Link (tel:)</Label><Input id="contact_phone_href" {...contactDetailsForm.register("phone_href")} placeholder="tel:+15551234567" /></div>
-                <div><Label htmlFor="contact_email">Email Address</Label><Input id="contact_email" type="email" {...contactDetailsForm.register("email")} placeholder="your.email@example.com" />{contactDetailsForm.formState.errors.email && <p className="text-destructive text-sm mt-1">{contactDetailsForm.formState.errors.email.message}</p>}</div>
-                <div><Label htmlFor="contact_email_href">Email Link (mailto:)</Label><Input id="contact_email_href" {...contactDetailsForm.register("email_href")} placeholder="mailto:your.email@example.com" /></div>
-              </div>
-              <Button type="submit" className="w-full sm:w-auto justify-self-start" disabled={isLoadingContactDetails}><Save className="mr-2 h-4 w-4" /> {isLoadingContactDetails ? 'Saving...' : 'Save Contact Info'}</Button>
+              <ScrollArea className="max-h-[60vh] p-1 pr-3">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-2">
+                  <div><Label htmlFor="contact_address">Address</Label><Input id="contact_address" {...contactDetailsForm.register("address")} placeholder="123 Main St, Anytown, USA" /></div>
+                  <div><Label htmlFor="contact_phone">Phone Display Text</Label><Input id="contact_phone" {...contactDetailsForm.register("phone")} placeholder="+1 (555) 123-4567" /></div>
+                  <div><Label htmlFor="contact_phone_href">Phone Link (tel:)</Label><Input id="contact_phone_href" {...contactDetailsForm.register("phone_href")} placeholder="tel:+15551234567" /></div>
+                  <div><Label htmlFor="contact_email">Email Address</Label><Input id="contact_email" type="email" {...contactDetailsForm.register("email")} placeholder="your.email@example.com" />{contactDetailsForm.formState.errors.email && <p className="text-destructive text-sm mt-1">{contactDetailsForm.formState.errors.email.message}</p>}</div>
+                  <div><Label htmlFor="contact_email_href">Email Link (mailto:)</Label><Input id="contact_email_href" {...contactDetailsForm.register("email_href")} placeholder="mailto:your.email@example.com" /></div>
+                </div>
+              </ScrollArea>
+              <Button type="submit" className="w-full sm:w-auto justify-self-start mt-4 ml-2" disabled={isLoadingContactDetails}><Save className="mr-2 h-4 w-4" /> {isLoadingContactDetails ? 'Saving...' : 'Save Contact Info'}</Button>
             </form>
           )}
         </CardContent>
       </Card>
 
-      <Card className="mb-8 shadow-lg">
-        <CardHeader>
-          <CardTitle className="flex items-center justify-between">Manage Social Links <LinkIconToUse className="h-6 w-6 text-primary" /></CardTitle>
-          <CardDescription>Add, edit, or delete social media links. Provide a direct image URL for icons.</CardDescription>
-        </CardHeader>
+      <Card className="shadow-lg">
+        <CardHeader><CardTitle className="flex items-center justify-between">Manage Social Links <LinkIconToUse className="h-6 w-6 text-primary" /></CardTitle><CardDescription>Add, edit, or delete social media links. Provide a direct image URL for icons.</CardDescription></CardHeader>
         <CardContent>
           <div className="mb-6 text-right"><Button onClick={() => handleOpenSocialLinkModal()} className="w-full sm:w-auto"><PlusCircle className="mr-2 h-4 w-4" /> Add Social Link</Button></div>
           {isLoadingSocialLinks ? (<p className="text-center text-muted-foreground">Loading social links...</p>) : socialLinks.length === 0 ? (<p className="text-muted-foreground text-center py-4">No social links found.</p>) : (
-            <div className="space-y-4">
-              {socialLinks.map((link) => (
-                <Card key={link.id} className="p-4 hover:shadow-md transition-shadow">
-                  <div className="flex flex-col sm:flex-row justify-between items-start gap-2">
-                    <div className="flex items-center gap-3 flex-grow min-w-0">
-                      {link.icon_image_url ? (
-                        <div className="relative h-5 w-5 rounded-sm overflow-hidden border bg-muted flex-shrink-0">
-                          <NextImage src={link.icon_image_url} alt={`${link.label} icon`} width={20} height={20} className="object-contain" />
+            <ScrollArea className="max-h-[60vh] p-1 pr-3">
+                <div className="space-y-4 p-2">
+                {socialLinks.map((link) => (
+                    <Card key={link.id} className="p-4 hover:shadow-md transition-shadow">
+                    <div className="flex flex-col sm:flex-row justify-between items-start gap-2">
+                        <div className="flex items-center gap-3 flex-grow min-w-0">
+                        {link.icon_image_url ? (
+                            <div className="relative h-5 w-5 rounded-sm overflow-hidden border bg-muted flex-shrink-0">
+                            <NextImage src={link.icon_image_url} alt={`${link.label} icon`} width={20} height={20} className="object-contain" />
+                            </div>
+                        ) : (
+                            <ImageIcon className="h-5 w-5 text-muted-foreground flex-shrink-0" />
+                        )}
+                        <div className="flex-grow min-w-0">
+                            <h4 className="font-semibold text-sm truncate" title={link.label}>{link.label} <span className="text-xs text-muted-foreground">(Sort: {link.sort_order ?? 0})</span></h4>
+                            <p className="text-xs text-muted-foreground truncate" title={link.url}>{link.display_text || link.url}</p>
                         </div>
-                      ) : (
-                        <ImageIcon className="h-5 w-5 text-muted-foreground flex-shrink-0" />
-                      )}
-                      <div className="flex-grow min-w-0">
-                        <h4 className="font-semibold text-sm truncate" title={link.label}>{link.label} <span className="text-xs text-muted-foreground">(Sort: {link.sort_order ?? 0})</span></h4>
-                        <p className="text-xs text-muted-foreground truncate" title={link.url}>{link.display_text || link.url}</p>
-                      </div>
+                        </div>
+                        <div className="flex space-x-2 self-start sm:self-end shrink-0 mt-2 sm:mt-0">
+                        <Button variant="outline" size="sm" onClick={() => handleOpenSocialLinkModal(link)}><Edit className="mr-1.5 h-3.5 w-3.5" /> Edit</Button>
+                        <Button variant="destructive" size="sm" onClick={() => triggerSocialLinkDeleteConfirmation(link)}><Trash2 className="mr-1.5 h-3.5 w-3.5" /> Delete</Button>
+                        </div>
                     </div>
-                    <div className="flex space-x-2 self-start sm:self-end shrink-0 mt-2 sm:mt-0">
-                      <Button variant="outline" size="sm" onClick={() => handleOpenSocialLinkModal(link)}><Edit className="mr-1.5 h-3.5 w-3.5" /> Edit</Button>
-                      <Button variant="destructive" size="sm" onClick={() => triggerSocialLinkDeleteConfirmation(link)}><Trash2 className="mr-1.5 h-3.5 w-3.5" /> Delete</Button>
-                    </div>
-                  </div>
-                </Card>
-              ))}
-            </div>
+                    </Card>
+                ))}
+                </div>
+            </ScrollArea>
           )}
         </CardContent>
       </Card>
@@ -340,7 +340,7 @@ export default function ContactManager() {
                 {submissionStatuses.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
               </SelectContent>
             </Select>
-             <Button variant="outline" onClick={fetchSubmissions} disabled={isLoadingSubmissions} className="w-full sm:w-auto">
+            <Button variant="outline" onClick={fetchSubmissions} disabled={isLoadingSubmissions} className="w-full sm:w-auto">
               <Filter className="mr-2 h-4 w-4"/> Apply Filter
             </Button>
           </div>
@@ -390,7 +390,6 @@ export default function ContactManager() {
         </CardContent>
       </Card>
 
-      {/* Social Link Modal & Delete Dialog */}
       <Dialog open={isSocialLinkModalOpen} onOpenChange={(isOpen) => { setIsSocialLinkModalOpen(isOpen); if (!isOpen) setCurrentSocialLink(null); }}>
         <DialogContent className="sm:max-w-[525px]"><DialogHeader><DialogTitle>{currentSocialLink ? 'Edit Social Link' : 'Add New Social Link'}</DialogTitle></DialogHeader>
           <form onSubmit={socialLinkForm.handleSubmit(onSocialLinkSubmit)} className="grid gap-4 py-4">
@@ -430,7 +429,6 @@ export default function ContactManager() {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* View Message Modal */}
       {selectedSubmission && (
         <Dialog open={isViewMessageModalOpen} onOpenChange={setIsViewMessageModalOpen}>
           <DialogContent className="sm:max-w-2xl">
@@ -454,7 +452,6 @@ export default function ContactManager() {
         </Dialog>
       )}
 
-      {/* Reply Modal */}
       {submissionToReplyTo && (
         <Dialog open={isReplyModalOpen} onOpenChange={(isOpen) => { if(!isOpen) setSubmissionToReplyTo(null); setIsReplyModalOpen(isOpen); }}>
           <DialogContent className="sm:max-w-lg">
@@ -485,22 +482,19 @@ export default function ContactManager() {
         </Dialog>
       )}
 
-      {/* Delete Submission Confirmation Dialog */}
-      <AlertDialog open={showSubmissionDeleteConfirm} onOpenChange={setShowSubmissionDeleteConfirm}>
+      <AlertDialog open={showSubmissionDeleteConfirmDialog} onOpenChange={setShowSubmissionDeleteConfirmDialog}>
         <AlertDialogContent className="bg-destructive border-destructive text-destructive-foreground">
             <AlertDialogPrimitiveHeader>
-                <AlertDialogPrimitiveTitle className="text-destructive-foreground">Delete Submission from: {submissionToDelete?.name}?</AlertDialogPrimitiveTitle>
+                <AlertDialogPrimitiveTitle className="text-destructive-foreground">Delete Submission from: {submissionToDeleteForDialog?.name}?</AlertDialogPrimitiveTitle>
                 <AlertDialogPrimitiveDescription className="text-destructive-foreground/90">This action cannot be undone and will permanently delete this message.</AlertDialogPrimitiveDescription>
             </AlertDialogPrimitiveHeader>
             <AlertDialogPrimitiveFooter>
-                <AlertDialogCancel onClick={() => { setShowSubmissionDeleteConfirm(false); setSubmissionToDelete(null); }} className={cn(buttonVariants({ variant: "outline" }), "border-destructive-foreground/40 text-destructive-foreground hover:bg-destructive-foreground/10 hover:text-destructive-foreground hover:border-destructive-foreground/60")}>Cancel</AlertDialogCancel>
+                <AlertDialogCancel onClick={() => { setShowSubmissionDeleteConfirmDialog(false); setSubmissionToDeleteForDialog(null); }} className={cn(buttonVariants({ variant: "outline" }), "border-destructive-foreground/40 text-destructive-foreground hover:bg-destructive-foreground/10 hover:text-destructive-foreground hover:border-destructive-foreground/60")}>Cancel</AlertDialogCancel>
                 <AlertDialogAction onClick={handleDeleteSubmission} className={cn(buttonVariants({ variant: "default" }), "bg-destructive-foreground text-destructive hover:bg-destructive-foreground/90")}>Delete Message</AlertDialogAction>
             </AlertDialogPrimitiveFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </>
+    </div>
   );
 }
-    
-
     
