@@ -60,6 +60,14 @@ export interface ProjectView {
     viewer_identifier: string | null;
 }
 
+export interface SkillInteraction {
+  id: string;
+  skill_id: string | null;
+  interaction_type: string | null;
+  interacted_at: string;
+  viewer_identifier: string | null;
+}
+
 
 export interface Database {
   public: {
@@ -122,7 +130,7 @@ export interface Database {
           created_at?: string
         }
       }
-      project_views: { // New table for project views
+      project_views: {
         Row: ProjectView
         Insert: {
           id?: string;
@@ -131,6 +139,17 @@ export interface Database {
           viewer_identifier?: string | null;
         }
         Update: Partial<ProjectView>
+      }
+      skill_interactions: { // New table for skill interactions
+        Row: SkillInteraction
+        Insert: {
+          id?: string;
+          skill_id?: string | null;
+          interaction_type?: string | null;
+          interacted_at?: string;
+          viewer_identifier?: string | null;
+        }
+        Update: Partial<SkillInteraction>
       }
       skill_categories: {
         Row: {
@@ -395,6 +414,7 @@ export interface Database {
           id: string
           skill_name: string
           category_id: string | null
+          // created_at was removed as per previous correction
         }
         Insert: {
           id?: string
@@ -445,7 +465,7 @@ export interface Database {
       }
       social_links: {
         Row: SocialLink;
-        Insert: Omit<SocialLink, 'id' | 'created_at'> & { id?: string; created_at?: string; };
+        Insert: Omit<SocialLink, 'id' | 'created_at'> & { id?: string; created_at?: string; icon_image_url?: string | null };
         Update: Partial<Omit<SocialLink, 'id' | 'created_at'>>;
       }
       contact_submissions: {
@@ -475,26 +495,25 @@ export interface Project {
   id: string;
   title: string;
   description: string | null;
-  imageUrl: string | null; // This is the client-side expected prop name
+  imageUrl: string | null;
   liveDemoUrl?: string | null;
   repoUrl?: string | null;
   tags: string[] | null;
   status: ProjectStatus | null;
   progress?: number | null;
   created_at: string;
-  image_url?: string | null; // From Supabase (snake_case)
-  live_demo_url?: string | null; // From Supabase
-  repo_url?: string | null;    // From Supabase
+  image_url?: string | null;
+  live_demo_url?: string | null;
+  repo_url?: string | null;
 }
 
 export interface Skill {
   id: string;
   name: string;
-  iconImageUrl: string | null; // Changed from iconName
+  iconImageUrl: string | null;
   description: string | null;
-  categoryId?: string | null; // For client-side use, if skill is fetched with category
-  created_at?: string; // Keep if it's in your actual DB table, otherwise remove
-  // Supabase specific fields (if different from client-side)
+  categoryId?: string | null;
+  created_at?: string;
   icon_image_url?: string | null;
   category_id?: string | null;
 }
@@ -502,12 +521,11 @@ export interface Skill {
 export interface SkillCategory {
   id: string;
   name: string;
-  iconImageUrl?: string | null; // Changed from icon_name
+  iconImageUrl?: string | null;
   skills?: Skill[];
   sort_order?: number | null;
   created_at?: string;
-  // Supabase specific fields (if different from client-side)
-  icon_image_url?: string | null; // From Supabase
+  icon_image_url?: string | null;
 }
 
 export type TimelineEventType = 'work' | 'education' | 'certification' | 'milestone';
@@ -517,11 +535,10 @@ export interface TimelineEvent {
   date: string;
   title: string;
   description: string;
-  iconImageUrl: string | null; // Changed from iconName
+  iconImageUrl: string | null;
   type: TimelineEventType;
   sort_order?: number | null;
   created_at?: string;
-  // Supabase specific
   icon_image_url?: string | null;
 }
 
@@ -530,16 +547,15 @@ export interface Certification {
   title: string;
   issuer: string;
   date: string;
-  imageUrl: string | null; // Client-side
-  verifyUrl?: string | null; // Client-side
+  imageUrl: string | null;
+  verifyUrl?: string | null;
   created_at: string;
-  // Supabase specific
   image_url?: string | null;
   verify_url?: string | null;
 }
 
 export interface AboutContent {
-  id: string; // Fixed ID
+  id: string;
   headline_main: string | null;
   headline_code_keyword: string | null;
   headline_connector: string | null;
@@ -547,15 +563,14 @@ export interface AboutContent {
   paragraph1: string | null;
   paragraph2: string | null;
   paragraph3: string | null;
-  imageUrl: string | null; // Client-side
+  imageUrl: string | null;
   image_tagline: string | null;
   updated_at?: string;
-  // Supabase specific
   image_url?: string | null;
 }
 
 export interface ResumeMeta {
-  id: string; // Fixed ID
+  id: string;
   description: string | null;
   resume_pdf_url: string | null;
   updated_at: string;
@@ -567,7 +582,7 @@ export interface ResumeExperience {
   company_name: string;
   date_range: string | null;
   description_points: string[] | null;
-  icon_image_url: string | null; // URL to an image
+  icon_image_url: string | null;
   sort_order?: number | null;
   created_at: string;
 }
@@ -578,7 +593,7 @@ export interface ResumeEducation {
   institution_name: string;
   date_range: string | null;
   description: string | null;
-  icon_image_url: string | null; // URL to an image
+  icon_image_url: string | null;
   sort_order?: number | null;
   created_at: string;
 }
@@ -587,13 +602,13 @@ export interface ResumeKeySkill {
   id: string;
   skill_name: string;
   category_id?: string | null;
-  // No created_at for individual skills in the last provided DB schema
+  // created_at was removed
 }
 
 export interface ResumeKeySkillCategory {
   id: string;
   category_name: string;
-  icon_image_url: string | null; // URL to an image
+  icon_image_url: string | null;
   skills?: ResumeKeySkill[];
   sort_order?: number | null;
   created_at: string;
@@ -603,21 +618,21 @@ export interface ResumeLanguage {
   id: string;
   language_name: string;
   proficiency: string | null;
-  icon_image_url: string | null; // URL to an image
+  icon_image_url: string | null;
   sort_order?: number | null;
   created_at: string;
 }
 
 export interface HeroContent {
-  id: string; // Fixed ID
+  id: string;
   main_name: string | null;
   subtitles: string[] | null;
-  social_media_links: StoredHeroSocialLink[] | null; // Array of objects
+  social_media_links: StoredHeroSocialLink[] | null;
   updated_at: string;
 }
 
 export interface ContactPageDetail {
-  id: string; // Fixed ID
+  id: string;
   address: string | null;
   phone: string | null;
   phone_href: string | null;
@@ -626,10 +641,10 @@ export interface ContactPageDetail {
   updated_at: string;
 }
 
-export interface SocialLink { // For Contact Page Social Links
+export interface SocialLink {
   id: string;
   label: string;
-  icon_image_url: string | null; // URL to an image
+  icon_image_url: string | null;
   url: string;
   display_text: string | null;
   sort_order?: number | null;
@@ -650,11 +665,7 @@ export interface ContactSubmission {
   submitted_at: string;
   notes?: string | null;
 }
-// Define User type based on Supabase Auth User
 export type User = {
   id: string;
   email?: string;
-  // Add other user properties if needed from session.user
 };
-
-    
