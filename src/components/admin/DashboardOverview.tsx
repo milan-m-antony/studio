@@ -8,11 +8,11 @@ import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { Eye, Brain, Download, Mail, Link as LinkIcon, BarChart3, Clock, TrendingUp, AlertCircle, ShoppingBag, Loader2, RefreshCw, Settings2 } from 'lucide-react';
+import { Eye, Brain, Download, Mail, Link as LinkIcon, BarChart3, Clock, TrendingUp, AlertCircle, ShoppingBag, Loader2, RefreshCw, Users, Settings2 } from 'lucide-react'; // Added Users here
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, XAxis, YAxis, Tooltip as RechartsTooltip, Legend as RechartsLegend, Cell } from 'recharts';
 import { supabase } from '@/lib/supabaseClient';
 import { subDays, format, isValid as isValidDate, formatDistanceToNow } from 'date-fns';
-import type { Project, Skill, ContactSubmission, ResumeDownload, ProjectView, SkillInteraction, SiteSettings } from '@/types/supabase';
+import type { SiteSettings, ProjectView, SkillInteraction, ResumeDownload, ContactSubmission } from '@/types/supabase'; // Ensure all types are imported
 
 const ADMIN_SITE_SETTINGS_ID = 'global_settings';
 const AUTO_REFRESH_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
@@ -40,7 +40,6 @@ const placeholderTrafficSourceData = [
     { name: 'Direct', visitors: 150, color: 'hsl(var(--chart-5))' },
 ];
 
-
 const StatCard = ({ title, value, icon: Icon, description, isLoading, valueClassName }: { title: string; value: string | number; icon: React.ElementType; description: string, isLoading?: boolean, valueClassName?: string }) => (
   <Card className="shadow-md hover:shadow-lg transition-shadow">
     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -67,14 +66,12 @@ export default function DashboardOverview() {
   const [isAnalyticsTrackingEnabled, setIsAnalyticsTrackingEnabled] = useState(true);
   const [isLoadingAppSettings, setIsLoadingAppSettings] = useState(true);
 
-
-  // Individual metric states
   const [totalProjectViews, setTotalProjectViews] = useState<number | null>(null);
   const [isLoadingTotalProjectViews, setIsLoadingTotalProjectViews] = useState(true);
 
   const [mostViewedProjectData, setMostViewedProjectData] = useState<MostViewedProjectData>({ title: null, views: null });
   const [isLoadingMostViewedProject, setIsLoadingMostViewedProject] = useState(true);
-
+  
   const [mostInteractedSkillData, setMostInteractedSkillData] = useState<MostInteractedSkillData>({ name: null, interactions: null });
   const [isLoadingMostInteractedSkill, setIsLoadingMostInteractedSkill] = useState(true);
 
@@ -87,12 +84,12 @@ export default function DashboardOverview() {
   const fetchDashboardData = useCallback(async (isManualRefresh = false) => {
     if (isManualRefresh) setIsRefreshing(true);
 
+    setIsLoadingAppSettings(true);
     setIsLoadingTotalProjectViews(true);
     setIsLoadingMostViewedProject(true);
     setIsLoadingMostInteractedSkill(true);
-    setIsLoadingRecentSubmissions(true);
     setIsLoadingResumeDownloads(true);
-    setIsLoadingAppSettings(true);
+    setIsLoadingRecentSubmissions(true);
 
     try {
       // Fetch Site Settings (including tracking toggle)
@@ -110,12 +107,11 @@ export default function DashboardOverview() {
       }
       setIsLoadingAppSettings(false);
 
-
       // Fetch Total Project Views
       const { count: viewsCount, error: viewsError } = await supabase
         .from('project_views')
         .select('*', { count: 'exact', head: true });
-      if (viewsError) console.error("[DashboardOverview] Error fetching total project views:", viewsError);
+      if (viewsError) console.error("[DashboardOverview] Error fetching total project views:", JSON.stringify(viewsError, null, 2));
       setTotalProjectViews(viewsCount ?? 0);
       setIsLoadingTotalProjectViews(false);
 
@@ -123,47 +119,61 @@ export default function DashboardOverview() {
       const { data: allProjectViews, error: allProjectViewsError } = await supabase
         .from('project_views')
         .select('project_id');
+
       if (allProjectViewsError) {
         console.error("Error fetching project views for aggregation:", JSON.stringify(allProjectViewsError, null, 2));
-        setMostViewedProjectData({ title: 'Error Loading', views: 0 });
+        setMostViewedProjectData({ title: 'Error', views: 0 });
       } else if (allProjectViews && allProjectViews.length > 0) {
         const viewCounts: Record<string, number> = {};
         allProjectViews.forEach(view => { if (view.project_id) viewCounts[view.project_id] = (viewCounts[view.project_id] || 0) + 1; });
+        
         let maxViews = 0; let mostViewedId: string | null = null;
         for (const projectId in viewCounts) { if (viewCounts[projectId] > maxViews) { maxViews = viewCounts[projectId]; mostViewedId = projectId; }}
+        
         if (mostViewedId) {
           const { data: projectData, error: projectError } = await supabase.from('projects').select('title').eq('id', mostViewedId).single();
-          if (projectError) setMostViewedProjectData({ title: 'Project Title Error', views: maxViews });
-          else setMostViewedProjectData({ title: projectData?.title || 'Unknown Project', views: maxViews });
+          if (projectError) {
+            console.error("Error fetching project title for most viewed:", JSON.stringify(projectError, null, 2));
+            setMostViewedProjectData({ title: 'Project Title Error', views: maxViews });
+          } else {
+            setMostViewedProjectData({ title: projectData?.title || 'Unknown Project', views: maxViews });
+          }
         } else { setMostViewedProjectData({ title: 'N/A (No Views)', views: 0 }); }
       } else { setMostViewedProjectData({ title: 'N/A (No Views)', views: 0 }); }
       setIsLoadingMostViewedProject(false);
-
+      
       // Fetch Most Interacted Skill
       const { data: allInteractions, error: allInteractionsError } = await supabase
         .from('skill_interactions')
         .select('skill_id');
+
       if (allInteractionsError) {
         console.error("Error fetching skill interactions for aggregation:", JSON.stringify(allInteractionsError, null, 2));
-        setMostInteractedSkillData({ name: 'Error Loading', interactions: 0 });
+        setMostInteractedSkillData({ name: 'Error', interactions: 0 });
       } else if (allInteractions && allInteractions.length > 0) {
         const interactionCounts: Record<string, number> = {};
-        allInteractions.forEach(interaction => { if (interaction.skill_id) interactionCounts[interaction.skill_id] = (interactionCounts[interaction.skill_id] || 0) + 1; });
+        allInteractions.forEach(interaction => { if(interaction.skill_id) interactionCounts[interaction.skill_id] = (interactionCounts[interaction.skill_id] || 0) + 1; });
+        
         let maxInteractions = 0; let mostInteractedSkillId: string | null = null;
         for (const skillId in interactionCounts) { if (interactionCounts[skillId] > maxInteractions) { maxInteractions = interactionCounts[skillId]; mostInteractedSkillId = skillId; }}
+
         if (mostInteractedSkillId) {
           const { data: skillData, error: skillError } = await supabase.from('skills').select('name').eq('id', mostInteractedSkillId).single();
-          if (skillError) setMostInteractedSkillData({ name: 'Skill Name Error', interactions: maxInteractions });
-          else setMostInteractedSkillData({ name: skillData?.name || 'Unknown Skill', interactions: maxInteractions });
-        } else { setMostInteractedSkillData({ name: 'N/A (No Interactions)', interactions: 0 }); }
-      } else { setMostInteractedSkillData({ name: 'N/A (No Interactions)', interactions: 0 }); }
+          if (skillError) {
+            console.error("Error fetching skill name for most interacted:", JSON.stringify(skillError, null, 2));
+            setMostInteractedSkillData({ name: 'Skill Name Error', interactions: maxInteractions });
+          } else {
+             setMostInteractedSkillData({ name: skillData?.name || 'Unknown Skill', interactions: maxInteractions });
+          }
+        } else { setMostInteractedSkillData({ name: 'N/A (No Interactions Yet)', interactions: 0 }); }
+      } else { setMostInteractedSkillData({ name: 'N/A (No Interactions Yet)', interactions: 0 }); }
       setIsLoadingMostInteractedSkill(false);
 
       // Fetch Total Resume Downloads
       const { count: resumeDownloadsCount, error: resumeError } = await supabase
         .from('resume_downloads')
         .select('*', { count: 'exact', head: true });
-      if (resumeError) console.error("[DashboardOverview] Error fetching total resume downloads:", resumeError);
+      if (resumeError) console.error("[DashboardOverview] Error fetching total resume downloads:", JSON.stringify(resumeError, null, 2));
       setTotalResumeDownloads(resumeDownloadsCount ?? 0);
       setIsLoadingResumeDownloads(false);
 
@@ -173,7 +183,7 @@ export default function DashboardOverview() {
         .from('contact_submissions')
         .select('*', { count: 'exact', head: true })
         .gte('submitted_at', sevenDaysAgo);
-      if (submissionsError) console.error("[DashboardOverview] Error fetching recent contact submissions:", submissionsError);
+      if (submissionsError) console.error("[DashboardOverview] Error fetching recent contact submissions:", JSON.stringify(submissionsError, null, 2));
       setRecentSubmissionsCount(submissionsCount ?? 0);
       setIsLoadingRecentSubmissions(false);
 
@@ -182,28 +192,27 @@ export default function DashboardOverview() {
         toast({ title: "Success", description: "Dashboard data updated ✅" });
       }
 
-    } catch (error) {
+    } catch (error: any) {
       console.error("[DashboardOverview] General error fetching dashboard data:", error);
-      toast({ title: "Error", description: "Could not refresh all dashboard data.", variant: "destructive"});
+      toast({ title: "Error", description: `Could not refresh all dashboard data: ${error.message}`, variant: "destructive"});
     } finally {
       if (isManualRefresh) setIsRefreshing(false);
     }
   }, [toast]);
 
   useEffect(() => {
-    fetchDashboardData(); // Initial fetch
+    fetchDashboardData(); 
     
-    // Set up auto-refresh
     if (autoRefreshTimerRef.current) clearInterval(autoRefreshTimerRef.current);
     autoRefreshTimerRef.current = setInterval(() => {
       console.log("[DashboardOverview] Auto-refreshing data...");
-      fetchDashboardData(false); // false indicates not a manual refresh
+      fetchDashboardData(false);
     }, AUTO_REFRESH_INTERVAL_MS);
 
     return () => {
       if (autoRefreshTimerRef.current) clearInterval(autoRefreshTimerRef.current);
     };
-  }, [fetchDashboardData]);
+  }, [fetchDashboardData]); // fetchDashboardData is memoized with useCallback
 
   const handleManualRefresh = () => {
     if (!isRefreshing) {
@@ -213,9 +222,9 @@ export default function DashboardOverview() {
 
   const handleToggleAnalyticsTracking = async (checked: boolean) => {
     setIsLoadingAppSettings(true);
-    const { data: { user } } = await supabase.auth.getUser();
+    const { data: { user } } = await supabase.auth.getUser(); // Ensure user context for logging
     if (!user) {
-        toast({ title: "Auth Error", description: "Please log in to change settings.", variant: "destructive"});
+        toast({ title: "Auth Error", description: "Please log in again to change settings.", variant: "destructive"});
         setIsLoadingAppSettings(false);
         return;
     }
@@ -228,8 +237,7 @@ export default function DashboardOverview() {
     if (updateError) {
       console.error("Error updating analytics tracking setting:", updateError);
       toast({ title: "Error", description: `Failed to update tracking setting: ${updateError.message}`, variant: "destructive" });
-      // Revert UI optimistically if needed, or re-fetch
-      setIsAnalyticsTrackingEnabled(!checked);
+      setIsAnalyticsTrackingEnabled(!checked); // Revert UI
     } else {
       setIsAnalyticsTrackingEnabled(checked);
       toast({ title: "Success", description: `Analytics tracking ${checked ? 'enabled' : 'disabled'}.` });
@@ -237,7 +245,7 @@ export default function DashboardOverview() {
         await supabase.from('admin_activity_log').insert({
             action_type: checked ? 'ANALYTICS_TRACKING_ENABLED' : 'ANALYTICS_TRACKING_DISABLED',
             description: `Admin ${checked ? 'enabled' : 'disabled'} site-wide analytics tracking.`,
-            user_identifier: user.id
+            user_identifier: user.id // Use authenticated user ID
         });
       } catch (logError) {
           console.error("Error logging analytics tracking toggle:", logError);
@@ -264,8 +272,8 @@ export default function DashboardOverview() {
             </div>
             <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 w-full sm:w-auto">
                  <div className="flex items-center space-x-2 p-2 border rounded-md bg-card-foreground/5 dark:bg-card-foreground/10 w-full sm:w-auto justify-between">
-                    <Label htmlFor="analytics-tracking-switch" className="text-sm font-medium">
-                      Analytics Tracking
+                    <Label htmlFor="analytics-tracking-switch" className="text-sm font-medium flex items-center">
+                      <Settings2 className="mr-2 h-4 w-4" /> Analytics Tracking
                     </Label>
                     {isLoadingAppSettings ? <Loader2 className="h-4 w-4 animate-spin" /> :
                         <Switch
@@ -292,14 +300,14 @@ export default function DashboardOverview() {
         <CardContent className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           <StatCard 
             title="Total Project Views" 
-            value={totalProjectViews ?? 0} 
+            value={isLoadingTotalProjectViews ? "..." : (totalProjectViews ?? 0)} 
             icon={Eye} 
-            description="Across all projects (based on card views)" 
+            description="Across all projects (card views)" 
             isLoading={isLoadingTotalProjectViews} 
           />
           <StatCard 
             title="Most Viewed Project" 
-            value={isLoadingMostViewedProject ? "Loading..." : `${mostViewedProjectData.title || 'N/A'} (${mostViewedProjectData.views ?? 0} views)`}
+            value={isLoadingMostViewedProject ? "..." : `${mostViewedProjectData.title || 'N/A'} (${mostViewedProjectData.views ?? 0} views)`}
             icon={TrendingUp} 
             description="Project with highest card views" 
             isLoading={isLoadingMostViewedProject}
@@ -307,9 +315,9 @@ export default function DashboardOverview() {
           />
           <StatCard 
             title="Most Interacted Skill" 
-            value={isLoadingMostInteractedSkill ? "Loading..." : `${mostInteractedSkillData.name || 'N/A'} (${mostInteractedSkillData.interactions ?? 0} interactions)`}
+            value={isLoadingMostInteractedSkill ? "..." : `${mostInteractedSkillData.name || 'N/A'} (${mostInteractedSkillData.interactions ?? 0} interactions)`}
             icon={Brain} 
-            description="Skill with most user interactions (views)" 
+            description="Skill with most card views (requires tracking)" 
             isLoading={isLoadingMostInteractedSkill}
             valueClassName="truncate text-lg sm:text-xl"
           />
@@ -323,14 +331,14 @@ export default function DashboardOverview() {
         <CardContent className="grid gap-4 md:grid-cols-2">
           <StatCard 
             title="Total Resume Downloads" 
-            value={totalResumeDownloads ?? 0} 
+            value={isLoadingResumeDownloads ? "..." : (totalResumeDownloads ?? 0)} 
             icon={Download} 
-            description="Track PDF downloads" 
+            description="Track PDF downloads (requires client-side event logging)" 
             isLoading={isLoadingResumeDownloads}
           />
           <StatCard 
             title="Contact Submissions (7 Days)" 
-            value={recentSubmissionsCount ?? 0} 
+            value={isLoadingRecentSubmissions ? "..." : (recentSubmissionsCount ?? 0)} 
             icon={Mail} 
             description="New messages from contact form" 
             isLoading={isLoadingRecentSubmissions}
@@ -394,8 +402,8 @@ export default function DashboardOverview() {
             <CardTitle className="text-lg flex items-center text-yellow-700 dark:text-yellow-500"><AlertCircle className="mr-2 h-5 w-5"/>Implementation Notes</CardTitle>
         </CardHeader>
         <CardContent className="text-sm text-yellow-600 dark:text-yellow-400/80 space-y-2">
-            <p><strong>Analytics Tracking Toggle:</strong> This toggle enables/disables logging for Project Views, Skill Interactions, and Resume Downloads. You will need to update the public-facing components (`ProjectCard.tsx`, `SkillCard.tsx`, `ResumeSectionClientView.tsx`) to fetch this setting and conditionally log these events.</p>
-            <p><strong>Visitor Analytics & Charts:</strong> These currently use placeholder data. For real data, integrate an analytics service or implement custom event logging for clicks on external links and more detailed page visit information.</p>
+            <p><strong>Analytics Tracking Toggle:</strong> This switch controls whether new view/interaction/download events are logged. Update your public components (`ProjectCard`, `SkillCard`, `ResumeSectionClientView`) to check this setting before logging.</p>
+            <p><strong>Visitor Analytics & Charts:</strong> These sections currently use placeholder data. Integrate a service like Vercel Analytics or Google Analytics, or implement custom event logging for real data.</p>
         </CardContent>
       </Card>
     </div>
