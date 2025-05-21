@@ -4,9 +4,8 @@ import { ArrowRight } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import React from 'react';
-import * as LucideIcons from 'lucide-react'; // For dynamic primary icon fallback
 
-// Default inline SVG placeholder for categories.
+// Default inline SVG placeholder for categories if no iconImageUrl is provided
 const DefaultCategorySvgFallback = (props: React.SVGProps<SVGSVGElement>) => (
   <svg
     xmlns="http://www.w3.org/2000/svg"
@@ -28,30 +27,13 @@ const DefaultCategorySvgFallback = (props: React.SVGProps<SVGSVGElement>) => (
 
 interface CategoryCardProps {
   name: string;
-  iconImageUrl: string | null | undefined; // Expecting URL now
+  iconImageUrl: string | null | undefined;
   skillCount: number;
   onClick: () => void;
 }
 
 export default function CategoryCard({ name, iconImageUrl, skillCount, onClick }: CategoryCardProps) {
-  let IconContent: React.ReactNode;
-
-  if (iconImageUrl) {
-    IconContent = (
-      <div className="relative h-12 w-12 mb-3 rounded-md overflow-hidden">
-        <NextImage
-          src={iconImageUrl}
-          alt={`${name} category icon`}
-          layout="fill"
-          objectFit="contain"
-          className="transition-transform group-hover:scale-110" // Removed dark mode inversion
-          data-ai-hint="category icon"
-        />
-      </div>
-    );
-  } else {
-     IconContent = <DefaultCategorySvgFallback className="h-12 w-12 mx-auto mb-3 transition-transform group-hover:scale-110 text-primary" />;
-  }
+  const hasValidIconUrl = iconImageUrl && typeof iconImageUrl === 'string' && iconImageUrl.trim() !== '';
 
   return (
     <Card
@@ -63,7 +45,19 @@ export default function CategoryCard({ name, iconImageUrl, skillCount, onClick }
       aria-label={`View skills in ${name} category`}
     >
       <CardHeader className="pb-2 flex flex-col items-center justify-center">
-        {IconContent}
+        {hasValidIconUrl ? (
+          <div className="relative h-12 w-12 mb-3 rounded-md overflow-hidden bg-muted">
+            <NextImage
+              src={iconImageUrl!} // Asserting non-null due to hasValidIconUrl check
+              alt={`${name} category icon`}
+              fill
+              className="object-contain transition-transform group-hover:scale-110"
+              data-ai-hint="category icon"
+            />
+          </div>
+        ) : (
+           <DefaultCategorySvgFallback className="h-12 w-12 mx-auto mb-3 transition-transform group-hover:scale-110 text-primary" />
+        )}
         <CardTitle className="text-xl font-semibold text-foreground mt-1">{name}</CardTitle>
       </CardHeader>
       <CardContent>
