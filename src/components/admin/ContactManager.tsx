@@ -7,7 +7,8 @@ import { Button, buttonVariants } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
-import { PlusCircle, Edit, Trash2, Mail, Link as LinkIconToUse, Phone, MapPin, Save, MessageSquare, Star, Eye, Filter, Send, Loader2, ImageIcon } from 'lucide-react';
+import { PlusCircle, Edit, Trash2, Mail, Link as LinkIconToUse, Phone, MapPin, Save, MessageSquare, Star, Eye, Filter, Send, Loader2, ImageIcon, ChevronDown, Tag as TagIcon } from 'lucide-react';
+import NextImage from 'next/image';
 import { supabase } from '@/lib/supabaseClient';
 import type { ContactPageDetail, SocialLink, ContactSubmission, SubmissionStatus } from '@/types/supabase';
 import {
@@ -22,11 +23,11 @@ import { z } from "zod";
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import NextImage from 'next/image';
 import { format, parseISO, isValid } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import * as AccordionPrimitive from "@radix-ui/react-accordion";
 
 
 const PRIMARY_CONTACT_DETAILS_ID = '00000000-0000-0000-0000-000000000005';
@@ -119,16 +120,16 @@ export default function ContactManager() {
 
   const handleSendReply = async () => {
     if (!submissionToReplyTo) {
-      toast({ title: "Error", description: "No submission selected to reply to.", variant: "destructive" });
+      toast({ title: "Error replying", description: "No submission selected.", variant: "destructive" });
+      return;
+    }
+     if (!submissionToReplyTo.id || !submissionToReplyTo.email || !submissionToReplyTo.name) {
+      console.error("[ContactManager] Submission data incomplete for reply:", submissionToReplyTo);
+      toast({ title: "Error", description: "Submission data is incomplete. Cannot send reply.", variant: "destructive" });
       return;
     }
     if (!replyMessage.trim()) {
       toast({ title: "Missing Information", description: "Please enter a reply message.", variant: "destructive" });
-      return;
-    }
-     if (!submissionToReplyTo.id || !submissionToReplyTo.email || !submissionToReplyTo.name) {
-      console.error("[ContactManager] Submission data incomplete for reply (should have been caught by handleOpenReplyModal):", submissionToReplyTo);
-      toast({ title: "Error", description: "Submission data is incomplete. Cannot send reply.", variant: "destructive" });
       return;
     }
 
@@ -139,7 +140,7 @@ export default function ContactManager() {
       recipientEmail: submissionToReplyTo.email,
       recipientName: submissionToReplyTo.name,
     };
-    console.log("[ContactManager] Payload for Edge Function:", payload);
+    console.log("[ContactManager] Payload for Edge Function 'send-contact-reply':", payload);
 
     try {
       const { data: functionData, error: functionError } = await supabase.functions.invoke('send-contact-reply', {
@@ -149,45 +150,58 @@ export default function ContactManager() {
       if (functionError) {
         console.error("[ContactManager] Error invoking Edge Function (raw):", JSON.stringify(functionError, null, 2));
         let specificMessage = "Failed to send reply. Edge Function call failed.";
+        // Attempt to get more specific error message if available
         if (typeof functionError === 'object' && functionError !== null) {
-          if ('message' in functionError && typeof functionError.message === 'string') {
-            try {
-              const parsedMessage = JSON.parse(functionError.message);
-              if (parsedMessage && typeof parsedMessage.error === 'string') {
-                specificMessage = parsedMessage.error;
-              } else if (typeof parsedMessage.message === 'string') {
-                specificMessage = parsedMessage.message;
-              } else {
-                specificMessage = functionError.message;
-              }
-            } catch (e) {
-              specificMessage = functionError.message; 
+            if ('message' in functionError && typeof (functionError as any).message === 'string') {
+                try {
+                    const parsedDetails = JSON.parse((functionError as any).message);
+                    if (parsedDetails && typeof parsedDetails.error === 'string') {
+                        specificMessage = parsedDetails.error;
+                    } else if (parsedDetails && typeof parsedDetails.message === 'string') {
+                        specificMessage = parsedDetails.message;
+                    } else {
+                         specificMessage = (functionError as any).message;
+                    }
+                } catch (e) {
+                    specificMessage = (functionError as any).message; // Fallback if message is not JSON
+                }
+            } else if ('details' in functionError && typeof (functionError as any).details === 'string') {
+                specificMessage = (functionError as any).details;
             }
-          }
         }
         throw new Error(specificMessage); 
       }
       
       if (functionData && functionData.error) { 
-         console.error("[ContactManager] Error from Edge Function logic:", JSON.stringify(functionData.error, null, 2));
+         console.error("[ContactManager] Error response from Edge Function logic:", JSON.stringify(functionData.error, null, 2));
          toast({ title: "Reply Service Error", description: (typeof functionData.error === 'string' ? functionData.error : JSON.stringify(functionData.error)) + " Check Edge Function logs.", variant: "destructive", duration: 9000 });
       } else {
-        toast({ title: "Reply Sent", description: functionData?.message || "Your reply has been processed (using Gmail SMTP configured in Edge Function)." });
+        toast({ 
+            title: "Reply Sent Successfully via Gmail SMTP", 
+            description: `Your styled reply to ${submissionToReplyTo.email} has been processed. The submission status is updated.`, 
+            variant: "default",
+            duration: 7000 
+        });
         setIsReplyModalOpen(false);
         setReplyMessage('');
         fetchSubmissions(); 
       }
     } catch (err: any) {
-      console.error("[ContactManager] Caught error after trying to invoke Edge Function:", err);
+      console.error("[ContactManager] Failed to send reply via Edge Function:", err);
       let errorMessage = "Function Invocation Error";
       if (err && err.message) { 
         errorMessage = err.message;
+      } else if (typeof err === 'object' && err !== null && 'details' in err && typeof err.details === 'string') {
+        errorMessage = err.details;
+      } else if (typeof err === 'object' && err !== null && 'error' in err && typeof err.error === 'string') {
+        errorMessage = err.error;
       }
-      toast({ title: "Reply Failed", description: `${errorMessage} Please check the Edge Function logs in Supabase for details.`, variant: "destructive" });
+      toast({ title: "Reply Failed", description: `${errorMessage}. Please check the Edge Function logs in Supabase.`, variant: "destructive", duration: 9000 });
     } finally {
       setIsSendingReply(false);
     }
   };
+
 
   return (
     <div className="space-y-8">
@@ -330,7 +344,7 @@ export default function ContactManager() {
                         <img src={watchedSocialLinkIconUrlInModal} alt="Icon Preview" className="h-6 w-6 object-contain border rounded-sm bg-muted" />
                     </div>
                 ) : (
-                    <div className="mt-2 text-xs text-muted-foreground">No preview available. Enter a valid image URL.</div>
+                    <div className="mt-2 text-xs text-muted-foreground">No preview available or invalid URL.</div>
                 )}
               </div>
               <div><Label htmlFor="social_url">URL <span className="text-destructive">*</span></Label><Input id="social_url" type="url" {...socialLinkForm.register("url")} placeholder="https://www.example.com" />{socialLinkForm.formState.errors.url && <p className="text-destructive text-sm mt-1">{socialLinkForm.formState.errors.url.message}</p>}</div>
